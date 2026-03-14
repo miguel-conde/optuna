@@ -1,0 +1,84 @@
+project:
+  type: book
+
+jupyter: optuna-book
+
+book:
+  title: "Optimization with Optuna: A Practical and Theoretical Guide to Modern Black-Box Optimization"
+  subtitle: "Advanced Mini-Course"
+  author: "Miguel Angel"
+  date: "3/14/2026" 
+  chapters:
+    - index.qmd
+    - intro.qmd
+    - part: "Part I: Foundations"
+      chapters:
+        - modules/01-foundations-modern-optimization.qmd
+        - modules/02-bayesian-optimization-fundamentals.qmd
+        - modules/03-tpe-algorithm.qmd
+        - modules/04-optuna-architecture.qmd
+    - part: "Part II: Core Usage"
+      chapters:
+        - modules/05-basic-optuna-usage.qmd
+        - modules/06-designing-search-spaces.qmd
+        - modules/07-samplers.qmd
+        - modules/08-pruning.qmd
+    - part: "Part III: Advanced Techniques"
+      chapters:
+        - modules/09-advanced-optimization-techniques.qmd
+        - modules/10-visualization-diagnostics.qmd
+        - modules/11-distributed-scalable-optimization.qmd
+    - part: "Part IV: Applications"
+      chapters:
+        - modules/12-optuna-machine-learning.qmd
+        - modules/13-optuna-general-optimization.qmd
+        - modules/14-production-workflows.qmd
+        - modules/15-final-project.qmd
+    - summary.qmd
+    - references.qmd
+
+bibliography: references.bib
+
+format:
+  html:
+    theme:
+      - cosmo
+      - brand
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-tools: true
+    code-link: true
+    number-sections: true
+    callout-appearance: simple
+    fig-width: 8
+    fig-height: 6
+  pdf:
+    documentclass: scrbook
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    geometry:
+      - margin=1in
+    include-in-header:
+      text: |
+        \usepackage{fvextra}
+        \DefineVerbatimEnvironment{Highlighting}{Verbatim}{
+          breaklines,
+          commandchars=\\\{\}
+        }
+
+execute:
+  freeze: auto
+  cache: true
+
+filters:
+  - quarto
+
+crossref:
+  chapters: true
+  
+editor: visual
+
+
+

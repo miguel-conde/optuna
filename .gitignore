@@ -1,0 +1,8 @@
+.venv/
+
+/.quarto/
+/_book/
+/_freeze/
+.jupyter_cache/
+*.log
+*.tex

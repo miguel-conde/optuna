@@ -1,0 +1,351 @@
+---
+title: "Bayesian Optimization Fundamentals"
+---
+
+This chapter introduces the core logic behind Bayesian optimization: build a probabilistic model of an expensive objective, estimate where information is most valuable, and decide where to evaluate next. That is the conceptual bridge between the search intuition in [Foundations of Modern Optimization](01-foundations-modern-optimization.qmd) and Optuna's default TPE-based workflow.
+
+By the end of the chapter, you should be able to explain the role of surrogate models, why acquisition functions are needed, and why classical Gaussian-process-based Bayesian optimization is both powerful and limited.
+
+This chapter assumes you are already comfortable with the optimization vocabulary from [Foundations of Modern Optimization](01-foundations-modern-optimization.qmd), along with basic probability concepts such as mean, variance, and normal distributions.
+
+## Why This Matters
+
+Suppose each hyperparameter trial for a large model takes two hours. You cannot afford to evaluate hundreds or thousands of random configurations just to discover where the promising region might be. You need a strategy that treats each evaluation as expensive and uses prior results to make better decisions.
+
+That is the problem Bayesian optimization is built to solve.
+
+## A Fast First Win
+
+Before discussing Gaussian processes formally, it helps to see what the optimizer is trying to do. In Bayesian optimization, each candidate point gets a predicted mean, a predicted uncertainty, and an acquisition score that decides whether it is worth evaluating.
+
+The following example computes Expected Improvement for a few candidate points using only the Python standard library.
+
+```{python}
+import math
+
+
+def normal_pdf(z):
+	return math.exp(-0.5 * z * z) / math.sqrt(2 * math.pi)
+
+
+def normal_cdf(z):
+	return 0.5 * (1 + math.erf(z / math.sqrt(2)))
+
+
+def expected_improvement(mu, sigma, f_best):
+	if sigma <= 1e-12:
+		return max(f_best - mu, 0.0)
+	z = (f_best - mu) / sigma
+	return (f_best - mu) * normal_cdf(z) + sigma * normal_pdf(z)
+
+
+f_best = 0.18
+candidates = [
+	{"x": 0.5, "mu": 0.30, "sigma": 0.05},
+	{"x": 1.0, "mu": 0.24, "sigma": 0.12},
+	{"x": 1.5, "mu": 0.28, "sigma": 0.30},
+	{"x": 2.0, "mu": 0.16, "sigma": 0.02},
+]
+
+for candidate in candidates:
+	candidate["ei"] = expected_improvement(
+		candidate["mu"],
+		candidate["sigma"],
+		f_best,
+	)
+
+best_candidate = max(candidates, key=lambda candidate: candidate["ei"])
+
+for candidate in candidates:
+	print(candidate)
+
+print("Next point to evaluate:", best_candidate)
+```
+
+The key observation is that the best next point is not always the one with the lowest predicted mean. A point with slightly worse predicted performance may still be more valuable if its uncertainty is high enough.
+
+## Why Surrogate Models Matter
+
+Bayesian optimization starts from a simple idea: instead of optimizing the true objective function directly, we build an approximate probabilistic model from the observations we already have.
+
+Let the true objective be:
+
+$$
+f(x)
+$$
+
+We build a surrogate model:
+
+$$
+\hat{f}(x)
+$$
+
+using observed data:
+
+$$
+D = \{(x_1, y_1), (x_2, y_2), \ldots, (x_n, y_n)\}
+$$
+
+where:
+
+$$
+y_i = f(x_i)
+$$
+
+The purpose of the surrogate is not just to estimate the function value. It must also estimate uncertainty. In other words, for each candidate point $x$, we want a predictive distribution:
+
+$$
+p(f(x) \mid D)
+$$
+
+That uncertainty estimate is what makes exploration possible.
+
+## Gaussian Processes: The Classical View
+
+The most classical surrogate model in Bayesian optimization is the Gaussian process, usually abbreviated GP.
+
+A Gaussian process defines a distribution over functions rather than a single best-fit curve. Formally:
+
+$$
+f(x) \sim \mathcal{GP}(m(x), k(x, x'))
+$$
+
+where:
+
+- $m(x)$ is the mean function.
+- $k(x, x')$ is the covariance kernel.
+
+The mean function captures the expected value of the objective, and the kernel encodes similarity between inputs. If two inputs are close according to the kernel, the GP expects their outputs to be similar as well.
+
+Common kernels include:
+
+- Radial basis function (RBF).
+- Matern.
+- Rational quadratic.
+
+The intuition is more important than the formulas at this stage: a Gaussian process gives you both a prediction and a measure of confidence in that prediction.
+
+## What Does a GP Predict?
+
+At a candidate point $x$, a GP provides:
+
+- A predictive mean:
+
+$$
+\mu(x)
+$$
+
+- A predictive variance:
+
+$$
+\sigma^2(x)
+$$
+
+So the prediction can be summarized as:
+
+$$
+f(x) \sim \mathcal{N}(\mu(x), \sigma^2(x))
+$$
+
+This is the core output that drives Bayesian optimization. The optimizer now has two pieces of information:
+
+- What value looks plausible at this point.
+- How uncertain that estimate is.
+
+## How the Acquisition Function Chooses the Next Point
+
+The surrogate model tells us what we currently believe about the objective. The acquisition function tells us what to do next.
+
+In general, the next evaluation point is chosen by solving:
+
+$$
+x_{\text{next}} = \arg\max a(x)
+$$
+
+where $a(x)$ is the acquisition function.
+
+Acquisition functions encode the exploration-exploitation tradeoff. They prefer points that either:
+
+- Look promising according to the predicted mean.
+- Remain uncertain enough that evaluating them could reveal something better.
+
+```{mermaid}
+flowchart LR
+	A[Observed trials] --> B[Fit surrogate model]
+	B --> C[Estimate mean and uncertainty]
+	C --> D[Compute acquisition score]
+	D --> E[Choose next point]
+	E --> F[Evaluate objective]
+	F --> A
+```
+
+## Probability of Improvement
+
+Probability of Improvement, or PI, is the simplest acquisition function.
+
+For minimization, let $f^*$ denote the best observed value so far. Then PI measures the probability that a candidate point beats that value:
+
+$$
+PI(x) = P(f(x) < f^*)
+$$
+
+Its interpretation is straightforward: rank points by how likely they are to improve the current best.
+
+The limitation is equally straightforward: PI often over-exploits. A point that is only marginally better but very certain can dominate a riskier point that could lead to a much larger improvement.
+
+## Expected Improvement
+
+Expected Improvement, or EI, fixes the main weakness of PI by asking not only whether improvement is likely, but how large that improvement might be.
+
+For minimization:
+
+$$
+EI(x) = \mathbb{E}[\max(f^* - f(x), 0)]
+$$
+
+This combines:
+
+- Low predicted values.
+- High uncertainty.
+
+That balance is why EI became one of the standard acquisition rules in Bayesian optimization.
+
+The fast example at the start of the chapter is an explicit EI calculation, and it shows the core idea: the next point is chosen for decision value, not just predicted objective value.
+
+## Upper and Lower Confidence Bounds
+
+Another family of acquisition functions uses confidence bounds directly.
+
+For maximization:
+
+$$
+UCB(x) = \mu(x) + \kappa \sigma(x)
+$$
+
+For minimization, the analogous lower confidence bound is:
+
+$$
+LCB(x) = \mu(x) - \kappa \sigma(x)
+$$
+
+where:
+
+- $\mu(x)$ is the predicted mean.
+- $\sigma(x)$ is the predictive standard deviation.
+- $\kappa$ controls how aggressively the optimizer explores.
+
+Large $\kappa$ favors exploration. Small $\kappa$ favors exploitation. This makes confidence-bound strategies attractive when you want a direct knob for controlling search behavior.
+
+## The Bayesian Optimization Loop
+
+Putting the pieces together, the classical Bayesian optimization loop is:
+
+1. Sample a small set of initial points.
+2. Fit a surrogate model such as a Gaussian process.
+3. Compute an acquisition function over the search space.
+4. Select the point that maximizes the acquisition score.
+5. Evaluate the true objective.
+6. Update the model with the new observation.
+7. Repeat.
+
+This loop works because the optimizer spends evaluations where they are expected to be most informative, not merely where the search space happens to be easy to enumerate.
+
+::: {.callout-warning}
+## Common Mistake
+
+Do not confuse optimizing the surrogate mean with performing Bayesian optimization. If you always choose the point with the best predicted mean, you remove the exploration term and the method can get trapped in regions that only look good under the current model.
+:::
+
+## Where Gaussian-Process Bayesian Optimization Struggles
+
+Gaussian-process-based Bayesian optimization is elegant, but it has practical limits.
+
+### Computational Complexity
+
+Training a Gaussian process typically scales as:
+
+$$
+O(n^3)
+$$
+
+where $n$ is the number of observations. That becomes expensive once the number of evaluations grows.
+
+### High-Dimensional Search Spaces
+
+Gaussian processes usually work best in relatively low-dimensional settings. Once the search space contains many interacting hyperparameters, the model quality and acquisition optimization can degrade quickly.
+
+As a rough rule of thumb, performance often becomes harder to maintain once the effective search dimension grows well beyond the small-scale regime.
+
+### Categorical and Conditional Variables
+
+Many machine learning search spaces include categorical or tree-structured choices such as:
+
+```text
+optimizer = ["adam", "sgd", "rmsprop"]
+```
+
+This is awkward for classical GP kernels, which are more naturally defined over continuous spaces.
+
+## Why Optuna Transitions to TPE Instead
+
+Optuna does not use Gaussian processes as its default strategy. Instead, it uses the Tree-structured Parzen Estimator, or TPE.
+
+The conceptual shift is important. Classical Bayesian optimization often models:
+
+$$
+p(y \mid x)
+$$
+
+TPE instead models:
+
+$$
+p(x \mid y)
+$$
+
+It separates the observed trials into good and bad regions, estimates densities for each group, and searches for points that are more likely under the good-trial density than under the bad-trial density.
+
+This leads to an optimization criterion of the form:
+
+$$
+\arg\max \frac{\ell(x)}{g(x)}
+$$
+
+where:
+
+- $\ell(x)$ is the density of good observations.
+- $g(x)$ is the density of bad observations.
+
+This reformulation is one reason TPE is practical for Optuna. It handles categorical variables better, scales more gracefully, and works well in higher-dimensional or conditional search spaces.
+
+We will unpack the full algorithm in [The TPE Algorithm](03-tpe-algorithm.qmd).
+
+## Practical Exercise: Compare Mean and Improvement
+
+Use the earlier Expected Improvement example as a starting point and modify it in three steps:
+
+1. Change `f_best` and observe how the acquisition ranking changes.
+2. Increase the uncertainty of one candidate and check when exploration becomes dominant.
+3. Add a new candidate with a very low mean and very low uncertainty, then compare it against a riskier candidate with higher uncertainty.
+
+Your goal is to build intuition for why acquisition functions do not behave like plain objective minimization.
+
+## Recap
+
+Bayesian optimization combines three components:
+
+- A surrogate model that approximates the unknown objective.
+- An uncertainty estimate that makes exploration possible.
+- An acquisition function that selects the next evaluation point.
+
+Gaussian processes provide the classical picture of this workflow, and they remain useful as a conceptual foundation. But the same chapter also explains why Optuna's default strategy moves away from GP-based optimization in practice.
+
+## Decision Guide
+
+Use the following mental model:
+
+- Use Bayesian optimization when each objective evaluation is expensive enough that learning from earlier trials matters.
+- Use Gaussian-process intuition to understand surrogate modeling and acquisition functions.
+- Expect GP-based methods to struggle once the space becomes highly dimensional, categorical, or heavily conditional.
+- Expect Optuna's TPE-based approach to be a better practical default for many real hyperparameter-search workloads.
+
+Next, [The TPE Algorithm](03-tpe-algorithm.qmd) turns that transition into a concrete optimization method.
