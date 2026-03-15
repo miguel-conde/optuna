@@ -1,333 +1,368 @@
-# Module 5 — Basic Optuna Usage
+# Module 6 — Designing Search Spaces
 
-**Goal:** Learn how to use Optuna to solve real optimization problems.
+**Goal:** Learn how to design **effective parameter search spaces**, which is one of the most critical aspects of successful optimization.
 
-In this module we move from **theory and architecture** to **practical usage**.
-You will learn how to:
+In practice, the **quality of the search space often matters more than the optimization algorithm itself**. Even a powerful optimizer like **TPE** will perform poorly if the search space is badly designed.
 
-* create optimization studies
-* define objective functions
-* define parameter search spaces
-* run optimization
-* inspect results
+This module explains how to structure parameter spaces effectively.
 
 ---
 
-# 1. Installation and Setup
+# 1. Continuous vs Discrete Spaces
 
-Optuna is easy to install via **pip**.
+Parameters can be divided into **continuous** and **discrete** types.
 
-```bash
-pip install optuna
-```
+## Continuous Parameters
 
-Verify the installation:
-
-```python
-import optuna
-print(optuna.__version__)
-```
-
-Optional packages (useful later):
-
-```bash
-pip install optuna-dashboard
-pip install plotly
-```
-
-These enable:
-
-* visualization tools
-* experiment dashboards
-
----
-
-# 2. Creating a Study
-
-The **Study** object manages the entire optimization process.
-
-Basic example:
-
-```python
-import optuna
-
-study = optuna.create_study(direction="minimize")
-```
-
-Key parameter:
-
-| Parameter   | Meaning                      |
-| ----------- | ---------------------------- |
-| `direction` | `"minimize"` or `"maximize"` |
-
-Examples:
-
-Minimize loss:
-
-```python
-study = optuna.create_study(direction="minimize")
-```
-
-Maximize accuracy:
-
-```python
-study = optuna.create_study(direction="maximize")
-```
-
----
-
-# 3. Defining the Objective Function
-
-The **objective function** defines the problem.
-
-It receives a **Trial object** and returns a numeric value.
+These represent real-valued ranges.
 
 Example:
 
-```python
-def objective(trial):
+[
+x \in [-10, 10]
+]
 
-    x = trial.suggest_float("x", -10, 10)
-
-    return (x - 2)**2
-```
-
-Inside the function:
-
-1. parameters are suggested
-2. the model or function is evaluated
-3. a scalar value is returned
-
-Optuna minimizes or maximizes this value.
-
----
-
-# 4. Running the Optimization
-
-Once the study and objective function are defined:
-
-```python
-study.optimize(objective, n_trials=100)
-```
-
-Parameters:
-
-| Parameter   | Meaning               |
-| ----------- | --------------------- |
-| `objective` | function to optimize  |
-| `n_trials`  | number of evaluations |
-
-Each trial corresponds to **one evaluation of the objective function**.
-
-Example optimization flow:
-
-```
-Trial 1 → parameters → objective value
-Trial 2 → parameters → objective value
-Trial 3 → parameters → objective value
-...
-```
-
-The sampler learns from previous trials.
-
----
-
-# 5. Parameter Suggestion API
-
-Parameters are defined inside the objective using **suggestion functions**.
-
-This is the **define-by-run** paradigm.
-
----
-
-## `suggest_float`
-
-Continuous parameter.
+Optuna API:
 
 ```python
 x = trial.suggest_float("x", -10, 10)
 ```
 
-Uniform sampling between bounds.
+Typical examples:
+
+| Parameter      | Example      |
+| -------------- | ------------ |
+| learning rate  | 0.0001 – 0.1 |
+| regularization | 1e-6 – 1     |
+| dropout        | 0 – 0.5      |
+
+Continuous parameters often represent **physical or algorithmic quantities**.
 
 ---
 
-## Log-scaled floats
+## Discrete Parameters
 
-Used for parameters spanning several orders of magnitude.
+Discrete parameters take **integer values**.
 
-Example: learning rates.
+Example:
+
+[
+depth \in {1,2,3,...,10}
+]
+
+Optuna API:
+
+```python
+depth = trial.suggest_int("depth", 1, 10)
+```
+
+Examples:
+
+| Parameter           | Example |
+| ------------------- | ------- |
+| tree depth          | 3–10    |
+| number of layers    | 1–5     |
+| number of neighbors | 3–50    |
+
+---
+
+## Categorical Parameters
+
+Categorical parameters represent **choices**.
+
+Optuna API:
+
+```python
+model = trial.suggest_categorical(
+    "model",
+    ["xgboost", "random_forest", "svm"]
+)
+```
+
+Examples:
+
+| Parameter  | Options        |
+| ---------- | -------------- |
+| optimizer  | adam / sgd     |
+| activation | relu / tanh    |
+| model type | rf / svm / xgb |
+
+---
+
+# 2. Log Distributions
+
+Some parameters span **multiple orders of magnitude**.
+
+Example: learning rate
+
+[
+[10^{-5}, 10^{-1}]
+]
+
+Sampling uniformly would oversample large values.
+
+Instead we sample in **log-space**.
+
+Optuna API:
+
+```python
+lr = trial.suggest_float(
+    "lr",
+    1e-5,
+    1e-1,
+    log=True
+)
+```
+
+This produces values like:
+
+```text
+1e-5
+2e-5
+8e-5
+1e-4
+...
+```
+
+Typical parameters requiring log scaling:
+
+| Parameter      | Range       |
+| -------------- | ----------- |
+| learning rate  | 1e-5 – 1e-1 |
+| regularization | 1e-6 – 10   |
+| kernel width   | 1e-3 – 10   |
+
+---
+
+# 3. Conditional Parameters
+
+Sometimes parameters **only exist when other parameters take certain values**.
+
+Example:
+
+If model = **Random Forest**, then optimize:
+
+* number of trees
+* tree depth
+
+If model = **SVM**, then optimize:
+
+* kernel
+* C parameter
+
+Optuna supports this naturally through **define-by-run**.
+
+Example:
+
+```python
+def objective(trial):
+
+    model = trial.suggest_categorical(
+        "model",
+        ["rf", "svm"]
+    )
+
+    if model == "rf":
+        n_trees = trial.suggest_int("n_trees", 50, 200)
+        depth = trial.suggest_int("depth", 3, 10)
+
+    else:
+        C = trial.suggest_float("C", 1e-3, 10, log=True)
+        kernel = trial.suggest_categorical(
+            "kernel",
+            ["linear", "rbf"]
+        )
+```
+
+This creates **conditional branches in the search space**.
+
+This structure is called **tree-structured search space**, which TPE handles very well.
+
+---
+
+# 4. Dynamic Search Spaces
+
+Optuna allows **search spaces to change dynamically during optimization**.
+
+Example:
+
+Search range may depend on another parameter.
+
+```python
+n_layers = trial.suggest_int("n_layers", 1, 5)
+
+for i in range(n_layers):
+
+    units = trial.suggest_int(
+        f"units_layer_{i}",
+        32,
+        256
+    )
+```
+
+Here:
+
+* the number of parameters depends on `n_layers`
+* each trial may have different dimensionality
+
+This flexibility is extremely useful for:
+
+* neural architecture search
+* algorithm configuration
+* dynamic pipelines
+
+---
+
+# 5. Hierarchical Search Spaces
+
+Hierarchical spaces represent **multi-level configuration structures**.
+
+Example: model selection + hyperparameters.
+
+```python
+model = trial.suggest_categorical(
+    "model",
+    ["xgb", "rf", "svm"]
+)
+```
+
+Then define model-specific parameters.
+
+```python
+if model == "xgb":
+
+    max_depth = trial.suggest_int("max_depth", 3, 10)
+    eta = trial.suggest_float("eta", 1e-3, 0.3, log=True)
+
+elif model == "rf":
+
+    n_estimators = trial.suggest_int("n_estimators", 50, 300)
+
+elif model == "svm":
+
+    C = trial.suggest_float("C", 1e-3, 10, log=True)
+```
+
+Hierarchical spaces are common in:
+
+* AutoML systems
+* pipeline optimization
+* architecture search
+
+---
+
+# 6. Example — Neural Network Architecture Search
+
+Optuna is often used for **neural architecture search**.
+
+Example:
+
+```python
+def objective(trial):
+
+    n_layers = trial.suggest_int("n_layers", 1, 4)
+
+    layers = []
+
+    for i in range(n_layers):
+
+        units = trial.suggest_int(
+            f"units_{i}",
+            32,
+            256
+        )
+
+        dropout = trial.suggest_float(
+            f"dropout_{i}",
+            0.0,
+            0.5
+        )
+
+        layers.append((units, dropout))
+```
+
+Each trial produces a **different network architecture**.
+
+This would be extremely difficult with traditional optimizers.
+
+---
+
+# 7. Example — Algorithm Configuration
+
+Optuna can also optimize **algorithmic parameters**.
+
+Example: tuning a numerical solver.
+
+```python
+solver = trial.suggest_categorical(
+    "solver",
+    ["gradient", "newton"]
+)
+
+if solver == "gradient":
+
+    lr = trial.suggest_float("lr", 1e-4, 1e-1, log=True)
+
+else:
+
+    damping = trial.suggest_float("damping", 1e-3, 1)
+```
+
+This allows optimization of **entire algorithm configurations**.
+
+---
+
+# 8. Best Practices for Search Space Design
+
+### Use Log Scales for Multiplicative Parameters
+
+Bad:
+
+```python
+lr = trial.suggest_float("lr", 0.00001, 0.1)
+```
+
+Better:
 
 ```python
 lr = trial.suggest_float("lr", 1e-5, 1e-1, log=True)
 ```
 
-This samples values like:
-
-```
-1e-5
-3e-5
-1e-4
-5e-4
-...
-```
-
-instead of uniform spacing.
-
 ---
 
-## `suggest_int`
+### Avoid Unreasonably Large Ranges
 
-Integer parameters.
+Bad:
 
 ```python
-depth = trial.suggest_int("depth", 2, 10)
+depth = trial.suggest_int("depth", 1, 1000)
 ```
 
-Example use cases:
-
-* tree depth
-* number of layers
-* number of neighbors
-
----
-
-## `suggest_categorical`
-
-Discrete choices.
+Better:
 
 ```python
-optimizer = trial.suggest_categorical(
-    "optimizer",
-    ["adam", "sgd", "rmsprop"]
-)
+depth = trial.suggest_int("depth", 3, 15)
 ```
 
-Common uses:
-
-* model type
-* optimizer
-* activation functions
+Large ranges slow down convergence.
 
 ---
 
-# 6. Example with Multiple Parameters
+### Use Domain Knowledge
 
-Example objective function with several parameters.
+Good search spaces reflect:
 
-```python
-def objective(trial):
-
-    x = trial.suggest_float("x", -10, 10)
-    y = trial.suggest_float("y", -10, 10)
-
-    return (x - 2)**2 + (y + 3)**2
-```
-
-This searches a **2D parameter space**.
+* theoretical constraints
+* empirical knowledge
+* practical limits
 
 ---
 
-# 7. Retrieving Optimization Results
+# Practical Exercise — Conditional Hyperparameter Optimization
 
-After optimization, Optuna stores all results.
+Let’s implement a small example.
 
----
-
-## Best Value
-
-```python
-study.best_value
-```
-
-The best objective value found.
-
----
-
-## Best Parameters
-
-```python
-study.best_params
-```
-
-Example output:
-
-```
-{'x': 1.98, 'y': -2.97}
-```
-
----
-
-## Best Trial
-
-```python
-study.best_trial
-```
-
-Contains full information:
-
-* parameters
-* objective value
-* trial metadata
-
-Example:
-
-```python
-best = study.best_trial
-
-print(best.params)
-print(best.value)
-```
-
----
-
-# 8. Inspecting All Trials
-
-To analyze optimization behavior:
-
-```python
-for trial in study.trials:
-    print(trial.number, trial.value, trial.params)
-```
-
-Useful for:
-
-* debugging
-* visualization
-* experiment tracking
-
----
-
-# 9. Complete Minimal Example
-
-```python
-import optuna
-
-def objective(trial):
-
-    x = trial.suggest_float("x", -10, 10)
-
-    return (x - 2)**2
-
-study = optuna.create_study(direction="minimize")
-
-study.optimize(objective, n_trials=50)
-
-print("Best value:", study.best_value)
-print("Best parameters:", study.best_params)
-```
-
-This is the **simplest Optuna optimization workflow**.
-
----
-
-# Practical Exercise — Optimize a Mathematical Function
-
-Let's optimize a non-trivial function:
-
-[
-f(x) = (x-3)^2 + \sin(5x)
-]
+We will choose between **two models** and tune their parameters.
 
 ---
 
@@ -339,57 +374,54 @@ import numpy as np
 
 def objective(trial):
 
+    model = trial.suggest_categorical(
+        "model",
+        ["quadratic", "sin"]
+    )
+
     x = trial.suggest_float("x", -5, 5)
 
-    y = (x - 3)**2 + np.sin(5*x)
+    if model == "quadratic":
+
+        y = (x - 2)**2
+
+    else:
+
+        y = np.sin(x) + 1
 
     return y
+
 
 study = optuna.create_study(direction="minimize")
 
 study.optimize(objective, n_trials=100)
 
-print("Best x:", study.best_params)
+print("Best parameters:", study.best_params)
 print("Best value:", study.best_value)
 ```
 
----
+This demonstrates:
 
-### What to Observe
-
-During optimization:
-
-* early trials explore broadly
-* later trials focus near good regions
-* the sampler learns promising areas
-
-This demonstrates **adaptive optimization**.
+* categorical parameter selection
+* conditional objective computation
+* flexible search spaces
 
 ---
 
 # Key Takeaways
 
-Basic Optuna usage consists of five steps:
+Effective search spaces include:
 
-1️⃣ Install Optuna
-2️⃣ Create a study
-3️⃣ Define the objective function
-4️⃣ Use `trial.suggest_*` to define parameters
-5️⃣ Run optimization with `study.optimize()`
+| Feature                | Why it matters                   |
+| ---------------------- | -------------------------------- |
+| Continuous parameters  | capture real-valued optimization |
+| Discrete parameters    | model integer constraints        |
+| Log distributions      | handle large magnitude ranges    |
+| Conditional parameters | support complex models           |
+| Dynamic spaces         | allow flexible architectures     |
+| Hierarchical spaces    | enable AutoML workflows          |
 
-Core APIs:
-
-| Function              | Purpose               |
-| --------------------- | --------------------- |
-| `suggest_float`       | continuous parameters |
-| `suggest_int`         | integer parameters    |
-| `suggest_categorical` | discrete choices      |
-
-Results are accessed via:
-
-* `study.best_value`
-* `study.best_params`
-* `study.best_trial`
+Designing the search space properly can improve optimization **more than changing the optimizer itself**.
 
 ---
 
@@ -397,22 +429,22 @@ Results are accessed via:
 
 Next we move to:
 
-# Module 6 — Designing Search Spaces
+# Module 7 — Samplers (Optimization Engines)
 
-This is one of the **most important skills in optimization**.
+We will study the algorithms that actually **drive the optimization process**.
 
-We will cover:
+Topics include:
 
-* continuous vs discrete spaces
-* log distributions
-* conditional parameters
-* hierarchical search spaces
-* dynamic parameter definitions
+* **TPE sampler**
+* **Random sampler**
+* **CMA-ES**
+* **Grid sampler**
+* **NSGA-II (multi-objective)**
 
-Designing a **good search space** often matters more than the optimizer itself.
+We will also compare **their strengths and weaknesses**.
 
 ---
 
-Before moving on:
+Before continuing, one quick question:
 
-Would you like me to also show **how to visualize the optimization history in Optuna** before the next module?
+Would you like me to also include **guidelines for detecting bad search spaces from optimization results** (a very useful real-world skill) in the next module?
