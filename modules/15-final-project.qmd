@@ -1,3 +1,608 @@
 ---
 title: "Final Project"
 ---
+
+This final chapter turns the book into a capstone portfolio. By the end, you should be able to build complete optimization workflows in three distinct settings: machine-learning pipelines, benchmark black-box functions, and stochastic simulation systems. Together, these projects are meant to prove not only that you can call Optuna effectively, but that you can design a search problem well, evaluate it honestly, and justify your optimization choices.
+
+## Why This Matters
+
+The earlier chapters separated the key ideas: search-space design, samplers, pruning, diagnostics, distributed execution, ML evaluation, general black-box optimization, and production discipline.
+
+The capstone is where those parts must work together. A strong final project does not merely show that Optuna found a decent parameter set. It shows that you can:
+
+- define the objective correctly
+- choose a search space that reflects the problem structure
+- select or justify a sampler
+- evaluate results honestly
+- interpret optimization behavior
+- communicate why the final configuration is credible
+
+That is the difference between learning the API and mastering the workflow.
+
+## How to Use This Chapter
+
+This module contains three project tracks:
+
+- Project A: ML pipeline optimization
+- Project B: complex function optimization and sampler comparison
+- Project C: simulation optimization under uncertainty
+
+You asked for all three, so the chapter is structured as a capstone portfolio rather than a single narrow assignment. Each project emphasizes a different skill:
+
+| Project | Primary lesson |
+|---|---|
+| A | rigorous ML optimization with leakage-safe evaluation |
+| B | sampler behavior on difficult black-box landscapes |
+| C | Optuna as a general-purpose optimizer for noisy simulations |
+
+If you complete all three well, you have covered the most important practical uses of Optuna in one portfolio.
+
+## Fast First Win: A Small Capstone Preview
+
+Before committing to the larger projects, run one small end-to-end study on a benchmark function. This gives you a concrete baseline and a quick reminder of the basic study loop.
+
+```{python}
+import math
+
+import optuna
+
+
+def rastrigin(values):
+	amplitude = 10.0
+	dimension = len(values)
+	return amplitude * dimension + sum(
+		value**2 - amplitude * math.cos(2.0 * math.pi * value)
+		for value in values
+	)
+
+
+def objective(trial):
+	x1 = trial.suggest_float("x1", -5.12, 5.12)
+	x2 = trial.suggest_float("x2", -5.12, 5.12)
+	return rastrigin([x1, x2])
+
+
+study = optuna.create_study(direction="minimize")
+study.optimize(objective, n_trials=80)
+
+print("Best value:", round(study.best_value, 6))
+print("Best params:", study.best_params)
+```
+
+This is not the full capstone yet. It is just a compact reminder that every larger project still reduces to the same fundamental structure: define a black-box objective, search efficiently, and interpret the result critically.
+
+```{mermaid}
+flowchart LR
+	A[Choose capstone project] --> B{Project type}
+	B -->|A| C[ML pipeline optimization]
+	B -->|B| D[Benchmark function study]
+	B -->|C| E[Simulation optimization]
+	C --> F[Evaluate and diagnose]
+	D --> F
+	E --> F
+	F --> G[Write final report]
+```
+
+## Project A: ML Pipeline Optimization
+
+Project A is the closest to a real applied ML workflow. Its purpose is not merely to optimize a classifier, but to show that you can build a leakage-safe, model-comparison-capable search procedure with a hierarchical search space.
+
+### Objective
+
+Build an end-to-end supervised-learning optimization workflow that includes:
+
+- preprocessing choices
+- model-family selection
+- model-specific hyperparameters
+- robust cross-validation
+- result analysis and interpretation
+
+This project should look like something you would actually keep and extend in a production ML setting.
+
+### Problem Setup
+
+Use a structured tabular dataset such as `breast_cancer` from scikit-learn, or an equivalent real dataset if you want a more domain-specific problem.
+
+The pipeline structure is intentionally broad:
+
+```text
+raw features
+   -> optional scaling
+   -> optional dimensionality reduction
+   -> model family
+   -> cross-validation score
+```
+
+That gives Optuna several kinds of choices to manage at once: preprocessing, model selection, and model-specific hyperparameters.
+
+### What the Search Space Should Express
+
+Project A should force you to use a conditional, hierarchical search space. That is one of the most important skills in practical Optuna usage.
+
+Recommended decision structure:
+
+- scaler: `StandardScaler`, `MinMaxScaler`, or no scaler
+- PCA usage: yes or no
+- number of PCA components when PCA is enabled
+- model family: logistic regression, random forest, or SVC
+- model-specific hyperparameters depending on the selected branch
+
+This means the search space is not flat. Different model families expose different parameter subspaces, which is exactly the kind of conditional structure Optuna handles well.
+
+### Full Project Code
+
+```python
+import optuna
+import numpy as np
+
+from sklearn.datasets import load_breast_cancer
+from sklearn.model_selection import StratifiedKFold, cross_val_score
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from sklearn.decomposition import PCA
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC
+
+X, y = load_breast_cancer(return_X_y=True)
+
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+
+
+def objective(trial):
+	steps = []
+
+	scaler_name = trial.suggest_categorical(
+		"scaler", ["none", "standard", "minmax"]
+	)
+
+	if scaler_name == "standard":
+		steps.append(("scaler", StandardScaler()))
+	elif scaler_name == "minmax":
+		steps.append(("scaler", MinMaxScaler()))
+
+	use_pca = trial.suggest_categorical("use_pca", [False, True])
+	if use_pca:
+		n_components = trial.suggest_int("pca_components", 5, min(X.shape[1], 25))
+		steps.append(("pca", PCA(n_components=n_components)))
+
+	model_name = trial.suggest_categorical("model", ["logreg", "rf", "svc"])
+
+	if model_name == "logreg":
+		c = trial.suggest_float("logreg_C", 1e-3, 10.0, log=True)
+		solver = trial.suggest_categorical("logreg_solver", ["lbfgs", "liblinear"])
+		model = LogisticRegression(
+			C=c,
+			solver=solver,
+			max_iter=2000,
+			random_state=42,
+		)
+
+	elif model_name == "rf":
+		n_estimators = trial.suggest_int("rf_n_estimators", 50, 300)
+		max_depth = trial.suggest_int("rf_max_depth", 2, 20)
+		min_samples_split = trial.suggest_int("rf_min_samples_split", 2, 10)
+		model = RandomForestClassifier(
+			n_estimators=n_estimators,
+			max_depth=max_depth,
+			min_samples_split=min_samples_split,
+			random_state=42,
+			n_jobs=-1,
+		)
+
+	else:
+		c = trial.suggest_float("svc_C", 1e-3, 10.0, log=True)
+		kernel = trial.suggest_categorical("svc_kernel", ["linear", "rbf"])
+		if kernel == "rbf":
+			gamma = trial.suggest_float("svc_gamma", 1e-4, 1.0, log=True)
+			model = SVC(C=c, kernel=kernel, gamma=gamma, probability=False)
+		else:
+			model = SVC(C=c, kernel=kernel, probability=False)
+
+	steps.append(("model", model))
+	pipeline = Pipeline(steps)
+
+	scores = cross_val_score(
+		pipeline,
+		X,
+		y,
+		cv=cv,
+		scoring="accuracy",
+		n_jobs=-1,
+	)
+	return scores.mean()
+
+
+study = optuna.create_study(
+	direction="maximize",
+	sampler=optuna.samplers.TPESampler(seed=42),
+)
+
+study.optimize(objective, n_trials=100)
+
+print("Best score:", study.best_value)
+print("Best params:")
+for key, value in study.best_params.items():
+	print(f"  {key}: {value}")
+```
+
+### What Project A Should Teach You
+
+This project is successful if it teaches you how to:
+
+- optimize whole pipelines rather than isolated models
+- structure conditional search spaces cleanly
+- avoid leakage by keeping preprocessing inside `Pipeline`
+- compare multiple model families in one study
+- reason about whether search-space breadth actually improved the workflow
+
+### Recommended Extensions
+
+If you want to strengthen Project A, add one or more of the following:
+
+- nested cross-validation for unbiased workflow assessment
+- persistent study storage with SQLite or PostgreSQL
+- Optuna visualizations for diagnostics
+- a final retraining stage on a full training split
+- parameter-importance and optimization-history analysis
+
+### Deliverables for Project A
+
+At the end of Project A, you should have:
+
+- the best pipeline configuration
+- the best cross-validation score
+- the top trials or a short leaderboard
+- at least one diagnostic plot
+- a short explanation of why the winning pipeline is credible
+
+## Project B: Complex Function Optimization
+
+Project B is the most controlled of the three tracks. Its main purpose is to help you understand optimizer behavior rather than application-specific evaluation protocol.
+
+### Objective
+
+Optimize one or more difficult non-convex benchmark functions and compare multiple samplers under a fair evaluation procedure.
+
+Recommended samplers:
+
+- random search
+- TPE
+- CMA-ES
+
+This project is where you should become more precise about sample efficiency, robustness across seeds, and the relationship between search-space geometry and sampler behavior.
+
+### Benchmark Function Choices
+
+Use at least one of the following:
+
+- Rastrigin
+- Ackley
+- Rosenbrock
+
+If you want stronger analysis, run more than one function and compare how the samplers behave across different landscape types.
+
+### Benchmark Definitions
+
+```python
+import numpy as np
+
+
+def rastrigin(x):
+	x = np.asarray(x)
+	amplitude = 10
+	return amplitude * len(x) + np.sum(x**2 - amplitude * np.cos(2 * np.pi * x))
+
+
+def ackley(x):
+	x = np.asarray(x)
+	n = len(x)
+	term1 = -20 * np.exp(-0.2 * np.sqrt(np.sum(x**2) / n))
+	term2 = -np.exp(np.sum(np.cos(2 * np.pi * x)) / n)
+	return term1 + term2 + 20 + np.e
+
+
+def rosenbrock(x):
+	x = np.asarray(x)
+	return np.sum(100 * (x[1:] - x[:-1] ** 2) ** 2 + (1 - x[:-1]) ** 2)
+```
+
+### Objective Wrapper
+
+```python
+import optuna
+
+FUNCTION_NAME = "rastrigin"  # or "ackley" / "rosenbrock"
+
+
+def evaluate_function(x):
+	if FUNCTION_NAME == "rastrigin":
+		return rastrigin(x)
+	if FUNCTION_NAME == "ackley":
+		return ackley(x)
+	if FUNCTION_NAME == "rosenbrock":
+		return rosenbrock(x)
+	raise ValueError("Unknown function")
+
+
+def objective(trial):
+	x1 = trial.suggest_float("x1", -5.0, 5.0)
+	x2 = trial.suggest_float("x2", -5.0, 5.0)
+	return evaluate_function([x1, x2])
+```
+
+### Comparing Samplers
+
+```python
+def run_study(sampler, n_trials=200):
+	study = optuna.create_study(direction="minimize", sampler=sampler)
+	study.optimize(objective, n_trials=n_trials)
+	return study
+
+
+study_random = run_study(optuna.samplers.RandomSampler(seed=42), n_trials=200)
+study_tpe = run_study(optuna.samplers.TPESampler(seed=42), n_trials=200)
+study_cmaes = run_study(optuna.samplers.CmaEsSampler(seed=42), n_trials=200)
+
+print("Random best:", study_random.best_value, study_random.best_params)
+print("TPE best:", study_tpe.best_value, study_tpe.best_params)
+print("CMA-ES best:", study_cmaes.best_value, study_cmaes.best_params)
+```
+
+### Recommended Evaluation Protocol
+
+Do not stop at one run per sampler. A serious comparison should repeat each sampler across several seeds.
+
+```python
+def repeated_runs(sampler_factory, n_runs=5, n_trials=200):
+	results = []
+	for seed in range(n_runs):
+		sampler = sampler_factory(seed)
+		study = optuna.create_study(direction="minimize", sampler=sampler)
+		study.optimize(objective, n_trials=n_trials)
+		results.append(study.best_value)
+	return results
+
+
+random_results = repeated_runs(
+	lambda seed: optuna.samplers.RandomSampler(seed=seed)
+)
+tpe_results = repeated_runs(
+	lambda seed: optuna.samplers.TPESampler(seed=seed)
+)
+cmaes_results = repeated_runs(
+	lambda seed: optuna.samplers.CmaEsSampler(seed=seed)
+)
+
+print("Random:", random_results)
+print("TPE:", tpe_results)
+print("CMA-ES:", cmaes_results)
+```
+
+### What Project B Should Teach You
+
+This project is successful if it teaches you:
+
+- how samplers differ in exploration and exploitation behavior
+- when TPE is a strong default and when it is not
+- where CMA-ES is competitive, especially on continuous spaces
+- how problem geometry changes optimizer performance
+- why one good run is not enough for a fair comparison
+
+### Deliverables for Project B
+
+At the end of Project B, you should have:
+
+- the best result for each sampler
+- repeated-run statistics across seeds
+- a convergence comparison
+- a short interpretation of sampler behavior
+- a conclusion about which sampler suits which kind of landscape
+
+## Project C: Simulation Optimization
+
+Project C is where Optuna looks least like a hyperparameter tuner and most like a general optimization engine.
+
+### Objective
+
+Tune parameters of a stochastic simulation in order to optimize an expected performance measure.
+
+This is a strong capstone because it introduces several real difficulties at once:
+
+- noisy objectives
+- repeated evaluations for robustness
+- integer decision variables
+- no gradients
+- objective cost driven by simulation runtime
+
+### Example Problem: Inventory Optimization
+
+Use a simple inventory-control simulation. The system has two decision variables:
+
+- reorder point
+- reorder quantity
+
+The simulation returns measures such as total cost and stockouts under stochastic demand. The goal is to minimize expected cost.
+
+### Simulation Model
+
+```python
+import numpy as np
+
+
+def simulate_inventory(reorder_point, reorder_quantity, days=180, seed=None):
+	rng = np.random.default_rng(seed)
+
+	inventory = reorder_quantity
+	total_cost = 0.0
+	stockouts = 0
+	pending_order = 0
+	lead_time_remaining = 0
+
+	holding_cost_per_unit = 0.1
+	order_cost = 20.0
+	stockout_penalty = 15.0
+
+	for _ in range(days):
+		demand = rng.poisson(8)
+
+		if lead_time_remaining > 0:
+			lead_time_remaining -= 1
+			if lead_time_remaining == 0:
+				inventory += pending_order
+				pending_order = 0
+
+		sold = min(inventory, demand)
+		unmet = demand - sold
+		inventory -= sold
+
+		total_cost += inventory * holding_cost_per_unit
+		total_cost += unmet * stockout_penalty
+		stockouts += unmet
+
+		if inventory <= reorder_point and pending_order == 0:
+			pending_order = reorder_quantity
+			lead_time_remaining = 3
+			total_cost += order_cost
+
+	return {
+		"total_cost": total_cost,
+		"stockouts": stockouts,
+	}
+```
+
+### Objective Function
+
+Because the simulation is noisy, the objective should average multiple replications.
+
+```python
+import optuna
+
+
+def objective(trial):
+	reorder_point = trial.suggest_int("reorder_point", 0, 50)
+	reorder_quantity = trial.suggest_int("reorder_quantity", 5, 100)
+
+	costs = []
+	for rep in range(10):
+		result = simulate_inventory(
+			reorder_point=reorder_point,
+			reorder_quantity=reorder_quantity,
+			days=180,
+			seed=rep,
+		)
+		costs.append(result["total_cost"])
+
+	return float(np.mean(costs))
+
+
+study = optuna.create_study(
+	direction="minimize",
+	sampler=optuna.samplers.TPESampler(seed=42),
+)
+
+study.optimize(objective, n_trials=100)
+
+print("Best cost:", study.best_value)
+print("Best params:", study.best_params)
+```
+
+### Why Project C Is Valuable
+
+Project C should convince you that Optuna is not limited to ML. It is a strong fit for decision problems where evaluation requires stochastic simulation and robustness matters more than analytic convenience.
+
+### Possible Extensions
+
+You can deepen Project C by adding:
+
+- multi-objective optimization over cost and stockouts
+- explicit service-level constraints
+- parallel execution of simulation replications
+- pruning for long-horizon simulations with intermediate signals
+- a financial or control-systems variant instead of inventory management
+
+### Deliverables for Project C
+
+At the end of Project C, you should have:
+
+- the best parameter configuration
+- expected simulated performance
+- variability across replications
+- a short discussion of objective noise and robustness
+- optional sensitivity analysis or multi-objective trade-offs
+
+::: callout-warning
+## Common Mistake
+
+Do not treat the final project as a contest to produce the single highest score at any cost. A weak capstone often over-optimizes one metric while ignoring evaluation quality, robustness across seeds, or the interpretability of the search procedure. The goal is not just to win a benchmark, but to justify the workflow.
+:::
+
+## How the Three Projects Fit Together
+
+The three projects are complementary rather than redundant.
+
+| Project | Main skill |
+|---|---|
+| A | structured ML optimization with honest evaluation |
+| B | sampler comparison and optimization theory in practice |
+| C | stochastic black-box optimization beyond ML |
+
+Taken together, they form a practical definition of Optuna mastery: you can use the library on real ML tasks, controlled benchmark landscapes, and noisy simulation systems without changing the underlying optimization mindset.
+
+## Recommended Capstone Order
+
+If you plan to complete all three, the most effective order is:
+
+1. Start with Project B to sharpen your intuition about samplers.
+2. Continue with Project A to practice structured ML evaluation and leakage-safe workflow design.
+3. Finish with Project C to generalize your understanding to noisy, non-ML black-box systems.
+
+That order moves from controlled settings to more realistic, operationally messy ones.
+
+## Final Report Structure
+
+A strong capstone report should include the following for each project:
+
+- problem statement
+- search-space design and justification
+- sampler choice and rationale
+- evaluation protocol
+- best results and diagnostics
+- brief lessons learned
+
+The strongest final synthesis answers questions such as:
+
+1. When is TPE the right default?
+2. When is CMA-ES a better choice?
+3. How should search-space design differ between ML, benchmark, and simulation settings?
+4. How does objective noise change the optimization strategy?
+
+## Completion Checklist
+
+Before considering the capstone complete, verify that you can show all of the following:
+
+- at least one full ML optimization workflow
+- at least one controlled sampler comparison on a benchmark function
+- at least one noisy black-box optimization problem outside ML
+- written justification for the main search-space and sampler decisions
+- some form of diagnostic or interpretive analysis, not only final numbers
+- a clear explanation of what you would improve in the next iteration
+
+## Recap
+
+The final project is successful when it demonstrates synthesis rather than repetition.
+
+- Project A proves that you can optimize a realistic ML pipeline responsibly.
+- Project B proves that you can reason about optimizer behavior rather than only accept defaults.
+- Project C proves that you understand Optuna as a general-purpose black-box optimization engine.
+- The combined portfolio proves that you can carry Optuna from theory to practice across very different problem classes.
+
+## Course Completion Summary
+
+By finishing this capstone portfolio, you will have used Optuna for:
+
+- hierarchical ML pipelines
+- benchmark black-box optimization
+- stochastic simulation tuning
+
+That is a strong and well-rounded mastery path. From here, the natural next step is to build your own compact Optuna reference sheet or internal playbook covering core APIs, search-space rules, sampler selection, pruning patterns, and production checklists.
