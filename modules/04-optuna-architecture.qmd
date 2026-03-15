@@ -1,3 +1,418 @@
 ---
 title: "Optuna Architecture"
 ---
+
+This chapter explains how Optuna is structured internally and how its main components cooperate during optimization. Once you understand the architecture, the library becomes easier to reason about: a study manages trials, a sampler proposes parameters, a pruner decides whether a trial should continue, and storage records the whole process.
+
+By the end of the chapter, you should be able to describe the role of the study, trial, objective function, search space, sampler, pruner, and storage backend, and explain how they interact inside Optuna's optimization loop.
+
+This chapter assumes you already understand the optimization ideas behind [The TPE Algorithm](03-tpe-algorithm.qmd). Here the focus shifts from theory to the actual objects Optuna exposes.
+
+## Why This Matters
+
+Many Optuna users start by copying a short example and calling `study.optimize(...)`. That is enough to get results, but not enough to debug failures, interpret trial states, reason about pruning, or choose the right storage backend once experiments become more serious.
+
+Understanding the architecture matters because Optuna is not just a function minimizer. It is a coordination layer for optimization logic, experiment state, and execution flow.
+
+## A Fast First Win
+
+The quickest way to see the architecture is to run a tiny study and inspect the central objects it produces.
+
+```{python}
+import optuna
+
+
+def objective(trial):
+	x = trial.suggest_float("x", -10, 10)
+	return (x - 2) ** 2
+
+
+study = optuna.create_study(direction="minimize")
+study.optimize(objective, n_trials=8)
+
+print("Best params:", study.best_params)
+print("Best value:", round(study.best_value, 4))
+print("Number of trials:", len(study.trials))
+print("First trial state:", study.trials[0].state)
+```
+
+This small example already exercises the core architecture:
+
+- A `Study` manages the experiment.
+- Each `Trial` evaluates one parameter configuration.
+- The objective function defines the problem.
+- The sampler proposes candidate parameter values.
+- Results are stored and exposed through the study object.
+
+## Architecture at a Glance
+
+An Optuna optimization run consists of several interacting components:
+
+```text
+Study
+ ├── Trials
+ │     ├── Parameters
+ │     ├── Objective value
+ │     └── Intermediate results
+ │
+ ├── Sampler
+ ├── Pruner
+ └── Storage
+```
+
+The `Study` is the central coordination object. Most of Optuna's public API is organized around it.
+
+```{mermaid}
+flowchart LR
+	A[Study] --> B[Sampler proposes parameters]
+	B --> C[Trial object created]
+	C --> D[Objective function runs]
+	D --> E[Intermediate values reported]
+	E --> F[Pruner may stop trial]
+	F --> G[Result stored]
+	G --> A
+```
+
+## The Study Object
+
+A `Study` represents one complete optimization experiment.
+
+It manages:
+
+- All trials in the experiment.
+- The sampler.
+- The pruner.
+- The storage backend.
+- The optimization direction.
+
+Creating a study is usually the first Optuna step:
+
+```{python}
+import optuna
+
+study = optuna.create_study(direction="minimize")
+print(type(study).__name__)
+```
+
+You can think of the study as the experiment manager. It schedules trials, collects results, tracks the best outcome, and exposes the overall state of the optimization.
+
+Important study operations include:
+
+```python
+study.optimize(objective, n_trials=100)
+study.best_params
+study.best_value
+study.best_trial
+study.trials
+```
+
+## The Trial Object
+
+A `Trial` represents one evaluation of the objective function.
+
+Each trial stores:
+
+- Parameter values.
+- The final objective value.
+- Intermediate values reported during training or iteration.
+- Metadata such as state and timestamps.
+
+Conceptually, the flow looks like this:
+
+```text
+Trial 1 -> parameters -> objective -> result
+Trial 2 -> parameters -> objective -> result
+Trial 3 -> parameters -> objective -> result
+```
+
+Trials are created and managed by the study, but the objective function interacts with them directly.
+
+### Trial lifecycle
+
+```text
+CREATED
+  ↓
+RUNNING
+  ↓
+COMPLETE / PRUNED / FAILED
+```
+
+Common states include:
+
+| State | Meaning |
+| --- | --- |
+| `COMPLETE` | Trial finished successfully |
+| `PRUNED` | Trial was stopped early |
+| `FAILED` | Trial ended with an error |
+
+## The Objective Function
+
+The objective function defines the optimization problem. It receives a `Trial` object and returns the scalar value to minimize or maximize.
+
+```{python}
+def objective(trial):
+	x = trial.suggest_float("x", -10, 10)
+	return (x - 2) ** 2
+```
+
+Inside the objective function, you usually do three things:
+
+1. Define parameters through `trial.suggest_*` methods.
+2. Evaluate the model, simulation, or function.
+3. Return the result.
+
+That returned result becomes the stored trial value.
+
+## The Search Space and Define-by-Run
+
+The search space is the set of parameters Optuna is allowed to explore.
+
+Optuna uses a define-by-run API, which means the search space is created dynamically during execution rather than declared in a separate static schema.
+
+For example:
+
+```{python}
+def objective(trial):
+	x = trial.suggest_float("x", -5, 5)
+	depth = trial.suggest_int("depth", 3, 10)
+	optimizer = trial.suggest_categorical("optimizer", ["adam", "sgd"])
+	lr = trial.suggest_float("lr", 1e-5, 1e-1, log=True)
+	return x**2
+```
+
+This approach is powerful because it supports dynamic and conditional spaces naturally.
+
+```{python}
+def objective(trial):
+	model = trial.suggest_categorical("model", ["svm", "rf"])
+
+	if model == "rf":
+		depth = trial.suggest_int("depth", 3, 10)
+
+	return 0.0
+```
+
+That is exactly the kind of tree-structured space where TPE is especially useful, which is why this chapter connects directly back to [The TPE Algorithm](03-tpe-algorithm.qmd).
+
+## Samplers
+
+The sampler decides how Optuna chooses new parameter values.
+
+In other words, the sampler implements the optimization strategy.
+
+Examples include:
+
+| Sampler | Method |
+| --- | --- |
+| `TPESampler` | Bayesian-style density estimation |
+| `RandomSampler` | Random search |
+| `CmaEsSampler` | Evolutionary strategy |
+| `GridSampler` | Exhaustive grid search |
+
+You can pass a sampler explicitly when creating a study:
+
+```{python}
+study = optuna.create_study(
+	direction="minimize",
+	sampler=optuna.samplers.TPESampler(),
+)
+
+print(type(study.sampler).__name__)
+```
+
+If you do not specify one, Optuna uses TPE by default for many standard single-objective optimization tasks.
+
+## Pruners
+
+Pruners implement early stopping. They decide whether a trial is unlikely to become competitive and should be terminated before finishing.
+
+This is especially useful when objective evaluations are expensive and produce intermediate progress signals, such as training loss by epoch.
+
+Typical use cases include:
+
+- Deep learning training.
+- Boosting methods.
+- Iterative simulations.
+
+Here is the basic pattern:
+
+```{python}
+def objective(trial):
+	x = trial.suggest_float("x", -5, 5)
+
+	for step in range(5):
+		value = (x - 2) ** 2 + 1 / (step + 1)
+		trial.report(value, step)
+
+		if trial.should_prune():
+			raise optuna.TrialPruned()
+
+	return value
+```
+
+Popular pruners include:
+
+| Pruner | Strategy |
+| --- | --- |
+| `MedianPruner` | Stops trials worse than the historical median |
+| `SuccessiveHalvingPruner` | Resource-based elimination |
+| `HyperbandPruner` | Multi-bracket early stopping |
+
+We will study pruning in depth later, but architecturally the main point is simple: the pruner depends on intermediate reports from the trial.
+
+## Storage Backends
+
+Optuna supports both in-memory and persistent storage.
+
+Storage matters because it enables:
+
+- Experiment tracking.
+- Fault tolerance.
+- Parallel or distributed optimization.
+
+### In-memory storage
+
+```{python}
+study = optuna.create_study(direction="minimize")
+```
+
+This is convenient for quick experiments, but the results disappear when the process ends.
+
+### SQLite storage
+
+```python
+study = optuna.create_study(
+	direction="minimize",
+	storage="sqlite:///example.db",
+)
+```
+
+This persists the study in a local database file.
+
+### Server databases
+
+For larger or distributed workloads, Optuna can use databases such as PostgreSQL or MySQL.
+
+```python
+storage = "postgresql://user:pass@host/db"
+```
+
+This allows multiple worker processes or machines to coordinate through shared study storage.
+
+## The Internal Optimization Loop
+
+At a high level, Optuna repeatedly runs a loop like this:
+
+```text
+while trials_remaining:
+	sampler -> propose parameters
+	trial -> run objective
+	record result
+	pruner -> check early stopping
+	update sampler
+```
+
+A more detailed view is:
+
+```text
+Study starts
+   ↓
+Sampler suggests parameters
+   ↓
+Trial object created
+   ↓
+Objective function executed
+   ↓
+Intermediate results reported
+   ↓
+Pruner may stop trial
+   ↓
+Result stored
+   ↓
+Sampler updates model
+```
+
+This repeats until a stopping condition is reached, such as a target number of trials, a timeout, or an external stop.
+
+::: {.callout-warning}
+## Common Mistake
+
+Do not think of the sampler, trial, and study as separate convenience features. They are parts of one coordinated system. Confusion usually appears when users try to reason about trial behavior without understanding which decisions belong to the study, which belong to the sampler, and which must happen inside the objective function.
+:::
+
+## A Minimal End-to-End Example
+
+The following example exercises the whole architecture in a compact form:
+
+```{python}
+import optuna
+
+
+def objective(trial):
+	x = trial.suggest_float("x", -5, 5)
+	return (x - 2) ** 2
+
+
+study = optuna.create_study(direction="minimize")
+study.optimize(objective, n_trials=20)
+
+print("Best params:", study.best_params)
+print("Best value:", round(study.best_value, 4))
+```
+
+That code already includes the essential architecture: study creation, trial generation, search-space definition, sampler-driven suggestions, and result collection.
+
+## Practical Exercise: Inspect Trial Objects
+
+After running a small study, inspect the recorded trial objects:
+
+```{python}
+for trial in study.trials[:3]:
+	print("Trial:", trial.number)
+	print("Params:", trial.params)
+	print("Value:", trial.value)
+	print("State:", trial.state)
+	print()
+```
+
+You can also inspect one specific trial in more detail:
+
+```python
+trial = study.trials[0]
+
+trial.params
+trial.value
+trial.distributions
+trial.datetime_start
+trial.datetime_complete
+```
+
+This information is useful for debugging studies, analyzing optimization behavior, and later building dashboards or experiment summaries.
+
+## Recap
+
+Optuna's architecture consists of a small number of key components with distinct responsibilities:
+
+| Component | Role |
+| --- | --- |
+| `Study` | Manages the optimization experiment |
+| `Trial` | Represents one evaluation of the objective |
+| Objective function | Defines the optimization problem |
+| Search space | Defines the tunable parameters |
+| `Sampler` | Proposes parameter values |
+| `Pruner` | Stops weak trials early |
+| Storage | Persists experiment state |
+
+The main architectural idea is not complexity, but coordination. Optuna works because these components form an iterative feedback loop between proposing parameters, running evaluations, deciding whether to stop early, and storing results.
+
+## Decision Guide
+
+Use the following mental model:
+
+- Reach for the `Study` when you want experiment-level control.
+- Reach for the `Trial` when defining parameters or reporting intermediate progress.
+- Reach for samplers when changing optimization strategy.
+- Reach for pruners when trial evaluations are iterative and expensive.
+- Reach for persistent storage when experiments need to survive process boundaries or run in parallel.
+
+Next, [Basic Optuna Usage](05-basic-optuna-usage.qmd) turns this architecture into practical day-to-day Optuna workflows.

@@ -1,433 +1,487 @@
-# Module 3 — The TPE Algorithm (Core of Optuna)
+# Module 4 — Optuna Architecture
 
-**Goal:** Understand the algorithm Optuna actually uses to perform optimization:
-**TPE — Tree-structured Parzen Estimator**.
+**Goal:** Understand how Optuna is structured internally and how its components interact during an optimization process.
 
-Unlike classical Bayesian Optimization based on **Gaussian Processes**, TPE uses **density estimation**. This allows it to scale better to high-dimensional and structured search spaces.
+At its core, Optuna implements a **general optimization engine** that coordinates:
 
----
+* the optimization problem
+* the search strategy
+* experiment tracking
+* pruning strategies
+* storage and parallelization
 
-# 1. Density Estimation Approach
-
-Traditional Bayesian optimization models:
-
-[
-p(y|x)
-]
-
-meaning:
-
-> What is the distribution of the objective value given parameters (x)?
-
-TPE flips the problem.
-
-Instead it models:
-
-[
-p(x|y)
-]
-
-meaning:
-
-> What parameter values tend to produce good objective values?
-
-This reformulation allows the algorithm to use **density estimation** instead of regression.
-
-The core idea:
-
-1. Evaluate some trials
-2. Separate **good results** and **bad results**
-3. Estimate probability densities for each group
-4. Sample new parameters likely to belong to the **good region**
+Understanding this architecture is critical for using Optuna **correctly and efficiently**.
 
 ---
 
-# 2. Splitting Observations into Good vs Bad Regions
-
-Assume we already evaluated (n) points:
-
-[
-(x_1,y_1), (x_2,y_2), ..., (x_n,y_n)
-]
-
-Define a threshold (y^*) such that:
-
-* the **best γ fraction** of trials are considered **good**
-* the rest are considered **bad**
-
-Typically:
-
-[
-\gamma \approx 0.1\text{–}0.25
-]
-
-Then we define two datasets:
-
-Good observations:
-
-[
-y < y^*
-]
-
-Bad observations:
-
-[
-y \ge y^*
-]
-
-From these we estimate two probability densities.
-
----
-
-# 3. Two Density Models
-
-TPE builds two models:
-
-[
-l(x) = p(x | y < y^*)
-]
-
-[
-g(x) = p(x | y \ge y^*)
-]
-
-Interpretation:
-
-| Density | Meaning                                          |
-| ------- | ------------------------------------------------ |
-| (l(x))  | parameters that tend to produce **good results** |
-| (g(x))  | parameters associated with **bad results**       |
-
-The goal becomes:
-
-> Sample parameters that look like **good trials**, but not like **bad trials**.
-
----
-
-# 4. Likelihood Ratio Optimization
-
-The next evaluation point is chosen by maximizing:
-
-[
-\frac{l(x)}{g(x)}
-]
-
-Interpretation:
-
-Good candidate points have:
-
-* high probability under **good density**
-* low probability under **bad density**
-
-This ratio acts similarly to an **acquisition function**.
-
-But instead of using a GP model, it uses **density ratios**.
-
----
-
-# 5. Parzen Density Estimators
-
-How do we estimate (l(x)) and (g(x))?
-
-Using **Kernel Density Estimation (KDE)**.
-
-Given samples:
-
-[
-x_1,x_2,...,x_n
-]
-
-The KDE estimate is:
-
-[
-p(x)=\frac{1}{n}\sum_{i=1}^{n}K(x-x_i)
-]
-
-Where (K) is a kernel function (often Gaussian).
-
-Interpretation:
-
-Each observation contributes a **smooth bump** in the probability distribution.
-
-This produces a continuous density estimate.
-
----
-
-# 6. Exploration vs Exploitation in TPE
-
-TPE balances exploration and exploitation through:
-
-### 1. Density ratio
-
-[
-\frac{l(x)}{g(x)}
-]
-
-High values indicate promising regions.
-
----
-
-### 2. Random sampling
-
-TPE samples multiple candidates and evaluates their ratios.
-
-This keeps exploration alive.
-
----
-
-### 3. Quantile threshold
-
-The parameter γ controls exploration.
-
-Typical value:
-
-[
-\gamma = 0.15
-]
-
-Lower γ:
-
-* stronger exploitation
-
-Higher γ:
-
-* more exploration
-
----
-
-# 7. The TPE Algorithm (Full Procedure)
-
-Simplified algorithm:
-
-```text
-1. Sample N random points
-2. Evaluate objective function
-3. Split trials into good and bad sets
-4. Estimate densities l(x) and g(x)
-5. Sample candidate parameters from l(x)
-6. Compute l(x) / g(x)
-7. Select best candidate
-8. Evaluate objective
-9. Update densities
-10. Repeat
+# 1. Core Architecture Overview
+
+An Optuna optimization consists of several interacting components:
+
+```
+Study
+ ├── Trials
+ │     ├── Parameters
+ │     ├── Objective value
+ │     └── Intermediate results
+ │
+ ├── Sampler (suggest parameters)
+ ├── Pruner (stop bad trials early)
+ └── Storage (persist experiments)
 ```
 
-Important detail:
-
-TPE **samples many candidates**, then chooses the best according to the likelihood ratio.
+The **Study** is the central object managing the optimization process.
 
 ---
 
-# 8. Why TPE Works Well in Practice
+# 2. Study
 
-TPE has several advantages compared to GP-based optimization.
+A **Study** represents a complete optimization experiment.
 
-### Handles High Dimensions
+It manages:
 
-Gaussian Processes struggle when:
-
-[
-d > 20
-]
-
-TPE works well with **dozens of parameters**.
-
----
-
-### Handles Categorical Variables
-
-TPE can easily model:
-
-* discrete variables
-* categorical variables
-* conditional search spaces
+* all trials
+* the sampler
+* the pruner
+* the storage backend
+* the optimization direction
 
 Example:
 
 ```python
-optimizer = trial.suggest_categorical(
-    "optimizer",
-    ["adam","sgd","rmsprop"]
+import optuna
+
+study = optuna.create_study(direction="minimize")
+```
+
+Key responsibilities of a Study:
+
+* schedule trials
+* collect results
+* determine the best trial
+* coordinate samplers and pruners
+
+You can think of a Study as:
+
+> the **experiment manager**.
+
+---
+
+## Important Study Methods
+
+Run optimization:
+
+```python
+study.optimize(objective, n_trials=100)
+```
+
+Access best result:
+
+```python
+study.best_params
+study.best_value
+study.best_trial
+```
+
+List trials:
+
+```python
+study.trials
+```
+
+---
+
+# 3. Trial
+
+A **Trial** represents **one evaluation of the objective function**.
+
+Each trial contains:
+
+* parameter values
+* objective value
+* intermediate results
+* state (completed, pruned, failed)
+
+During optimization:
+
+```
+Trial 1 → parameters → objective → result
+Trial 2 → parameters → objective → result
+Trial 3 → parameters → objective → result
+```
+
+Trials are created and managed automatically by the Study.
+
+---
+
+## Trial Lifecycle
+
+```
+CREATED
+  ↓
+RUNNING
+  ↓
+COMPLETE / PRUNED / FAILED
+```
+
+Possible states:
+
+| State    | Meaning                |
+| -------- | ---------------------- |
+| COMPLETE | finished successfully  |
+| PRUNED   | stopped early          |
+| FAILED   | error during execution |
+
+---
+
+# 4. Objective Function
+
+The **objective function** defines the problem being optimized.
+
+It receives a **Trial object** and returns a value.
+
+Example:
+
+```python
+def objective(trial):
+
+    x = trial.suggest_float("x", -10, 10)
+
+    return (x - 2)**2
+```
+
+Inside the objective function we:
+
+1. define the search space
+2. compute the objective value
+3. return the result
+
+The returned value becomes the **trial value**.
+
+---
+
+# 5. Search Space
+
+The **search space** defines the parameters to be optimized.
+
+Optuna uses a **define-by-run** approach.
+
+Instead of defining the space beforehand, we define it **during execution**.
+
+Example:
+
+```python
+x = trial.suggest_float("x", -5, 5)
+```
+
+Other parameter types:
+
+```python
+trial.suggest_int("depth", 3, 10)
+
+trial.suggest_categorical("optimizer", ["adam", "sgd"])
+
+trial.suggest_float("lr", 1e-5, 1e-1, log=True)
+```
+
+Advantages of define-by-run:
+
+* dynamic search spaces
+* conditional parameters
+* flexible modeling
+
+Example:
+
+```python
+model = trial.suggest_categorical("model", ["svm","rf"])
+
+if model == "rf":
+    depth = trial.suggest_int("depth", 3, 10)
+```
+
+This creates a **tree-structured search space**, which is exactly what **TPE handles well**.
+
+---
+
+# 6. Samplers
+
+The **Sampler** determines **how parameters are chosen**.
+
+Samplers implement the optimization algorithm.
+
+Examples:
+
+| Sampler       | Method                |
+| ------------- | --------------------- |
+| TPESampler    | Bayesian optimization |
+| RandomSampler | random search         |
+| CmaEsSampler  | evolutionary strategy |
+| GridSampler   | exhaustive search     |
+
+Example:
+
+```python
+study = optuna.create_study(
+    sampler=optuna.samplers.TPESampler()
 )
 ```
 
+Default sampler:
+
+**TPE**.
+
+Samplers operate using information from **previous trials**.
+
 ---
 
-### Works with Tree-Structured Search Spaces
+# 7. Pruners
+
+Pruners implement **early stopping**.
+
+They terminate trials that are unlikely to produce good results.
+
+This is crucial when evaluations are expensive.
+
+Example use cases:
+
+* deep learning training
+* boosting models
+* iterative simulations
+
+Pruners rely on **intermediate results**.
+
+Example training loop:
+
+```python
+for epoch in range(100):
+
+    loss = train_model()
+
+    trial.report(loss, epoch)
+
+    if trial.should_prune():
+        raise optuna.TrialPruned()
+```
+
+Popular pruners:
+
+| Pruner                  | Strategy                      |
+| ----------------------- | ----------------------------- |
+| MedianPruner            | stop trials worse than median |
+| SuccessiveHalvingPruner | resource allocation           |
+| HyperbandPruner         | multi-bracket strategy        |
+
+We will study pruning in depth later.
+
+---
+
+# 8. Storage Backends
+
+Optuna supports persistent experiment storage.
+
+This enables:
+
+* experiment tracking
+* parallel optimization
+* fault tolerance
+
+Available storage options:
+
+### In-memory (default)
+
+```python
+study = optuna.create_study()
+```
+
+Not persistent.
+
+---
+
+### SQLite
+
+```python
+study = optuna.create_study(
+    storage="sqlite:///example.db"
+)
+```
+
+Trials are saved to a database.
+
+---
+
+### PostgreSQL / MySQL
+
+Used for **distributed optimization**.
 
 Example:
 
-```
-model = trial.suggest_categorical("model", ["xgboost","svm"])
-
-if model == "xgboost":
-    depth = trial.suggest_int("depth",3,10)
+```python
+storage="postgresql://user:pass@host/db"
 ```
 
-This creates a **tree-structured parameter space**, which is hard for Gaussian processes.
+This allows multiple workers to run trials simultaneously.
 
 ---
 
-### Efficient in Practice
+# 9. Internal Optimization Loop
 
-TPE has complexity roughly:
+Optuna executes the following loop:
 
-[
-O(n)
-]
+```
+while trials_remaining:
 
-per iteration.
+    sampler → propose parameters
 
-Much more scalable than:
+    trial → run objective
 
-[
-O(n^3)
-]
+    record result
 
-for Gaussian processes.
+    pruner → check early stopping
+
+    update sampler
+```
+
+Detailed flow:
+
+```
+Study starts
+   ↓
+Sampler suggests parameters
+   ↓
+Trial object created
+   ↓
+Objective function executed
+   ↓
+Intermediate results reported
+   ↓
+Pruner may stop trial
+   ↓
+Result stored
+   ↓
+Sampler updates model
+```
+
+This loop repeats until:
+
+* `n_trials` reached
+* timeout reached
+* manual stop
 
 ---
 
-# 9. Why Optuna Uses TPE
+# 10. Optuna Execution Lifecycle
 
-Optuna’s design goals:
+Full lifecycle of an experiment:
 
-* high scalability
-* flexible search spaces
-* strong performance in ML hyperparameter tuning
+```
+1 create study
+2 start optimization
+3 run trials
+4 sampler updates strategy
+5 pruner removes weak trials
+6 results stored
+7 best parameters returned
+```
 
-TPE satisfies all three.
-
-This is why **Optuna uses TPE as its default sampler**.
-
-Other samplers exist (we will study them later):
-
-* RandomSampler
-* CMA-ES
-* NSGA-II (multi-objective)
-
----
-
-# Practical Exercise — Implement a Simplified TPE
-
-This simplified version captures the core idea.
-
-### Step 1 — Define the objective
+Minimal working example:
 
 ```python
-import numpy as np
+import optuna
 
-def objective(x):
-    return (x-2)**2 + np.sin(3*x)
+def objective(trial):
+
+    x = trial.suggest_float("x", -5, 5)
+
+    return (x-2)**2
+
+study = optuna.create_study(direction="minimize")
+
+study.optimize(objective, n_trials=50)
+
+print(study.best_params)
 ```
+
+This code executes the **entire architecture**.
 
 ---
 
-### Step 2 — Initial random sampling
+# Practical Exercise — Inspecting Trial Objects
+
+Let’s inspect the data stored inside trials.
+
+Example:
 
 ```python
-X = np.random.uniform(-5,5,20)
-Y = objective(X)
+for t in study.trials:
+    print("Trial:", t.number)
+    print("Params:", t.params)
+    print("Value:", t.value)
+    print("State:", t.state)
+    print()
 ```
 
----
-
-### Step 3 — Split good vs bad trials
+You can also inspect a specific trial:
 
 ```python
-gamma = 0.2
-threshold = np.quantile(Y, gamma)
+trial = study.trials[0]
 
-good = X[Y < threshold]
-bad = X[Y >= threshold]
+trial.params
+trial.value
+trial.distributions
+trial.datetime_start
+trial.datetime_complete
 ```
 
----
+This information is essential for:
 
-### Step 4 — Density estimation
-
-```python
-from scipy.stats import gaussian_kde
-
-l_density = gaussian_kde(good)
-g_density = gaussian_kde(bad)
-```
-
----
-
-### Step 5 — Sample candidates
-
-```python
-candidates = np.random.uniform(-5,5,100)
-ratio = l_density(candidates) / g_density(candidates)
-
-x_next = candidates[np.argmax(ratio)]
-```
-
----
-
-### Step 6 — Evaluate new point
-
-```python
-y_next = objective(x_next)
-```
-
-Append and repeat.
-
-This simplified version reproduces the **core mechanism behind TPE**.
+* debugging experiments
+* analyzing optimization behavior
+* building dashboards
 
 ---
 
 # Key Takeaways
 
-TPE reformulates Bayesian optimization using **density estimation**.
+Optuna’s architecture consists of several core components:
 
-Instead of modeling:
+| Component    | Role                                |
+| ------------ | ----------------------------------- |
+| Study        | manages the optimization experiment |
+| Trial        | single evaluation of the objective  |
+| Objective    | defines the optimization problem    |
+| Search space | defines parameters                  |
+| Sampler      | proposes parameters                 |
+| Pruner       | stops bad trials early              |
+| Storage      | saves experiment data               |
 
-[
-p(y|x)
-]
+The optimization process follows an **iterative feedback loop** between:
 
-it models:
-
-[
-p(x|y)
-]
-
-This allows:
-
-* better scalability
-* handling categorical variables
-* flexible search spaces
-
-The algorithm selects new candidates by maximizing:
-
-[
-\frac{l(x)}{g(x)}
-]
-
-which favors parameters similar to **good trials** but different from **bad ones**.
+* sampler
+* objective evaluation
+* pruner
+* storage
 
 ---
 
-# Before Moving to Module 4
+# Next Module
 
-Next module:
+Next we move to:
 
-# Module 4 — Optuna Architecture
+# Module 5 — Basic Optuna Usage
 
-We will study the internal components:
+We will cover:
 
-* **Study**
-* **Trial**
-* **Objective functions**
-* **Samplers**
-* **Pruners**
-* **Storage backends**
+* creating studies
+* defining search spaces
+* retrieving results
+* first real optimization workflows
 
-This is where theory meets **actual Optuna usage**.
+This is where we start building **real Optuna optimization pipelines**.
 
-Before continuing, quick check:
+---
 
-1️⃣ Is the **density-ratio idea behind TPE** clear?
-2️⃣ Would you like a **visual explanation of how KDE builds the densities (l(x)) and (g(x))** before we move on?
+Before continuing, one quick check:
+
+1️⃣ Is the **architecture and component interaction** clear?
+
+2️⃣ Would you like me to also show **how Optuna internally stores parameter distributions** before moving to the next module?
