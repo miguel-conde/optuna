@@ -1,3 +1,275 @@
 ---
 title: "Visualization and Diagnostics"
 ---
+
+This chapter is about reading an optimization process rather than merely running one. By the end, you should be able to use Optuna's visualization tools to diagnose convergence, identify influential parameters, detect bad search-space design, and decide when a study needs redesign rather than more trials.
+
+## Why This Matters
+
+An optimizer can fail quietly. A study may appear to run correctly while wasting budget on irrelevant parameters, spending trials in the wrong scale, or bouncing around a noisy objective with little real progress.
+
+That is why diagnostics matter. Once you can inspect optimization history, parameter importance, and interactions, you stop treating hyperparameter tuning as a black box and start treating it as an iterative engineering process.
+
+## Fast First Win: Build a Study Worth Diagnosing
+
+To make the diagnostic tools meaningful, start with a study that is deliberately imperfect: a noisy objective with a search range that is wider than necessary.
+
+```{python}
+import random
+
+import optuna
+
+
+def objective(trial):
+	x = trial.suggest_float("x", -100.0, 100.0)
+	y = trial.suggest_float("y", -100.0, 100.0)
+
+	signal = (x - 3.0) ** 2 + (y + 2.0) ** 2
+	noise = random.gauss(0.0, 1.0)
+	return signal + noise
+
+
+sampler = optuna.samplers.TPESampler(seed=42)
+study = optuna.create_study(direction="minimize", sampler=sampler)
+study.optimize(objective, n_trials=120)
+
+best_so_far = []
+incumbent = float("inf")
+for trial in study.trials:
+	if trial.value is not None:
+		incumbent = min(incumbent, trial.value)
+		best_so_far.append(round(incumbent, 3))
+
+print("Best value:", round(study.best_value, 3))
+print("Best params:", study.best_params)
+print("First 10 incumbent values:", best_so_far[:10])
+print("Last 10 incumbent values:", best_so_far[-10:])
+```
+
+This example gives you something realistic to inspect: convergence under noise, a search space that is broader than needed, and two parameters that should both matter.
+
+## Which Tools Does Optuna Provide?
+
+Optuna exposes its plotting tools through `optuna.visualization`, which generates interactive Plotly figures.
+
+``` python
+import optuna.visualization as vis
+
+vis.plot_optimization_history(study)
+vis.plot_param_importances(study)
+vis.plot_slice(study)
+vis.plot_parallel_coordinate(study)
+vis.plot_contour(study)
+```
+
+If Plotly is not already installed in your environment, add it explicitly:
+
+``` bash
+pip install plotly
+```
+
+For advanced studies, these plots are not presentation artifacts. They are debugging tools for your search strategy.
+
+## How Should You Read Optimization History?
+
+The optimization history plot shows objective value as a function of trial number.
+
+``` python
+optuna.visualization.plot_optimization_history(study)
+```
+
+Two different curves matter conceptually:
+
+-   Trial values: the raw objective values observed at each evaluation.
+-   Best-so-far values: the incumbent trajectory, which shows whether the optimizer is still making meaningful progress.
+
+```{mermaid}
+flowchart LR
+	A[Run study] --> B[Plot optimization history]
+	B --> C{Improvement still happening?}
+	C -->|Yes| D[Keep budget or refine sampler]
+	C -->|No| E[Inspect space and diagnostics]
+	E --> F[Reduce range or redesign parameters]
+	D --> G[Continue optimization]
+	F --> G
+```
+
+Typical interpretations:
+
+-   Healthy convergence: the best-so-far curve keeps improving, even if raw trial values remain noisy.
+-   Stagnation: many trials pass without a better incumbent, suggesting a poor search space, insufficient exploration, or an almost-exhausted budget.
+-   High noise: raw values swing widely, but the incumbent barely changes, indicating evaluation instability or stochastic objectives.
+
+Convergence plots are especially useful when read alongside [Pruning](08-pruning.qmd), because apparent stagnation may mean the search space is bad, not merely that pruning is aggressive.
+
+## What Does Parameter Importance Actually Mean?
+
+Parameter importance estimates how much each parameter contributes to variation in the objective.
+
+``` python
+optuna.visualization.plot_param_importances(study)
+```
+
+Optuna commonly uses fANOVA-style reasoning. At a high level, if total objective variation is $\mathrm{Var}(f(x))$, the importance of parameter $x_i$ is approximated by the fraction of variance explained by changes in that parameter:
+
+$$
+\mathrm{Importance}(x_i) = \frac{\mathrm{Var}_{x_i}\left(\mathbb{E}[f(x) \mid x_i]\right)}{\mathrm{Var}(f(x))}
+$$
+
+Interpretation is practical rather than philosophical:
+
+-   High importance suggests the parameter meaningfully changes outcomes in the explored region.
+-   Low importance suggests the parameter is either genuinely weak or not yet explored in the right regime.
+
+This distinction matters. Low importance does not automatically mean the parameter is useless. It may only mean that the current search space or trial budget has not revealed its effect yet.
+
+## How Do Slice Plots Expose Useful Structure?
+
+Slice plots visualize one parameter against the objective.
+
+``` python
+optuna.visualization.plot_slice(study)
+```
+
+Use them to answer questions such as:
+
+-   Is there a narrow region where the objective improves sharply?
+-   Is the relationship monotonic, U-shaped, or mostly flat?
+-   Are strong results concentrated near one boundary of the search range?
+
+This is one of the quickest ways to catch poorly designed spaces from [Designing Search Spaces](06-designing-search-spaces.qmd). If all strong trials cluster near one edge, your range is probably too wide or mis-scaled.
+
+## When Do Parallel Coordinates Help More Than Slices?
+
+Slice plots show one parameter at a time. Parallel coordinate plots help when performance depends on combinations of parameters.
+
+``` python
+optuna.visualization.plot_parallel_coordinate(study)
+```
+
+Each line represents a single trial crossing multiple parameter axes and the objective value. This is useful for discovering patterns such as:
+
+-   strong trials combining high learning rates with low regularization
+-   a parameter becoming useful only when another parameter is within a narrow interval
+-   certain regions consistently producing weak results regardless of other choices
+
+For advanced practitioners, this is the bridge between raw visualization and search-space redesign: you use the observed structure to introduce conditional or hierarchical spaces rather than continuing with a flat parameter definition.
+
+## What Do Contour Plots Add?
+
+Contour plots focus on pairwise interactions between parameters.
+
+``` python
+optuna.visualization.plot_contour(study)
+```
+
+They are especially informative when good performance is not attached to one parameter alone, but to a combination. A contour plot can reveal a valley, ridge, or island of strong performance that slice plots would hide.
+
+Common diagnostic outcomes:
+
+-   one parameter matters only when another is small
+-   two parameters compensate for one another
+-   a supposedly important parameter is important only because it interacts with another one
+
+That is often the point where a search problem stops being “pick the right values” and becomes “represent the structure correctly.”
+
+## How Do Visuals Reveal a Bad Search Space?
+
+Most failed studies are not failures of the sampler alone. They are failures of problem formulation.
+
+Typical warning signs include:
+
+| Symptom | Likely issue | Typical fix |
+|------------------------|------------------------|------------------------|
+| Best trials sit on parameter boundaries | Range too wide or too narrow | Re-center or rescale the space |
+| Slice plots are flat | Parameter is weak or irrelevant | Remove it or reduce its emphasis |
+| Good trials cluster logarithmically | Linear scale is inappropriate | Use log sampling |
+| Convergence stalls early | Space is too broad or too noisy | Narrow the space or stabilize the objective |
+
+This is why visualization is not an afterthought. It is how you decide whether the next 200 trials will be useful or wasteful.
+
+## How Do You Diagnose Parameter Interactions?
+
+Interactions occur when the effect of one parameter depends on the value of another.
+
+For example, a high learning rate may work only with a large batch size, while the same learning rate fails at smaller batches. If you ignore that interaction, you may incorrectly conclude that the learning rate itself is unstable.
+
+The best tools for this are:
+
+-   contour plots for pairwise structure
+-   parallel coordinate plots for higher-dimensional patterns
+-   parameter importance plots to see whether interaction-heavy parameters are globally influential
+
+These signals often justify a redesign into conditional search spaces or alternative samplers, which connects directly back to [Advanced Optimization Techniques](09-advanced-optimization-techniques.qmd) and [Samplers](07-samplers.qmd).
+
+## When Is the Dashboard Worth Using?
+
+Static analysis is useful, but long-running or collaborative studies benefit from a live interface.
+
+``` bash
+optuna-dashboard sqlite:///example.db
+```
+
+The dashboard is especially useful when you want:
+
+-   live trial monitoring
+-   filtering and comparing subsets of runs
+-   interactive Pareto-front inspection for multi-objective studies
+-   lightweight review of a shared experiment store
+
+If you are moving from one-off studies to an experiment workflow, the dashboard is often the fastest route to operational visibility.
+
+::: callout-warning
+## Common Mistake
+
+Do not interpret diagnostic plots as ground truth when you have too few trials or a highly noisy objective. A parameter-importance ranking built from weak coverage can look precise while still being misleading.
+:::
+
+## Practical Exercise: Diagnose a Weak Study and Repair It
+
+Use the study from the opening example as your baseline. Then generate the core diagnostics.
+
+``` python
+import optuna.visualization as vis
+
+vis.plot_optimization_history(study)
+vis.plot_param_importances(study)
+vis.plot_slice(study)
+vis.plot_parallel_coordinate(study)
+vis.plot_contour(study)
+```
+
+Work through the exercise in four passes:
+
+1.  Inspect the optimization history and decide whether the study is still improving or mostly plateaued.
+2.  Use slice and importance plots to determine whether both `x` and `y` deserve the current range of `[-100, 100]`.
+3.  Redefine the objective with a narrower range such as `[-10, 10]` and rerun the study with the same trial budget.
+4.  Compare the two studies and explain whether the redesign improved convergence, interpretability, or both.
+
+Questions to answer after the run:
+
+-   Did the incumbent improve earlier after narrowing the range?
+-   Did parameter importance become easier to interpret?
+-   Did the plots suggest a log scale, a narrower linear scale, or a conditional redesign?
+-   If the objective remained noisy, would you spend more trials or reduce evaluation noise first?
+
+## Recap
+
+Diagnostics turn Optuna from a trial generator into an optimization workflow you can reason about.
+
+-   Optimization history tells you whether progress is real, stalled, or hidden by noise.
+-   Parameter-importance analysis helps prioritize which parameters deserve budget and attention.
+-   Slice, contour, and parallel coordinate plots reveal boundaries, scaling mistakes, and interactions.
+-   The dashboard is useful once studies become large, persistent, or collaborative.
+
+## Decision Guide
+
+Use diagnostic tools as a redesign loop, not just as a report at the end.
+
+-   Start with optimization history when you want to know whether the budget is still producing value.
+-   Use slice plots when you suspect a parameter range or scale is poorly chosen.
+-   Use contour and parallel coordinate plots when performance depends on interactions.
+-   Use parameter importance to simplify the space, but only after checking that the study has enough coverage.
+-   Use the dashboard when repeated or long-running studies need live visibility.
+
+The next chapter extends this diagnostic mindset into infrastructure. In [Distributed and Scalable Optimization](11-distributed-scalable-optimization.qmd), we will look at storage backends, parallel execution, and the operational concerns that appear once optimization leaves the single-process notebook setting.
