@@ -1,3 +1,290 @@
 ---
 title: "Optuna for General Optimization"
 ---
+
+This chapter moves Optuna outside the usual machine-learning framing and treats it as a general black-box optimizer. By the end, you should be able to recognize which non-ML problems fit the Optuna workflow, design objective functions for simulations and algorithmic systems, and use benchmark functions to reason about optimizer behavior on difficult landscapes.
+
+## Why This Matters
+
+It is easy to think of Optuna as a hyperparameter tuning library because that is where many users first encounter it. But the underlying abstraction is much broader: if you can write a Python function that evaluates a candidate configuration and returns a score, you can often optimize it with Optuna.
+
+That makes Optuna relevant far beyond model tuning. Engineering calibration, scientific simulation, control design, numerical algorithms, reinforcement learning, and benchmark optimization all share the same structural problem: expensive black-box search over a space with limited analytic structure.
+
+## Fast First Win: Optimize a Non-Convex Function
+
+The fastest way to see this generality is to leave datasets behind and optimize a purely mathematical objective.
+
+Consider:
+
+$$
+f(x) = (x - 3)^2 + \sin(5x)
+$$
+
+This is not a trivial convex bowl. The sinusoidal term creates oscillations and several local basins, which is exactly the kind of landscape where naive search can waste evaluations.
+
+```{python}
+import math
+
+import optuna
+
+
+def objective(trial):
+	x = trial.suggest_float("x", -5.0, 5.0)
+	return (x - 3.0) ** 2 + math.sin(5.0 * x)
+
+
+study = optuna.create_study(direction="minimize")
+study.optimize(objective, n_trials=120)
+
+print("Best value:", round(study.best_value, 5))
+print("Best params:", study.best_params)
+```
+
+Nothing about this workflow is machine-learning specific. The objective is just a callable black box, and Optuna treats it the same way it would treat a validation loss.
+
+## What Makes a Problem a Good Fit for Optuna?
+
+The common pattern is not “has hyperparameters.” The common pattern is:
+
+- you can evaluate a candidate configuration programmatically
+- evaluations are expensive enough that sample efficiency matters
+- gradients are unavailable, unreliable, or irrelevant
+- the search space may mix continuous, discrete, and categorical choices
+
+In other words, Optuna is useful whenever you have to search intelligently rather than differentiate analytically.
+
+```{mermaid}
+flowchart LR
+	A[Choose candidate parameters] --> B[Run black-box system]
+	B --> C[Observe objective value]
+	C --> D[Record result in study]
+	D --> E[Sampler proposes next candidate]
+	E --> A
+```
+
+This pattern appears in surprisingly different domains, which is why general optimization is such an important part of understanding Optuna well.
+
+## How Does Mathematical Optimization Differ From ML Tuning?
+
+Mathematical benchmark functions strip away dataset complexity and let you inspect the optimizer itself.
+
+For example, if the objective is deterministic and cheap, then poor performance is more likely to come from the search strategy or search-space design than from noisy evaluation. That makes benchmark functions useful for intuition, debugging, and comparing samplers before moving into more realistic workloads.
+
+At the same time, benchmark functions can be misleading if you treat them as the whole story. Real objectives often include stochastic noise, failed runs, discontinuities, or simulation costs that simple benchmark surfaces do not capture.
+
+## How Should You Think About Simulation Calibration?
+
+Many scientific and engineering workflows use a simulator to generate outputs that should match observed data or desired physical behavior.
+
+The general pattern looks like this:
+
+$$
+\min_{x \in \mathcal{X}} \; \lVert \mathrm{simulation}(x) - \mathrm{data} \rVert
+$$
+
+where $x$ is the parameter vector you want to calibrate.
+
+Typical examples include:
+
+- epidemiological models fitted to observed case counts
+- climate or energy simulations calibrated to measurements
+- financial Monte Carlo models tuned to market statistics
+- robotics simulators matched to real system behavior
+
+```python
+def objective(trial):
+	alpha = trial.suggest_float("alpha", 0.0, 2.0)
+	beta = trial.suggest_float("beta", 0.0, 2.0)
+
+	prediction = simulate(alpha, beta)
+	error = mean_squared_error(prediction, observed)
+	return error
+```
+
+The important point is not the specific domain. It is that Optuna only needs the final scalar objective. The simulator can be arbitrarily complex internally.
+
+## Why Are Physics and Engineering Objectives Good Examples?
+
+Physics and engineering problems often contain exactly the features that make black-box optimization hard:
+
+- expensive evaluations
+- non-differentiable or piecewise behavior
+- noisy measurements
+- constraints tied to safety or feasibility
+
+That makes them a strong match for the ideas from [Advanced Optimization Techniques](09-advanced-optimization-techniques.qmd). Constraints, multi-objective trade-offs, and conditional spaces often appear naturally here.
+
+```python
+def objective(trial):
+	friction = trial.suggest_float("friction", 0.0, 1.0)
+	mass = trial.suggest_float("mass", 0.5, 10.0)
+
+	result = run_physics_simulation(friction, mass)
+	return result["energy_loss"]
+```
+
+If you can run the simulation and measure what matters, you can usually wrap it in an Optuna objective.
+
+## What About Algorithm Configuration?
+
+Algorithms themselves are often optimization targets. A search heuristic, numerical solver, planner, or controller may expose parameters whose best setting depends heavily on the workload.
+
+Examples include:
+
+| System | Tunable parameters |
+|---|---|
+| Genetic algorithm | mutation rate, crossover rate, population size |
+| Monte Carlo tree search | exploration constant, rollout budget |
+| Numerical solver | tolerance, step size, iteration cap |
+| Heuristic planner | beam width, search depth, penalty weights |
+
+```python
+def objective(trial):
+	step_size = trial.suggest_float("step_size", 1e-4, 1e-1, log=True)
+	tolerance = trial.suggest_float("tol", 1e-6, 1e-2, log=True)
+	return run_solver(step_size, tolerance)
+```
+
+This is often where Optuna becomes especially useful in research code, because algorithm configuration tends to combine expensive evaluation with poorly understood parameter interactions.
+
+## Why Is Reinforcement Learning a Special Case?
+
+Reinforcement learning is a natural use case for Optuna, but it is also one of the messiest.
+
+RL objectives are typically:
+
+- noisy across runs
+- expensive to evaluate
+- sensitive to seeds and environment details
+- sometimes non-stationary during training
+
+That makes Optuna useful, but it also makes the objective design more fragile.
+
+```python
+def objective(trial):
+	lr = trial.suggest_float("lr", 1e-5, 1e-3, log=True)
+	gamma = trial.suggest_float("gamma", 0.9, 0.999)
+
+	reward = train_rl_agent(lr, gamma)
+	return -reward
+```
+
+The optimization logic is still straightforward, but the engineering judgment is harder: how many episodes make a fair evaluation, how much variance is acceptable, and whether pruning will save time without biasing results too aggressively.
+
+## How Do You Handle Expensive or Noisy Objectives?
+
+General optimization problems are often slow enough that each objective evaluation matters.
+
+Practical strategies include:
+
+- using pruning when intermediate metrics are meaningful
+- parallelizing trials when evaluations are independent
+- narrowing the search space with domain knowledge
+- relying on adaptive samplers such as TPE to reduce wasted evaluations
+
+This is where earlier modules connect directly. [Samplers](07-samplers.qmd), [Pruning](08-pruning.qmd), and [Distributed and Scalable Optimization](11-distributed-scalable-optimization.qmd) are not ML-only topics; they are core tools for general optimization too.
+
+## Why Do Benchmark Functions Still Matter?
+
+Benchmark functions are not toys in the trivial sense. They are controlled stress tests for optimization algorithms.
+
+Three classic examples are:
+
+| Function | Typical difficulty |
+|---|---|
+| Rastrigin | many local minima and strong periodic structure |
+| Ackley | broad flat region with a narrow central basin |
+| Rosenbrock | curved valley with deceptively hard geometry |
+
+These functions are useful because they make different optimizer weaknesses visible.
+
+- A method may explore well but refine poorly.
+- Another may perform well in smooth valleys but struggle with multimodality.
+- A third may work in low dimensions and degrade quickly as dimensionality grows.
+
+So benchmark functions are best treated as diagnostic surfaces, not as substitutes for real applications.
+
+## A Closer Look: The Rastrigin Function
+
+Rastrigin is a good example because it is simple to write down and still difficult to optimize globally.
+
+For an $n$-dimensional vector $x$, it is defined as:
+
+$$
+f(x) = 10n + \sum_{i=1}^{n} \left(x_i^2 - 10\cos(2\pi x_i)\right)
+$$
+
+Its global minimum is at the origin, where $f(x) = 0$, but the cosine term creates many local minima across the domain. This makes it a good test of whether the optimizer can keep exploring rather than collapsing too early into one local basin.
+
+## Practical Exercise: Optimize a Benchmark Function
+
+Use Optuna to optimize a two-dimensional Rastrigin function.
+
+```{python}
+import math
+
+import optuna
+
+
+def rastrigin(values):
+	amplitude = 10.0
+	dimension = len(values)
+	return amplitude * dimension + sum(
+		value**2 - amplitude * math.cos(2.0 * math.pi * value)
+		for value in values
+	)
+
+
+def objective(trial):
+	x1 = trial.suggest_float("x1", -5.12, 5.12)
+	x2 = trial.suggest_float("x2", -5.12, 5.12)
+	return rastrigin([x1, x2])
+
+
+study = optuna.create_study(direction="minimize")
+study.optimize(objective, n_trials=300)
+
+print("Best parameters:", study.best_params)
+print("Best value:", round(study.best_value, 6))
+```
+
+Then work through the exercise in four passes:
+
+1. Run the two-dimensional version and record how close Optuna gets to the origin.
+2. Increase the number of trials and compare whether the best value continues to improve materially.
+3. Add a third dimension and observe how the difficulty changes.
+4. Compare TPE with random search and note which one appears more sample-efficient.
+
+Questions to answer after the run:
+
+- Did the optimizer converge close to the global minimum or settle in a local basin?
+- How much harder did the problem become after adding one more dimension?
+- Did more trials help because the sampler improved its beliefs, or simply because brute-force coverage increased?
+- Which aspects of this benchmark feel unrealistic compared with a noisy simulator or RL environment?
+
+::: callout-warning
+## Common Mistake
+
+Do not assume success on benchmark functions automatically translates to success on real-world objectives. Benchmarks are useful because they isolate difficulty, but practical systems add noise, failures, constraints, and evaluation costs that can dominate optimizer behavior.
+:::
+
+## Recap
+
+Optuna is a general-purpose optimizer because its interface is built around black-box objective evaluation rather than around machine-learning APIs.
+
+- Mathematical functions are useful for understanding optimizer behavior directly.
+- Simulations, solvers, and engineering systems fit naturally when they can be evaluated programmatically.
+- Reinforcement learning and stochastic environments require extra care because evaluation noise can dominate the search.
+- Benchmark functions are best used as controlled stress tests, not as proof that a workflow is production-ready.
+
+## Decision Guide
+
+Choose the objective design as carefully as you choose the sampler.
+
+- Use Optuna for non-ML problems when the system can be evaluated as a black box and sample efficiency matters.
+- Use benchmark functions when you want to study optimizer behavior in a controlled setting.
+- Use domain knowledge aggressively to narrow search ranges for simulations and engineering systems.
+- Treat noisy objectives, failed runs, and constraints as first-class design concerns rather than as edge cases.
+- Reuse pruning, storage, and distributed execution patterns from earlier chapters whenever objective cost becomes significant.
+
+The next chapter turns these ideas into operational practice. In [Production Workflows](14-production-workflows.qmd), we will look at study persistence, experiment tracking, reproducibility, and the habits that make Optuna reliable in real systems rather than just interesting in notebooks.
