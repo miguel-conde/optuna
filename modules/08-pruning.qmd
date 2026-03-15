@@ -122,12 +122,12 @@ That exception is not an error condition in the usual sense. It is the normal co
 
 ```{mermaid}
 flowchart LR
-	A[Training step] --> B[Compute intermediate metric]
-	B --> C[trial.report(value, step)]
-	C --> D{trial.should_prune()?}
-	D -->|Yes| E[Raise TrialPruned]
-	D -->|No| F[Continue training]
-	F --> A
+    A[Training step] --> B[Compute intermediate metric]
+    B --> C["trial.report(value, step)"]
+    C --> D{"trial.should_prune()?"}
+    D -->|Yes| E[Raise TrialPruned]
+    D -->|No| F[Continue training]
+    F --> A
 ```
 
 ## Median Pruning
