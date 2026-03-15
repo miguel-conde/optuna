@@ -1,3 +1,348 @@
 ---
 title: "Designing Search Spaces"
 ---
+
+This chapter focuses on one of the most important practical skills in optimization: designing a search space that the optimizer can explore effectively. In real Optuna workflows, a well-designed space often matters more than the choice between two strong samplers.
+
+By the end of the chapter, you should be able to distinguish continuous, discrete, categorical, conditional, dynamic, and hierarchical search spaces, and choose parameter ranges that reflect both domain knowledge and optimization efficiency.
+
+This chapter builds directly on [Basic Optuna Usage](05-basic-optuna-usage.qmd) and connects back to why [The TPE Algorithm](03-tpe-algorithm.qmd) works well with tree-structured spaces.
+
+## Why This Matters
+
+Suppose you are tuning a model and choose a learning-rate range from `1e-8` to `10`, a tree depth from `1` to `1000`, and several conditional parameters that are never active together. Even a strong optimizer will waste trials in irrelevant or pathological regions.
+
+Search-space design matters because the optimizer can only search the space you give it. If the space is poorly structured, the optimization loop becomes inefficient no matter how sophisticated the sampler is.
+
+## A Fast First Win
+
+The easiest way to see search-space design in action is to compare a few parameter types inside one small Optuna objective.
+
+```{python}
+import optuna
+
+optuna.logging.set_verbosity(optuna.logging.WARNING)
+
+
+def objective(trial):
+	x = trial.suggest_float("x", -10, 10)
+	depth = trial.suggest_int("depth", 2, 8)
+	optimizer = trial.suggest_categorical("optimizer", ["adam", "sgd"])
+	lr = trial.suggest_float("lr", 1e-5, 1e-1, log=True)
+
+	penalty = 0.0 if optimizer == "adam" else 0.2
+	return (x - 2) ** 2 + 0.01 * depth + penalty + abs(lr - 1e-2)
+
+
+study = optuna.create_study(direction="minimize")
+study.optimize(objective, n_trials=20)
+
+print("Best params:", study.best_params)
+print("Best value:", round(study.best_value, 4))
+```
+
+This example already shows the main idea of the chapter: the search space is not just a range of numbers. It is a structured description of what the optimizer is allowed to try.
+
+## Continuous, Discrete, and Categorical Parameters
+
+Search spaces usually combine different parameter types.
+
+### Continuous parameters
+
+Continuous parameters represent real-valued ranges.
+
+$$
+x \in [-10, 10]
+$$
+
+In Optuna:
+
+```python
+x = trial.suggest_float("x", -10, 10)
+```
+
+Typical continuous parameters include:
+
+| Parameter | Example range |
+| --- | --- |
+| Learning rate | `0.0001` to `0.1` |
+| Regularization | `1e-6` to `1` |
+| Dropout | `0` to `0.5` |
+
+### Discrete parameters
+
+Discrete parameters often take integer values.
+
+$$
+depth \in \{1, 2, 3, \ldots, 10\}
+$$
+
+In Optuna:
+
+```python
+depth = trial.suggest_int("depth", 1, 10)
+```
+
+Examples include tree depth, numbers of layers, and neighborhood sizes.
+
+### Categorical parameters
+
+Categorical parameters represent choices among named options.
+
+```python
+model = trial.suggest_categorical(
+	"model",
+	["xgboost", "random_forest", "svm"],
+)
+```
+
+These are common for model families, optimizers, activations, kernels, and preprocessing decisions.
+
+## Why Log-Scaled Parameters Matter
+
+Some parameters span multiple orders of magnitude. Learning rates are the canonical example.
+
+Instead of sampling uniformly over
+
+$$
+[10^{-5}, 10^{-1}]
+$$
+
+you usually want to sample in log-space:
+
+```python
+lr = trial.suggest_float("lr", 1e-5, 1e-1, log=True)
+```
+
+This avoids oversampling the large end of the range and better reflects how such parameters behave in practice.
+
+Typical log-scaled parameters include:
+
+| Parameter | Example range |
+| --- | --- |
+| Learning rate | `1e-5` to `1e-1` |
+| Regularization | `1e-6` to `10` |
+| Kernel width | `1e-3` to `10` |
+
+## Conditional Parameters
+
+Some parameters only make sense when another choice is active.
+
+For example, if the selected model is a random forest, you may want to optimize `n_trees` and `depth`. If the selected model is an SVM, those parameters are irrelevant, and instead you care about `C` and `kernel`.
+
+Optuna handles this naturally with define-by-run logic:
+
+```{python}
+def objective(trial):
+	model = trial.suggest_categorical("model", ["rf", "svm"])
+
+	if model == "rf":
+		n_trees = trial.suggest_int("n_trees", 50, 200)
+		depth = trial.suggest_int("depth", 3, 10)
+		return 0.001 * n_trees + 0.1 * depth
+
+	c_value = trial.suggest_float("C", 1e-3, 10, log=True)
+	kernel = trial.suggest_categorical("kernel", ["linear", "rbf"])
+	kernel_penalty = 0.0 if kernel == "rbf" else 0.2
+	return abs(c_value - 1.0) + kernel_penalty
+```
+
+This creates a conditional branch inside the search space. Structurally, that is exactly the kind of tree-shaped configuration TPE is designed to handle well.
+
+## Dynamic Search Spaces
+
+Optuna also allows the number of active parameters to depend on earlier choices.
+
+For example:
+
+```{python}
+def objective(trial):
+	n_layers = trial.suggest_int("n_layers", 1, 4)
+
+	total_units = 0
+	for i in range(n_layers):
+		units = trial.suggest_int(f"units_layer_{i}", 32, 256)
+		total_units += units
+
+	return abs(total_units - 320)
+```
+
+Here, the dimensionality of the space changes from trial to trial because the number of active layer parameters depends on `n_layers`.
+
+This flexibility is useful for neural architecture search, pipeline configuration, and other structured optimization problems.
+
+## Hierarchical Search Spaces
+
+Hierarchical spaces are multi-level search spaces where one decision activates a whole family of sub-decisions.
+
+```{python}
+def objective(trial):
+	model = trial.suggest_categorical("model", ["xgb", "rf", "svm"])
+
+	if model == "xgb":
+		max_depth = trial.suggest_int("max_depth", 3, 10)
+		eta = trial.suggest_float("eta", 1e-3, 0.3, log=True)
+		return 0.1 * max_depth + abs(eta - 0.05)
+
+	if model == "rf":
+		n_estimators = trial.suggest_int("n_estimators", 50, 300)
+		return abs(n_estimators - 180)
+
+	c_value = trial.suggest_float("C", 1e-3, 10, log=True)
+	return abs(c_value - 1.5)
+```
+
+This kind of hierarchy is common in AutoML workflows and whole-pipeline optimization.
+
+```{mermaid}
+flowchart TD
+	A[Choose model] --> B[XGBoost branch]
+	A --> C[Random Forest branch]
+	A --> D[SVM branch]
+	B --> E[max_depth, eta]
+	C --> F[n_estimators, depth]
+	D --> G[C, kernel]
+```
+
+## Example: Neural Architecture Search
+
+Optuna is often used for neural architecture search precisely because define-by-run spaces can express variable structure compactly.
+
+```python
+def objective(trial):
+	n_layers = trial.suggest_int("n_layers", 1, 4)
+
+	layers = []
+	for i in range(n_layers):
+		units = trial.suggest_int(f"units_{i}", 32, 256)
+		dropout = trial.suggest_float(f"dropout_{i}", 0.0, 0.5)
+		layers.append((units, dropout))
+
+	return len(layers)
+```
+
+Each trial can represent a different architecture, which would be cumbersome to describe in a rigid static search-space definition.
+
+## Example: Algorithm Configuration
+
+Search spaces do not have to be about model hyperparameters only. They can also represent algorithmic design choices.
+
+```python
+solver = trial.suggest_categorical("solver", ["gradient", "newton"])
+
+if solver == "gradient":
+	lr = trial.suggest_float("lr", 1e-4, 1e-1, log=True)
+else:
+	damping = trial.suggest_float("damping", 1e-3, 1)
+```
+
+This lets Optuna search not only over numeric hyperparameters, but over whole families of algorithm behavior.
+
+## Best Practices for Search Space Design
+
+### Use log scales for multiplicative parameters
+
+Bad:
+
+```python
+lr = trial.suggest_float("lr", 0.00001, 0.1)
+```
+
+Better:
+
+```python
+lr = trial.suggest_float("lr", 1e-5, 1e-1, log=True)
+```
+
+### Avoid absurdly large ranges
+
+Bad:
+
+```python
+depth = trial.suggest_int("depth", 1, 1000)
+```
+
+Better:
+
+```python
+depth = trial.suggest_int("depth", 3, 15)
+```
+
+Large unrealistic ranges waste trials and slow convergence.
+
+### Use domain knowledge aggressively
+
+Good search spaces reflect:
+
+- Theoretical constraints.
+- Empirical experience.
+- Practical operating limits.
+
+::: {.callout-warning}
+## Common Mistake
+
+Do not treat the search space as a neutral container. It encodes assumptions about what values are plausible. A badly chosen space can make a strong sampler look weak, hide the true optimum behind useless volume, or spend most trials on configurations you would never deploy.
+:::
+
+## Practical Exercise: Conditional Hyperparameter Optimization
+
+As a hands-on exercise, optimize a tiny conditional problem where the study chooses between two model families.
+
+```{python}
+import math
+import optuna
+
+optuna.logging.set_verbosity(optuna.logging.WARNING)
+
+
+def objective(trial):
+	model = trial.suggest_categorical("model", ["quadratic", "sin"])
+	x = trial.suggest_float("x", -5, 5)
+
+	if model == "quadratic":
+		return (x - 2) ** 2
+
+	return math.sin(x) + 1
+
+
+study = optuna.create_study(direction="minimize")
+study.optimize(objective, n_trials=60)
+
+print("Best parameters:", study.best_params)
+print("Best value:", round(study.best_value, 4))
+```
+
+This example demonstrates:
+
+- Categorical model selection.
+- Conditional objective logic.
+- Flexible search-space definition inside the objective.
+
+Try extending it by adding model-specific parameters that only apply to one branch.
+
+## Recap
+
+Effective search spaces often include a mix of:
+
+| Feature | Why it matters |
+| --- | --- |
+| Continuous parameters | Capture real-valued behavior |
+| Discrete parameters | Respect integer constraints |
+| Log distributions | Handle multi-scale parameters |
+| Conditional parameters | Support structured model choices |
+| Dynamic spaces | Allow variable architecture or pipeline depth |
+| Hierarchical spaces | Enable multi-level AutoML workflows |
+
+The practical lesson is simple: a good search space can improve optimization more than switching between two strong optimizers.
+
+## Decision Guide
+
+Use the following mental model:
+
+- Use continuous ranges for genuinely real-valued quantities.
+- Use integer or categorical parameters when the problem structure demands them.
+- Use `log=True` whenever scale matters more than absolute distance.
+- Use conditional and hierarchical branches when different model families require different parameter sets.
+- Shrink overly broad ranges whenever domain knowledge allows it.
+
+Next, [Samplers](07-samplers.qmd) focuses on the optimization engines that search these spaces and how their behavior differs in practice.
