@@ -1,368 +1,405 @@
-# Module 6 — Designing Search Spaces
+# Module 7 — Samplers (Optimization Engines)
 
-**Goal:** Learn how to design **effective parameter search spaces**, which is one of the most critical aspects of successful optimization.
+**Goal:** Understand the algorithms that actually **choose parameter values** during optimization.
 
-In practice, the **quality of the search space often matters more than the optimization algorithm itself**. Even a powerful optimizer like **TPE** will perform poorly if the search space is badly designed.
+In Optuna, the **Sampler** is the component responsible for generating new candidate parameters for each trial.
 
-This module explains how to structure parameter spaces effectively.
+Conceptually:
+
+```
+Sampler → proposes parameters
+Trial → evaluates objective
+Sampler → updates model
+```
+
+Different samplers implement different **optimization strategies**.
 
 ---
 
-# 1. Continuous vs Discrete Spaces
+# 1. What a Sampler Does
 
-Parameters can be divided into **continuous** and **discrete** types.
+Each trial follows this process:
 
-## Continuous Parameters
+```
+1 sampler proposes parameters
+2 objective function evaluates them
+3 result is stored
+4 sampler learns from results
+```
 
-These represent real-valued ranges.
+Example interaction:
 
-Example:
+```
+Trial 1 → sampler proposes random parameters
+Trial 2 → sampler proposes new parameters
+Trial 10 → sampler focuses near good regions
+```
+
+The sampler decides **how exploration and exploitation are balanced**.
+
+---
+
+# 2. TPE Sampler (Default)
+
+Optuna’s default optimizer is **TPE (Tree-structured Parzen Estimator)**.
+
+It is a **Bayesian optimization method based on density estimation**.
+
+Instead of modeling:
 
 [
-x \in [-10, 10]
+p(y|x)
 ]
 
-Optuna API:
-
-```python
-x = trial.suggest_float("x", -10, 10)
-```
-
-Typical examples:
-
-| Parameter      | Example      |
-| -------------- | ------------ |
-| learning rate  | 0.0001 – 0.1 |
-| regularization | 1e-6 – 1     |
-| dropout        | 0 – 0.5      |
-
-Continuous parameters often represent **physical or algorithmic quantities**.
-
----
-
-## Discrete Parameters
-
-Discrete parameters take **integer values**.
-
-Example:
+TPE models:
 
 [
-depth \in {1,2,3,...,10}
+p(x|y)
 ]
 
-Optuna API:
+Key idea:
 
-```python
-depth = trial.suggest_int("depth", 1, 10)
 ```
-
-Examples:
-
-| Parameter           | Example |
-| ------------------- | ------- |
-| tree depth          | 3–10    |
-| number of layers    | 1–5     |
-| number of neighbors | 3–50    |
+good trials → build density l(x)
+bad trials → build density g(x)
+maximize l(x)/g(x)
+```
 
 ---
 
-## Categorical Parameters
+## Characteristics
 
-Categorical parameters represent **choices**.
+| Property            | Behavior              |
+| ------------------- | --------------------- |
+| Type                | Bayesian optimization |
+| Exploration         | adaptive              |
+| Scalability         | good                  |
+| Categorical support | excellent             |
+| High dimensionality | good                  |
 
-Optuna API:
+---
+
+## When to Use TPE
+
+Use TPE for:
+
+* ML hyperparameter tuning
+* mixed parameter spaces
+* categorical parameters
+* conditional spaces
+
+Typical example:
+
+```
+model selection
+learning rate tuning
+architecture search
+```
+
+TPE is the **general-purpose optimizer** in Optuna.
+
+---
+
+# 3. Random Sampler
+
+The **RandomSampler** performs pure random search.
+
+Parameters are sampled independently from the search space.
+
+Example:
 
 ```python
-model = trial.suggest_categorical(
-    "model",
-    ["xgboost", "random_forest", "svm"]
+sampler = optuna.samplers.RandomSampler()
+
+study = optuna.create_study(
+    sampler=sampler
 )
 ```
 
-Examples:
+---
 
-| Parameter  | Options        |
-| ---------- | -------------- |
-| optimizer  | adam / sgd     |
-| activation | relu / tanh    |
-| model type | rf / svm / xgb |
+## Characteristics
+
+| Property     | Behavior      |
+| ------------ | ------------- |
+| Type         | random search |
+| Exploration  | maximum       |
+| Exploitation | none          |
+| Complexity   | minimal       |
 
 ---
 
-# 2. Log Distributions
+## When to Use Random Sampling
 
-Some parameters span **multiple orders of magnitude**.
+Useful for:
 
-Example: learning rate
+* baseline comparisons
+* early exploration
+* debugging optimization pipelines
+* small parameter spaces
+
+Random search is surprisingly effective in **very high-dimensional spaces**.
+
+However, it does **not learn from previous trials**.
+
+---
+
+# 4. CMA-ES Sampler
+
+CMA-ES stands for:
+
+**Covariance Matrix Adaptation Evolution Strategy**
+
+It is an **evolutionary optimization algorithm**.
+
+Instead of modeling densities, it maintains a **multivariate Gaussian distribution** over parameters.
+
+Parameters are updated based on:
+
+* mean vector
+* covariance matrix
+
+The covariance matrix learns **parameter correlations**.
+
+---
+
+## CMA-ES Update Concept
+
+Each generation:
+
+```
+sample population
+evaluate objective
+select best individuals
+update distribution
+```
+
+This adapts the **shape of the search distribution**.
+
+---
+
+## Characteristics
+
+| Property             | Behavior              |
+| -------------------- | --------------------- |
+| Type                 | evolutionary strategy |
+| Exploration          | adaptive              |
+| Handles correlations | very well             |
+| Continuous spaces    | excellent             |
+
+---
+
+## When to Use CMA-ES
+
+CMA-ES works well for:
+
+* continuous parameters
+* medium-dimensional spaces
+* expensive objective functions
+* smooth landscapes
+
+Example:
+
+```
+physics simulation calibration
+numerical optimization
+continuous ML hyperparameters
+```
+
+Limitations:
+
+* does **not handle categorical variables well**
+* slower initialization phase
+
+---
+
+# 5. Grid Sampler
+
+GridSampler performs **exhaustive search** over a predefined grid.
+
+Example:
+
+```python
+search_space = {
+    "x": [-2, 0, 2],
+    "y": [-1, 1]
+}
+
+sampler = optuna.samplers.GridSampler(search_space)
+```
+
+This evaluates **all combinations**.
+
+---
+
+## Characteristics
+
+| Property    | Behavior          |
+| ----------- | ----------------- |
+| Type        | exhaustive search |
+| Exploration | deterministic     |
+| Learning    | none              |
+
+---
+
+## When to Use Grid Sampling
+
+Useful when:
+
+* search space is very small
+* reproducibility is critical
+* benchmarking algorithms
+
+Grid search becomes impractical when the number of parameters increases.
+
+---
+
+# 6. NSGA-II Sampler (Multi-objective Optimization)
+
+NSGA-II is used for **multi-objective optimization**.
+
+Instead of optimizing one objective:
 
 [
-[10^{-5}, 10^{-1}]
+f(x)
 ]
 
-Sampling uniformly would oversample large values.
+we optimize multiple:
 
-Instead we sample in **log-space**.
+[
+f_1(x), f_2(x)
+]
 
-Optuna API:
+Example:
+
+* maximize accuracy
+* minimize model size
+
+---
+
+## Pareto Optimality
+
+In multi-objective optimization we search for the **Pareto frontier**.
+
+A solution is Pareto optimal if:
+
+* no objective can improve
+* without worsening another
+
+Example:
+
+```
+Model A → high accuracy, large size
+Model B → lower accuracy, smaller size
+```
+
+Both may belong to the **Pareto frontier**.
+
+---
+
+## Characteristics
+
+| Property    | Behavior                     |
+| ----------- | ---------------------------- |
+| Type        | evolutionary multi-objective |
+| Output      | Pareto set                   |
+| Exploration | population-based             |
+
+---
+
+## Example
 
 ```python
-lr = trial.suggest_float(
-    "lr",
-    1e-5,
-    1e-1,
-    log=True
+study = optuna.create_study(
+    directions=["minimize","maximize"],
+    sampler=optuna.samplers.NSGAIISampler()
 )
 ```
 
-This produces values like:
-
-```text
-1e-5
-2e-5
-8e-5
-1e-4
-...
-```
-
-Typical parameters requiring log scaling:
-
-| Parameter      | Range       |
-| -------------- | ----------- |
-| learning rate  | 1e-5 – 1e-1 |
-| regularization | 1e-6 – 10   |
-| kernel width   | 1e-3 – 10   |
+This allows optimization of multiple objectives simultaneously.
 
 ---
 
-# 3. Conditional Parameters
+# 7. Exploration Behavior of Samplers
 
-Sometimes parameters **only exist when other parameters take certain values**.
+Different samplers explore the search space differently.
 
-Example:
+| Sampler | Exploration Strategy           |
+| ------- | ------------------------------ |
+| Random  | uniform sampling               |
+| TPE     | probabilistic density modeling |
+| CMA-ES  | adaptive Gaussian search       |
+| Grid    | deterministic enumeration      |
+| NSGA-II | evolutionary population        |
 
-If model = **Random Forest**, then optimize:
+Exploration strategies influence:
 
-* number of trees
-* tree depth
-
-If model = **SVM**, then optimize:
-
-* kernel
-* C parameter
-
-Optuna supports this naturally through **define-by-run**.
-
-Example:
-
-```python
-def objective(trial):
-
-    model = trial.suggest_categorical(
-        "model",
-        ["rf", "svm"]
-    )
-
-    if model == "rf":
-        n_trees = trial.suggest_int("n_trees", 50, 200)
-        depth = trial.suggest_int("depth", 3, 10)
-
-    else:
-        C = trial.suggest_float("C", 1e-3, 10, log=True)
-        kernel = trial.suggest_categorical(
-            "kernel",
-            ["linear", "rbf"]
-        )
-```
-
-This creates **conditional branches in the search space**.
-
-This structure is called **tree-structured search space**, which TPE handles very well.
+* convergence speed
+* robustness
+* sample efficiency
 
 ---
 
-# 4. Dynamic Search Spaces
+# 8. Samplers in High-Dimensional Spaces
 
-Optuna allows **search spaces to change dynamically during optimization**.
+High-dimensional optimization is difficult because:
 
-Example:
+[
+Volume \propto k^d
+]
 
-Search range may depend on another parameter.
+As dimension increases:
 
-```python
-n_layers = trial.suggest_int("n_layers", 1, 5)
+* search space explodes
+* exploration becomes harder
 
-for i in range(n_layers):
+Performance comparison:
 
-    units = trial.suggest_int(
-        f"units_layer_{i}",
-        32,
-        256
-    )
+| Sampler | High-dim performance |
+| ------- | -------------------- |
+| Random  | moderate             |
+| TPE     | good                 |
+| CMA-ES  | moderate             |
+| Grid    | poor                 |
+
+TPE often performs best in:
+
+```
+20–100 parameters
+mixed parameter types
 ```
 
-Here:
-
-* the number of parameters depends on `n_layers`
-* each trial may have different dimensionality
-
-This flexibility is extremely useful for:
-
-* neural architecture search
-* algorithm configuration
-* dynamic pipelines
+This explains why it is the **default sampler in Optuna**.
 
 ---
 
-# 5. Hierarchical Search Spaces
+# 9. Selecting the Right Sampler
 
-Hierarchical spaces represent **multi-level configuration structures**.
+General guidelines:
 
-Example: model selection + hyperparameters.
+| Situation                     | Recommended Sampler |
+| ----------------------------- | ------------------- |
+| general hyperparameter tuning | TPE                 |
+| baseline comparison           | Random              |
+| continuous optimization       | CMA-ES              |
+| small search space            | Grid                |
+| multi-objective problems      | NSGA-II             |
 
-```python
-model = trial.suggest_categorical(
-    "model",
-    ["xgb", "rf", "svm"]
-)
-```
+In practice:
 
-Then define model-specific parameters.
-
-```python
-if model == "xgb":
-
-    max_depth = trial.suggest_int("max_depth", 3, 10)
-    eta = trial.suggest_float("eta", 1e-3, 0.3, log=True)
-
-elif model == "rf":
-
-    n_estimators = trial.suggest_int("n_estimators", 50, 300)
-
-elif model == "svm":
-
-    C = trial.suggest_float("C", 1e-3, 10, log=True)
-```
-
-Hierarchical spaces are common in:
-
-* AutoML systems
-* pipeline optimization
-* architecture search
+> **Start with TPE unless you have a strong reason not to.**
 
 ---
 
-# 6. Example — Neural Network Architecture Search
+# Practical Exercise — Comparing Samplers
 
-Optuna is often used for **neural architecture search**.
+Let’s compare **Random Search vs TPE**.
 
-Example:
+Objective function:
 
-```python
-def objective(trial):
-
-    n_layers = trial.suggest_int("n_layers", 1, 4)
-
-    layers = []
-
-    for i in range(n_layers):
-
-        units = trial.suggest_int(
-            f"units_{i}",
-            32,
-            256
-        )
-
-        dropout = trial.suggest_float(
-            f"dropout_{i}",
-            0.0,
-            0.5
-        )
-
-        layers.append((units, dropout))
-```
-
-Each trial produces a **different network architecture**.
-
-This would be extremely difficult with traditional optimizers.
-
----
-
-# 7. Example — Algorithm Configuration
-
-Optuna can also optimize **algorithmic parameters**.
-
-Example: tuning a numerical solver.
-
-```python
-solver = trial.suggest_categorical(
-    "solver",
-    ["gradient", "newton"]
-)
-
-if solver == "gradient":
-
-    lr = trial.suggest_float("lr", 1e-4, 1e-1, log=True)
-
-else:
-
-    damping = trial.suggest_float("damping", 1e-3, 1)
-```
-
-This allows optimization of **entire algorithm configurations**.
-
----
-
-# 8. Best Practices for Search Space Design
-
-### Use Log Scales for Multiplicative Parameters
-
-Bad:
-
-```python
-lr = trial.suggest_float("lr", 0.00001, 0.1)
-```
-
-Better:
-
-```python
-lr = trial.suggest_float("lr", 1e-5, 1e-1, log=True)
-```
-
----
-
-### Avoid Unreasonably Large Ranges
-
-Bad:
-
-```python
-depth = trial.suggest_int("depth", 1, 1000)
-```
-
-Better:
-
-```python
-depth = trial.suggest_int("depth", 3, 15)
-```
-
-Large ranges slow down convergence.
-
----
-
-### Use Domain Knowledge
-
-Good search spaces reflect:
-
-* theoretical constraints
-* empirical knowledge
-* practical limits
-
----
-
-# Practical Exercise — Conditional Hyperparameter Optimization
-
-Let’s implement a small example.
-
-We will choose between **two models** and tune their parameters.
+[
+f(x) = (x-3)^2 + \sin(5x)
+]
 
 ---
 
@@ -372,56 +409,67 @@ We will choose between **two models** and tune their parameters.
 import optuna
 import numpy as np
 
-def objective(trial):
 
-    model = trial.suggest_categorical(
-        "model",
-        ["quadratic", "sin"]
-    )
+def objective(trial):
 
     x = trial.suggest_float("x", -5, 5)
 
-    if model == "quadratic":
-
-        y = (x - 2)**2
-
-    else:
-
-        y = np.sin(x) + 1
-
-    return y
+    return (x - 3)**2 + np.sin(5*x)
 
 
-study = optuna.create_study(direction="minimize")
+# TPE sampler
+study_tpe = optuna.create_study(
+    sampler=optuna.samplers.TPESampler(),
+    direction="minimize"
+)
 
-study.optimize(objective, n_trials=100)
+study_tpe.optimize(objective, n_trials=100)
 
-print("Best parameters:", study.best_params)
-print("Best value:", study.best_value)
+
+# Random sampler
+study_random = optuna.create_study(
+    sampler=optuna.samplers.RandomSampler(),
+    direction="minimize"
+)
+
+study_random.optimize(objective, n_trials=100)
+
+
+print("TPE best:", study_tpe.best_value)
+print("Random best:", study_random.best_value)
 ```
 
-This demonstrates:
+---
 
-* categorical parameter selection
-* conditional objective computation
-* flexible search spaces
+### What to Observe
+
+Typically:
+
+* early trials behave similarly
+* TPE converges faster
+* random search continues exploring
+
+This illustrates **adaptive optimization**.
 
 ---
 
 # Key Takeaways
 
-Effective search spaces include:
+Samplers determine **how parameters are chosen**.
 
-| Feature                | Why it matters                   |
-| ---------------------- | -------------------------------- |
-| Continuous parameters  | capture real-valued optimization |
-| Discrete parameters    | model integer constraints        |
-| Log distributions      | handle large magnitude ranges    |
-| Conditional parameters | support complex models           |
-| Dynamic spaces         | allow flexible architectures     |
-| Hierarchical spaces    | enable AutoML workflows          |
+| Sampler | Best For                      |
+| ------- | ----------------------------- |
+| TPE     | general hyperparameter tuning |
+| Random  | baseline or exploration       |
+| CMA-ES  | continuous optimization       |
+| Grid    | small discrete spaces         |
+| NSGA-II | multi-objective optimization  |
 
-Designing the search space properly can improve optimization **more than changing the optimizer itself**.
+TPE is the default because it:
+
+* balances exploration/exploitation
+* scales well to high dimensions
+* handles categorical parameters
 
 ---
 
@@ -429,22 +477,24 @@ Designing the search space properly can improve optimization **more than changin
 
 Next we move to:
 
-# Module 7 — Samplers (Optimization Engines)
+# Module 8 — Pruning (Early Stopping)
 
-We will study the algorithms that actually **drive the optimization process**.
+One of Optuna’s most powerful features.
 
-Topics include:
+We will learn:
 
-* **TPE sampler**
-* **Random sampler**
-* **CMA-ES**
-* **Grid sampler**
-* **NSGA-II (multi-objective)**
+* how to stop bad trials early
+* how pruning saves huge amounts of compute
+* pruning algorithms:
 
-We will also compare **their strengths and weaknesses**.
+  * Median pruning
+  * Successive Halving
+  * Hyperband
+
+This is **critical when optimizing expensive models like deep learning**.
 
 ---
 
-Before continuing, one quick question:
+Before continuing, quick check:
 
-Would you like me to also include **guidelines for detecting bad search spaces from optimization results** (a very useful real-world skill) in the next module?
+Would you like me to also include a **real-world benchmark showing TPE vs Random vs CMA-ES convergence behavior** in the next module?
