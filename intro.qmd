@@ -1,4 +1,4 @@
-# Introduction
+# Introduction {.unnumbered}
 
 Optuna is one of the most effective libraries available for modern black-box optimization in Python. Many users encounter it through hyperparameter tuning, but that entry point can hide its deeper value. Optuna is not merely a convenience wrapper around search loops. It is a flexible framework for making optimization decisions under limited budgets, expensive evaluations, mixed search spaces, and uncertain objective behavior.
 

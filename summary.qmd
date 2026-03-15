@@ -1,4 +1,4 @@
-# Summary
+# Summary {.unnumbered}
 
 This book set out to present Optuna as more than a convenient hyperparameter-tuning tool. Across the full set of chapters, the central idea has been consistent: Optuna is a practical framework for black-box optimization problems where evaluations are expensive, noisy, structured, or operationally constrained.
 
