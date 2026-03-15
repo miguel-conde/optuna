@@ -1,52 +1,52 @@
-# Module 4 — Optuna Architecture
+# Module 5 — Basic Optuna Usage
 
-**Goal:** Understand how Optuna is structured internally and how its components interact during an optimization process.
+**Goal:** Learn how to use Optuna to solve real optimization problems.
 
-At its core, Optuna implements a **general optimization engine** that coordinates:
+In this module we move from **theory and architecture** to **practical usage**.
+You will learn how to:
 
-* the optimization problem
-* the search strategy
-* experiment tracking
-* pruning strategies
-* storage and parallelization
-
-Understanding this architecture is critical for using Optuna **correctly and efficiently**.
-
----
-
-# 1. Core Architecture Overview
-
-An Optuna optimization consists of several interacting components:
-
-```
-Study
- ├── Trials
- │     ├── Parameters
- │     ├── Objective value
- │     └── Intermediate results
- │
- ├── Sampler (suggest parameters)
- ├── Pruner (stop bad trials early)
- └── Storage (persist experiments)
-```
-
-The **Study** is the central object managing the optimization process.
+* create optimization studies
+* define objective functions
+* define parameter search spaces
+* run optimization
+* inspect results
 
 ---
 
-# 2. Study
+# 1. Installation and Setup
 
-A **Study** represents a complete optimization experiment.
+Optuna is easy to install via **pip**.
 
-It manages:
+```bash
+pip install optuna
+```
 
-* all trials
-* the sampler
-* the pruner
-* the storage backend
-* the optimization direction
+Verify the installation:
 
-Example:
+```python
+import optuna
+print(optuna.__version__)
+```
+
+Optional packages (useful later):
+
+```bash
+pip install optuna-dashboard
+pip install plotly
+```
+
+These enable:
+
+* visualization tools
+* experiment dashboards
+
+---
+
+# 2. Creating a Study
+
+The **Study** object manages the entire optimization process.
+
+Basic example:
 
 ```python
 import optuna
@@ -54,91 +54,33 @@ import optuna
 study = optuna.create_study(direction="minimize")
 ```
 
-Key responsibilities of a Study:
+Key parameter:
 
-* schedule trials
-* collect results
-* determine the best trial
-* coordinate samplers and pruners
+| Parameter   | Meaning                      |
+| ----------- | ---------------------------- |
+| `direction` | `"minimize"` or `"maximize"` |
 
-You can think of a Study as:
+Examples:
 
-> the **experiment manager**.
-
----
-
-## Important Study Methods
-
-Run optimization:
+Minimize loss:
 
 ```python
-study.optimize(objective, n_trials=100)
+study = optuna.create_study(direction="minimize")
 ```
 
-Access best result:
+Maximize accuracy:
 
 ```python
-study.best_params
-study.best_value
-study.best_trial
-```
-
-List trials:
-
-```python
-study.trials
+study = optuna.create_study(direction="maximize")
 ```
 
 ---
 
-# 3. Trial
+# 3. Defining the Objective Function
 
-A **Trial** represents **one evaluation of the objective function**.
+The **objective function** defines the problem.
 
-Each trial contains:
-
-* parameter values
-* objective value
-* intermediate results
-* state (completed, pruned, failed)
-
-During optimization:
-
-```
-Trial 1 → parameters → objective → result
-Trial 2 → parameters → objective → result
-Trial 3 → parameters → objective → result
-```
-
-Trials are created and managed automatically by the Study.
-
----
-
-## Trial Lifecycle
-
-```
-CREATED
-  ↓
-RUNNING
-  ↓
-COMPLETE / PRUNED / FAILED
-```
-
-Possible states:
-
-| State    | Meaning                |
-| -------- | ---------------------- |
-| COMPLETE | finished successfully  |
-| PRUNED   | stopped early          |
-| FAILED   | error during execution |
-
----
-
-# 4. Objective Function
-
-The **objective function** defines the problem being optimized.
-
-It receives a **Trial object** and returns a value.
+It receives a **Trial object** and returns a numeric value.
 
 Example:
 
@@ -150,316 +92,304 @@ def objective(trial):
     return (x - 2)**2
 ```
 
-Inside the objective function we:
+Inside the function:
 
-1. define the search space
-2. compute the objective value
-3. return the result
+1. parameters are suggested
+2. the model or function is evaluated
+3. a scalar value is returned
 
-The returned value becomes the **trial value**.
-
----
-
-# 5. Search Space
-
-The **search space** defines the parameters to be optimized.
-
-Optuna uses a **define-by-run** approach.
-
-Instead of defining the space beforehand, we define it **during execution**.
-
-Example:
-
-```python
-x = trial.suggest_float("x", -5, 5)
-```
-
-Other parameter types:
-
-```python
-trial.suggest_int("depth", 3, 10)
-
-trial.suggest_categorical("optimizer", ["adam", "sgd"])
-
-trial.suggest_float("lr", 1e-5, 1e-1, log=True)
-```
-
-Advantages of define-by-run:
-
-* dynamic search spaces
-* conditional parameters
-* flexible modeling
-
-Example:
-
-```python
-model = trial.suggest_categorical("model", ["svm","rf"])
-
-if model == "rf":
-    depth = trial.suggest_int("depth", 3, 10)
-```
-
-This creates a **tree-structured search space**, which is exactly what **TPE handles well**.
+Optuna minimizes or maximizes this value.
 
 ---
 
-# 6. Samplers
+# 4. Running the Optimization
 
-The **Sampler** determines **how parameters are chosen**.
-
-Samplers implement the optimization algorithm.
-
-Examples:
-
-| Sampler       | Method                |
-| ------------- | --------------------- |
-| TPESampler    | Bayesian optimization |
-| RandomSampler | random search         |
-| CmaEsSampler  | evolutionary strategy |
-| GridSampler   | exhaustive search     |
-
-Example:
+Once the study and objective function are defined:
 
 ```python
-study = optuna.create_study(
-    sampler=optuna.samplers.TPESampler()
-)
+study.optimize(objective, n_trials=100)
 ```
 
-Default sampler:
+Parameters:
 
-**TPE**.
+| Parameter   | Meaning               |
+| ----------- | --------------------- |
+| `objective` | function to optimize  |
+| `n_trials`  | number of evaluations |
 
-Samplers operate using information from **previous trials**.
+Each trial corresponds to **one evaluation of the objective function**.
+
+Example optimization flow:
+
+```
+Trial 1 → parameters → objective value
+Trial 2 → parameters → objective value
+Trial 3 → parameters → objective value
+...
+```
+
+The sampler learns from previous trials.
 
 ---
 
-# 7. Pruners
+# 5. Parameter Suggestion API
 
-Pruners implement **early stopping**.
+Parameters are defined inside the objective using **suggestion functions**.
 
-They terminate trials that are unlikely to produce good results.
+This is the **define-by-run** paradigm.
 
-This is crucial when evaluations are expensive.
+---
+
+## `suggest_float`
+
+Continuous parameter.
+
+```python
+x = trial.suggest_float("x", -10, 10)
+```
+
+Uniform sampling between bounds.
+
+---
+
+## Log-scaled floats
+
+Used for parameters spanning several orders of magnitude.
+
+Example: learning rates.
+
+```python
+lr = trial.suggest_float("lr", 1e-5, 1e-1, log=True)
+```
+
+This samples values like:
+
+```
+1e-5
+3e-5
+1e-4
+5e-4
+...
+```
+
+instead of uniform spacing.
+
+---
+
+## `suggest_int`
+
+Integer parameters.
+
+```python
+depth = trial.suggest_int("depth", 2, 10)
+```
 
 Example use cases:
 
-* deep learning training
-* boosting models
-* iterative simulations
-
-Pruners rely on **intermediate results**.
-
-Example training loop:
-
-```python
-for epoch in range(100):
-
-    loss = train_model()
-
-    trial.report(loss, epoch)
-
-    if trial.should_prune():
-        raise optuna.TrialPruned()
-```
-
-Popular pruners:
-
-| Pruner                  | Strategy                      |
-| ----------------------- | ----------------------------- |
-| MedianPruner            | stop trials worse than median |
-| SuccessiveHalvingPruner | resource allocation           |
-| HyperbandPruner         | multi-bracket strategy        |
-
-We will study pruning in depth later.
+* tree depth
+* number of layers
+* number of neighbors
 
 ---
 
-# 8. Storage Backends
+## `suggest_categorical`
 
-Optuna supports persistent experiment storage.
-
-This enables:
-
-* experiment tracking
-* parallel optimization
-* fault tolerance
-
-Available storage options:
-
-### In-memory (default)
+Discrete choices.
 
 ```python
-study = optuna.create_study()
-```
-
-Not persistent.
-
----
-
-### SQLite
-
-```python
-study = optuna.create_study(
-    storage="sqlite:///example.db"
+optimizer = trial.suggest_categorical(
+    "optimizer",
+    ["adam", "sgd", "rmsprop"]
 )
 ```
 
-Trials are saved to a database.
+Common uses:
+
+* model type
+* optimizer
+* activation functions
 
 ---
 
-### PostgreSQL / MySQL
+# 6. Example with Multiple Parameters
 
-Used for **distributed optimization**.
+Example objective function with several parameters.
+
+```python
+def objective(trial):
+
+    x = trial.suggest_float("x", -10, 10)
+    y = trial.suggest_float("y", -10, 10)
+
+    return (x - 2)**2 + (y + 3)**2
+```
+
+This searches a **2D parameter space**.
+
+---
+
+# 7. Retrieving Optimization Results
+
+After optimization, Optuna stores all results.
+
+---
+
+## Best Value
+
+```python
+study.best_value
+```
+
+The best objective value found.
+
+---
+
+## Best Parameters
+
+```python
+study.best_params
+```
+
+Example output:
+
+```
+{'x': 1.98, 'y': -2.97}
+```
+
+---
+
+## Best Trial
+
+```python
+study.best_trial
+```
+
+Contains full information:
+
+* parameters
+* objective value
+* trial metadata
 
 Example:
 
 ```python
-storage="postgresql://user:pass@host/db"
-```
+best = study.best_trial
 
-This allows multiple workers to run trials simultaneously.
+print(best.params)
+print(best.value)
+```
 
 ---
 
-# 9. Internal Optimization Loop
+# 8. Inspecting All Trials
 
-Optuna executes the following loop:
+To analyze optimization behavior:
 
-```
-while trials_remaining:
-
-    sampler → propose parameters
-
-    trial → run objective
-
-    record result
-
-    pruner → check early stopping
-
-    update sampler
+```python
+for trial in study.trials:
+    print(trial.number, trial.value, trial.params)
 ```
 
-Detailed flow:
+Useful for:
 
-```
-Study starts
-   ↓
-Sampler suggests parameters
-   ↓
-Trial object created
-   ↓
-Objective function executed
-   ↓
-Intermediate results reported
-   ↓
-Pruner may stop trial
-   ↓
-Result stored
-   ↓
-Sampler updates model
-```
-
-This loop repeats until:
-
-* `n_trials` reached
-* timeout reached
-* manual stop
+* debugging
+* visualization
+* experiment tracking
 
 ---
 
-# 10. Optuna Execution Lifecycle
-
-Full lifecycle of an experiment:
-
-```
-1 create study
-2 start optimization
-3 run trials
-4 sampler updates strategy
-5 pruner removes weak trials
-6 results stored
-7 best parameters returned
-```
-
-Minimal working example:
+# 9. Complete Minimal Example
 
 ```python
 import optuna
 
 def objective(trial):
 
-    x = trial.suggest_float("x", -5, 5)
+    x = trial.suggest_float("x", -10, 10)
 
-    return (x-2)**2
+    return (x - 2)**2
 
 study = optuna.create_study(direction="minimize")
 
 study.optimize(objective, n_trials=50)
 
-print(study.best_params)
+print("Best value:", study.best_value)
+print("Best parameters:", study.best_params)
 ```
 
-This code executes the **entire architecture**.
+This is the **simplest Optuna optimization workflow**.
 
 ---
 
-# Practical Exercise — Inspecting Trial Objects
+# Practical Exercise — Optimize a Mathematical Function
 
-Let’s inspect the data stored inside trials.
+Let's optimize a non-trivial function:
 
-Example:
+[
+f(x) = (x-3)^2 + \sin(5x)
+]
 
-```python
-for t in study.trials:
-    print("Trial:", t.number)
-    print("Params:", t.params)
-    print("Value:", t.value)
-    print("State:", t.state)
-    print()
-```
+---
 
-You can also inspect a specific trial:
+### Implementation
 
 ```python
-trial = study.trials[0]
+import optuna
+import numpy as np
 
-trial.params
-trial.value
-trial.distributions
-trial.datetime_start
-trial.datetime_complete
+def objective(trial):
+
+    x = trial.suggest_float("x", -5, 5)
+
+    y = (x - 3)**2 + np.sin(5*x)
+
+    return y
+
+study = optuna.create_study(direction="minimize")
+
+study.optimize(objective, n_trials=100)
+
+print("Best x:", study.best_params)
+print("Best value:", study.best_value)
 ```
 
-This information is essential for:
+---
 
-* debugging experiments
-* analyzing optimization behavior
-* building dashboards
+### What to Observe
+
+During optimization:
+
+* early trials explore broadly
+* later trials focus near good regions
+* the sampler learns promising areas
+
+This demonstrates **adaptive optimization**.
 
 ---
 
 # Key Takeaways
 
-Optuna’s architecture consists of several core components:
+Basic Optuna usage consists of five steps:
 
-| Component    | Role                                |
-| ------------ | ----------------------------------- |
-| Study        | manages the optimization experiment |
-| Trial        | single evaluation of the objective  |
-| Objective    | defines the optimization problem    |
-| Search space | defines parameters                  |
-| Sampler      | proposes parameters                 |
-| Pruner       | stops bad trials early              |
-| Storage      | saves experiment data               |
+1️⃣ Install Optuna
+2️⃣ Create a study
+3️⃣ Define the objective function
+4️⃣ Use `trial.suggest_*` to define parameters
+5️⃣ Run optimization with `study.optimize()`
 
-The optimization process follows an **iterative feedback loop** between:
+Core APIs:
 
-* sampler
-* objective evaluation
-* pruner
-* storage
+| Function              | Purpose               |
+| --------------------- | --------------------- |
+| `suggest_float`       | continuous parameters |
+| `suggest_int`         | integer parameters    |
+| `suggest_categorical` | discrete choices      |
+
+Results are accessed via:
+
+* `study.best_value`
+* `study.best_params`
+* `study.best_trial`
 
 ---
 
@@ -467,21 +397,22 @@ The optimization process follows an **iterative feedback loop** between:
 
 Next we move to:
 
-# Module 5 — Basic Optuna Usage
+# Module 6 — Designing Search Spaces
+
+This is one of the **most important skills in optimization**.
 
 We will cover:
 
-* creating studies
-* defining search spaces
-* retrieving results
-* first real optimization workflows
+* continuous vs discrete spaces
+* log distributions
+* conditional parameters
+* hierarchical search spaces
+* dynamic parameter definitions
 
-This is where we start building **real Optuna optimization pipelines**.
+Designing a **good search space** often matters more than the optimizer itself.
 
 ---
 
-Before continuing, one quick check:
+Before moving on:
 
-1️⃣ Is the **architecture and component interaction** clear?
-
-2️⃣ Would you like me to also show **how Optuna internally stores parameter distributions** before moving to the next module?
+Would you like me to also show **how to visualize the optimization history in Optuna** before the next module?
