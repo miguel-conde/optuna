@@ -280,7 +280,7 @@ This is convenient for quick experiments, but the results disappear when the pro
 
 ### SQLite storage
 
-```{python}
+```python
 study = optuna.create_study(
 	direction="minimize",
 	storage="sqlite:///example.db",

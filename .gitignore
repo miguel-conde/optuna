@@ -6,3 +6,4 @@
 .jupyter_cache/
 *.log
 *.tex
+*.db
