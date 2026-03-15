@@ -1,3 +1,403 @@
 ---
 title: "Samplers"
 ---
+
+This chapter explains the optimization engines that actually choose parameter values in Optuna. Once the objective function and search space are defined, the sampler determines how the study explores the space, what it learns from previous trials, and how quickly it tends to converge toward strong regions.
+
+By the end of the chapter, you should be able to describe the main Optuna sampler families, understand when to use each one, and explain how their exploration behavior changes in high-dimensional or structured search spaces.
+
+This chapter builds directly on [Designing Search Spaces](06-designing-search-spaces.qmd), because sampler performance only makes sense in the context of the space being searched.
+
+## Why This Matters
+
+Once your search space is well designed, the next practical question is which optimization engine should drive the search. The answer depends on the structure of the problem: mixed or categorical spaces, continuous-only optimization, exhaustive benchmarking, or multiple objectives all push toward different samplers.
+
+Optuna exposes those choices through a unified interface, which makes it easy to compare strategies without rewriting the rest of the optimization workflow.
+
+## A Fast First Win
+
+The quickest way to see what a sampler changes is to run the same objective with two different search strategies.
+
+```{python}
+import math
+import optuna
+
+optuna.logging.set_verbosity(optuna.logging.WARNING)
+
+
+def objective(trial):
+	x = trial.suggest_float("x", -5, 5)
+	return (x - 3) ** 2 + math.sin(5 * x)
+
+
+study_tpe = optuna.create_study(
+	sampler=optuna.samplers.TPESampler(),
+	direction="minimize",
+)
+study_tpe.optimize(objective, n_trials=40)
+
+study_random = optuna.create_study(
+	sampler=optuna.samplers.RandomSampler(),
+	direction="minimize",
+)
+study_random.optimize(objective, n_trials=40)
+
+print("TPE best:", round(study_tpe.best_value, 4))
+print("Random best:", round(study_random.best_value, 4))
+```
+
+This does not prove that one sampler is always better. It shows the central point of the chapter: the sampler is the optimization policy that drives trial selection.
+
+## What a Sampler Does
+
+In Optuna, the sampler is the component responsible for proposing new parameter values.
+
+Conceptually, the loop looks like this:
+
+```text
+Sampler -> proposes parameters
+Trial -> evaluates objective
+Sampler -> updates internal strategy
+```
+
+At a higher level, each trial follows the same pattern:
+
+```text
+1. sampler proposes parameters
+2. objective function evaluates them
+3. result is stored
+4. sampler learns from results
+```
+
+The crucial difference between samplers is how they balance exploration and exploitation.
+
+```{mermaid}
+flowchart LR
+	A[Sampler] --> B[Parameter proposal]
+	B --> C[Trial runs objective]
+	C --> D[Result stored]
+	D --> E[Sampler updates strategy]
+	E --> A
+```
+
+## TPE Sampler
+
+Optuna's default optimizer is the Tree-structured Parzen Estimator, or TPE.
+
+TPE is a Bayesian-style optimization method based on density estimation. Instead of modeling
+
+$$
+p(y \mid x)
+$$
+
+it models
+
+$$
+p(x \mid y)
+$$
+
+and uses the separation between good and bad trials to rank new candidates.
+
+The core idea is:
+
+```text
+good trials -> build density l(x)
+bad trials -> build density g(x)
+maximize l(x) / g(x)
+```
+
+Characteristics:
+
+| Property | Behavior |
+| --- | --- |
+| Type | Bayesian-style density estimation |
+| Exploration | Adaptive |
+| Scalability | Good |
+| Categorical support | Excellent |
+| High-dimensional robustness | Good |
+
+Use TPE for:
+
+- General machine-learning hyperparameter tuning.
+- Mixed parameter spaces.
+- Categorical variables.
+- Conditional or tree-structured spaces.
+
+In practice, TPE is the default because it is the most versatile general-purpose sampler in Optuna.
+
+## Random Sampler
+
+`RandomSampler` performs pure random search.
+
+```python
+sampler = optuna.samplers.RandomSampler()
+
+study = optuna.create_study(
+	sampler=sampler,
+	direction="minimize",
+)
+```
+
+It does not learn from previous trials. Each proposal is independent.
+
+Characteristics:
+
+| Property | Behavior |
+| --- | --- |
+| Type | Random search |
+| Exploration | Maximum |
+| Exploitation | None |
+| Complexity | Minimal |
+
+Use random search for:
+
+- Baseline comparisons.
+- Early pipeline debugging.
+- Very small or poorly understood spaces.
+- Cases where you want a neutral reference strategy.
+
+Random search is often stronger than people expect, especially as a baseline.
+
+## CMA-ES Sampler
+
+CMA-ES stands for Covariance Matrix Adaptation Evolution Strategy.
+
+It is an evolutionary method that maintains a multivariate Gaussian search distribution and updates that distribution based on successful samples.
+
+Conceptually:
+
+```text
+sample population
+evaluate objective
+select strong candidates
+update mean and covariance
+repeat
+```
+
+Characteristics:
+
+| Property | Behavior |
+| --- | --- |
+| Type | Evolutionary strategy |
+| Exploration | Adaptive |
+| Handles correlations | Very well |
+| Continuous spaces | Excellent |
+
+Use CMA-ES for:
+
+- Continuous optimization.
+- Medium-dimensional spaces.
+- Expensive smooth objectives.
+- Problems where parameter correlations matter.
+
+Limitations:
+
+- It is not a natural fit for categorical variables.
+- It often has a slower warm-up phase than simpler approaches.
+
+Illustrative setup:
+
+```python
+sampler = optuna.samplers.CmaEsSampler()
+study = optuna.create_study(sampler=sampler, direction="minimize")
+```
+
+## Grid Sampler
+
+`GridSampler` performs exhaustive search over a predefined grid.
+
+```python
+search_space = {
+	"x": [-2, 0, 2],
+	"y": [-1, 1],
+}
+
+sampler = optuna.samplers.GridSampler(search_space)
+```
+
+It does not learn from past results. Its purpose is deterministic coverage of a fixed set of combinations.
+
+Characteristics:
+
+| Property | Behavior |
+| --- | --- |
+| Type | Exhaustive search |
+| Exploration | Deterministic |
+| Learning | None |
+
+Use grid search when:
+
+- The space is genuinely small.
+- Reproducible coverage matters more than efficiency.
+- You want a controlled benchmark.
+
+Its weakness is obvious: it becomes impractical very quickly as the number of parameters grows.
+
+## NSGA-II for Multi-Objective Optimization
+
+`NSGAIISampler` is used for multi-objective optimization.
+
+Instead of optimizing a single objective
+
+$$
+f(x)
+$$
+
+you optimize multiple objectives simultaneously, such as:
+
+$$
+f_1(x), f_2(x)
+$$
+
+For example, you may want to maximize accuracy while minimizing model size.
+
+The goal is not a single best point, but a Pareto frontier: a set of trade-off solutions where improving one objective would worsen another.
+
+```python
+study = optuna.create_study(
+	directions=["minimize", "maximize"],
+	sampler=optuna.samplers.NSGAIISampler(),
+)
+```
+
+Characteristics:
+
+| Property | Behavior |
+| --- | --- |
+| Type | Evolutionary multi-objective optimization |
+| Output | Pareto set |
+| Exploration | Population-based |
+
+## Exploration Behavior Across Samplers
+
+Different samplers explore the space differently.
+
+| Sampler | Exploration strategy |
+| --- | --- |
+| Random | Uniform sampling |
+| TPE | Probabilistic density modeling |
+| CMA-ES | Adaptive Gaussian search |
+| Grid | Deterministic enumeration |
+| NSGA-II | Evolutionary population search |
+
+These choices influence:
+
+- Convergence speed.
+- Sample efficiency.
+- Robustness to local structure.
+- Suitability for mixed or high-dimensional spaces.
+
+## Samplers in High-Dimensional Spaces
+
+High-dimensional optimization is difficult because search volume grows rapidly with the number of parameters.
+
+If each parameter has $k$ relevant configurations and the dimension is $d$, then the effective search burden grows roughly like:
+
+$$
+k^d
+$$
+
+That is why high-dimensional behavior matters so much when choosing a sampler.
+
+In broad practical terms:
+
+| Sampler | High-dimensional behavior |
+| --- | --- |
+| Random | Moderate baseline |
+| TPE | Often strong in mixed spaces |
+| CMA-ES | Useful in continuous spaces, but not universal |
+| Grid | Usually poor |
+
+TPE often performs well in mixed, structured problems with dozens of parameters, which is one reason it became Optuna's default choice.
+
+## Choosing the Right Sampler
+
+As a practical rule of thumb:
+
+| Situation | Recommended sampler |
+| --- | --- |
+| General hyperparameter tuning | TPE |
+| Baseline comparison | Random |
+| Continuous optimization | CMA-ES |
+| Small discrete space | Grid |
+| Multi-objective problem | NSGA-II |
+
+The default recommendation remains simple:
+
+> Start with TPE unless you have a concrete reason to choose something else.
+
+::: {.callout-warning}
+## Common Mistake
+
+Do not compare samplers on a poorly designed or unfairly scaled search space and then conclude that one algorithm is intrinsically better. Sampler performance depends heavily on search-space structure, budget, parameter types, and objective noise.
+:::
+
+## Practical Exercise: Compare Samplers
+
+Compare TPE and random search on the same one-dimensional objective:
+
+$$
+f(x) = (x - 3)^2 + \sin(5x)
+$$
+
+```{python}
+import math
+import optuna
+
+optuna.logging.set_verbosity(optuna.logging.WARNING)
+
+
+def objective(trial):
+	x = trial.suggest_float("x", -5, 5)
+	return (x - 3) ** 2 + math.sin(5 * x)
+
+
+study_tpe = optuna.create_study(
+	sampler=optuna.samplers.TPESampler(),
+	direction="minimize",
+)
+study_tpe.optimize(objective, n_trials=100)
+
+study_random = optuna.create_study(
+	sampler=optuna.samplers.RandomSampler(),
+	direction="minimize",
+)
+study_random.optimize(objective, n_trials=100)
+
+print("TPE best:", round(study_tpe.best_value, 4))
+print("Random best:", round(study_random.best_value, 4))
+```
+
+What to observe:
+
+- Early trials often look similar.
+- TPE usually begins exploiting strong regions sooner.
+- Random search continues broad exploration throughout the run.
+
+If you want to deepen the exercise, repeat the comparison with a larger trial budget or a two-parameter function.
+
+## Recap
+
+Samplers determine how Optuna chooses new parameter values.
+
+| Sampler | Best fit |
+| --- | --- |
+| TPE | General hyperparameter tuning |
+| Random | Baselines and debugging |
+| CMA-ES | Continuous optimization |
+| Grid | Small discrete spaces |
+| NSGA-II | Multi-objective optimization |
+
+TPE is the default because it balances exploration and exploitation, handles categorical and conditional spaces well, and remains practical in many high-dimensional problems.
+
+## Decision Guide
+
+Use the following mental model:
+
+- Use TPE as the general default.
+- Use random search to establish a baseline or sanity check a pipeline.
+- Use CMA-ES when the space is mostly continuous and parameter correlations matter.
+- Use grid only when the space is intentionally tiny.
+- Use NSGA-II when there is no single objective to optimize.
+
+Next, [Pruning](08-pruning.qmd) turns to one of Optuna's most important efficiency features: stopping weak trials early to save compute.
