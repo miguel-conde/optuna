@@ -1,3 +1,60 @@
 # Summary
 
-In summary, this book has no content whatsoever.
+This book set out to present Optuna as more than a convenient hyperparameter-tuning tool. Across the full set of chapters, the central idea has been consistent: Optuna is a practical framework for black-box optimization problems where evaluations are expensive, noisy, structured, or operationally constrained.
+
+The early chapters established the optimization setting itself. We started from the limits of grid search, random search, and gradient-based thinking in black-box problems, then moved into Bayesian optimization concepts and the TPE algorithm that gives Optuna much of its practical strength. That foundation matters because good Optuna usage depends on understanding what kind of search problem you are solving, not just which API call to make.
+
+The middle chapters focused on workflow design. You saw how studies and trials are structured, how search spaces should be defined, how samplers differ, and how pruning changes the economics of expensive evaluations. Those chapters all point to the same practical truth: optimization performance is shaped as much by search-space design and evaluation logic as by the optimizer itself.
+
+The later chapters broadened the picture. We moved into multi-objective optimization, diagnostics, distributed execution, machine-learning workflows, general-purpose black-box optimization, and production concerns such as persistence, reproducibility, and operational handoff. By that point, Optuna stopped looking like a tuning helper and started looking like part of a broader optimization system.
+
+## The Main Lessons To Keep
+
+Several ideas should remain after the details of the individual examples fade.
+
+- Optimization begins with problem formulation. A bad search space or a weak evaluation protocol will undermine even a strong sampler.
+- TPE is a strong default for many real Optuna workloads, but defaults should still be justified against problem structure.
+- Pruning is valuable when intermediate signals are meaningful, not merely because early stopping sounds efficient.
+- Diagnostics matter. Optimization history, parameter importance, and interaction plots are part of understanding the search, not optional polish.
+- Persistent studies, metadata, and final-training separation are essential once optimization moves beyond local experiments.
+- Optuna applies well beyond machine learning whenever the objective can be evaluated as a black box and sample efficiency matters.
+
+## How The Parts Fit Together
+
+The structure of the book was cumulative by design.
+
+- The foundations explain why Optuna exists.
+- The core usage chapters explain how to express problems in Optuna.
+- The advanced chapters explain how to interpret, scale, and extend optimization workflows.
+- The application chapters show how the same ideas transfer across ML, benchmark optimization, simulation, and production systems.
+- The capstone chapter turns those ideas into a portfolio of complete workflows.
+
+If you have worked through the full book carefully, you should now be able to move between theory and practice without treating them as separate worlds.
+
+## What Competence Should Look Like Now
+
+At this point, you should be able to answer questions such as:
+
+- Is this problem a good fit for Optuna?
+- Is the search space reflecting the real structure of the decision problem?
+- Is the objective measuring what actually matters?
+- Is the evaluation protocol stable and leakage-free?
+- Is the chosen sampler appropriate for the space and budget?
+- Are the results reproducible, inspectable, and operationally usable?
+
+Those are better indicators of mastery than simply knowing how to launch a study.
+
+## Where To Go Next
+
+There are several strong next steps depending on your goals.
+
+- If you care most about applied machine learning, extend the pipeline and production chapters into your own project templates.
+- If you care about optimization research, use the benchmark and sampler-comparison material as a starting point for more systematic experiments.
+- If you work with simulations or decision systems, adapt the general-optimization and production chapters into reproducible black-box optimization workflows.
+- If you lead teams, turn the practical rules from this book into an internal playbook covering search spaces, evaluation design, storage, diagnostics, and deployment handoff.
+
+## Final Takeaway
+
+The real value of Optuna is not that it automates search. Many tools can automate search. Its value is that it lets you express complex optimization problems cleanly, reuse information efficiently, and build workflows that scale from quick experiments to reproducible systems.
+
+Used well, Optuna is not just a tuning library. It is a disciplined way to think about black-box optimization in practice.

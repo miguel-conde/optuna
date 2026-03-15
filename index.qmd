@@ -1,5 +1,48 @@
 # Preface {.unnumbered}
 
-This is a Quarto book.
+This book is a practical and theoretical guide to using Optuna as a modern black-box optimization framework. It is written for readers who already know Python, machine learning, and standard hyperparameter-search ideas, but want a deeper and more systematic understanding of how Optuna works and where it fits beyond routine model tuning.
 
-To learn more about Quarto books visit <https://quarto.org/docs/books>.
+Most introductions to Optuna stop at the mechanics of `create_study`, `trial.suggest_*`, and `study.optimize`. Those tools matter, but they are only the surface. The more important questions are structural: what kind of optimization problem are you actually solving, why do some search spaces fail, when does TPE outperform simpler baselines, how should pruning be interpreted, and what changes when optimization becomes distributed, persistent, and production-facing.
+
+This book is organized as a progression from foundations to applications. The early chapters explain the optimization setting Optuna was built for. The middle chapters cover search-space design, samplers, pruning, diagnostics, and distributed execution. The later chapters apply those ideas to machine learning, general black-box optimization, and production workflows, before ending with a capstone portfolio in [Final Project](modules/15-final-project.qmd).
+
+The intended reading style is hands-on but critical. Most chapters include runnable examples, but the goal is not only to run code successfully. The goal is to understand why a workflow is well designed, when a result should be trusted, and what trade-offs appear once optimization is used in realistic systems.
+
+## Who This Book Is For
+
+This book assumes that you already have:
+
+- working knowledge of Python
+- familiarity with machine-learning evaluation
+- basic understanding of grid search and random search
+- enough mathematical maturity to follow optimization arguments and probability-based intuition
+
+It is not written as a first introduction to machine learning or Python. It is written for practitioners who want to move from “I can tune a model with Optuna” to “I can design and justify optimization workflows across several problem classes.”
+
+## What You Will Learn
+
+By the end of the book, you should be able to:
+
+- explain the black-box optimization setting that motivates Optuna
+- understand the role of Bayesian optimization ideas and the TPE algorithm
+- design effective search spaces, including conditional and hierarchical ones
+- choose and interpret samplers and pruners more deliberately
+- diagnose optimization behavior using visual and statistical signals
+- scale studies across persistent and distributed workflows
+- apply Optuna to machine learning, benchmark optimization, and simulation-based objectives
+- structure optimization work so that results are reproducible and operationally credible
+
+## How To Use The Book
+
+There are two reasonable ways to read it.
+
+- Read it sequentially if you want the full conceptual arc from foundations to capstone.
+- Read by need if you already use Optuna and want targeted guidance on topics such as [Designing Search Spaces](modules/06-designing-search-spaces.qmd), [Visualization and Diagnostics](modules/10-visualization-diagnostics.qmd), or [Production Workflows](modules/14-production-workflows.qmd).
+
+If you plan to implement serious optimization workflows, the strongest path is sequential reading followed by the capstone chapter. The chapters are designed to build on one another, especially from the TPE discussion onward.
+
+## A Note On Scope
+
+Optuna is often introduced as a hyperparameter optimization library, but this book deliberately uses a wider framing. Hyperparameter tuning is one major application, not the whole story. The same Optuna abstractions can be used for simulation calibration, benchmark-function optimization, algorithm configuration, and other black-box search problems where evaluation is expensive or noisy.
+
+That broader perspective is the organizing idea of the book.

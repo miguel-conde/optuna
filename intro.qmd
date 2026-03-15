@@ -1,5 +1,112 @@
 # Introduction
 
-This is a book created from markdown and executable code.
+Optuna is one of the most effective libraries available for modern black-box optimization in Python. Many users encounter it through hyperparameter tuning, but that entry point can hide its deeper value. Optuna is not merely a convenience wrapper around search loops. It is a flexible framework for making optimization decisions under limited budgets, expensive evaluations, mixed search spaces, and uncertain objective behavior.
 
-See @knuth84 for additional discussion of literate programming.
+This book takes that broader view seriously. Its central claim is that Optuna becomes far more useful once you understand the optimization setting it was designed for, the statistical logic behind its default sampler, and the engineering discipline required to evaluate and operationalize the results.
+
+## The Problem Optuna Solves
+
+The class of problems Optuna handles well has a recognizable structure.
+
+You have a function or system that can be evaluated, but not easily analyzed. Each evaluation may be expensive, noisy, or stochastic. The search space may include continuous, integer, categorical, or conditional decisions. Gradients may be unavailable or irrelevant. And the total trial budget may be small enough that brute-force search is wasteful.
+
+That is the black-box optimization setting. In practical terms, it includes problems such as:
+
+- tuning a machine-learning pipeline under cross-validation
+- calibrating a simulation to match observed behavior
+- comparing algorithmic configurations under runtime constraints
+- optimizing a stochastic system where every evaluation includes randomness
+
+Optuna gives you a way to search these spaces adaptively rather than blindly.
+
+## Why This Book Exists
+
+There are many code examples online that show how to use Optuna, but fewer resources explain the reasoning behind effective usage. In practice, mistakes often happen at a higher level than syntax.
+
+Common failures include:
+
+- badly designed search spaces
+- overconfident interpretation of noisy results
+- leakage in machine-learning evaluation
+- misuse of persistent storage or distributed workers
+- premature confidence in one sampler without understanding the landscape
+
+This book is meant to close that gap. It combines theory, implementation, and workflow design so that Optuna is treated as part of an optimization methodology, not just a library call.
+
+## How The Book Is Organized
+
+The book is divided into four parts.
+
+### Part I: Foundations
+
+The opening modules explain what black-box optimization is, why classical exhaustive search fails, how Bayesian optimization is framed conceptually, and why TPE matters so much in Optuna's design.
+
+### Part II: Core Usage
+
+The next part covers the mechanics that determine whether Optuna is effective in practice: studies, trials, parameter suggestion APIs, search-space design, sampler behavior, and pruning.
+
+### Part III: Advanced Techniques
+
+This part moves into multi-objective optimization, diagnostics, distributed execution, and the deeper operational patterns required once studies become more complex or costly.
+
+### Part IV: Applications
+
+The final part applies the earlier ideas to machine learning, general black-box optimization, production workflows, and a capstone portfolio in [Final Project](modules/15-final-project.qmd).
+
+The structure is intentionally cumulative. Later chapters assume you understand not just the API, but the optimization logic behind it.
+
+## What You Should Expect From The Examples
+
+Most important chapters include runnable examples, but the examples are intentionally small. The goal is to make the logic visible rather than hide it in a large notebook or application scaffold.
+
+You should expect examples that are:
+
+- short enough to read in one sitting
+- self-contained when practical
+- designed to illustrate one main idea at a time
+- connected to realistic trade-offs rather than only happy-path usage
+
+Where a code block is not meant to execute during the book build, it is presented as a copyable pattern rather than as a runnable notebook cell. That distinction is deliberate. The book tries to balance correctness, readability, and real workflow relevance.
+
+## A Working Mental Model
+
+One useful way to think about Optuna is as a coordination layer around repeated experiments.
+
+```text
+define search space
+	-> evaluate candidate
+	-> record result
+	-> update search strategy
+	-> repeat under budget
+```
+
+Everything else in the book refines that loop.
+
+- The theory chapters explain why the loop should be adaptive.
+- The architecture chapters explain how Optuna represents the loop internally.
+- The search-space and sampler chapters explain how to make the loop effective.
+- The diagnostics and production chapters explain how to make the loop trustworthy.
+
+## What “Mastery” Looks Like Here
+
+By the end of the book, mastery does not mean memorizing every API. It means being able to answer questions such as:
+
+- Is this a good optimization problem for Optuna?
+- Is the search space well designed for the actual decision structure?
+- Does the evaluation protocol measure what we claim it measures?
+- Are the results robust enough to trust?
+- Which sampler or pruning strategy is justified here?
+- Can this workflow be resumed, inspected, and operationalized later?
+
+That is the standard this book is written toward.
+
+## Suggested Reading Path
+
+If you are new to serious optimization work, read the book in order. If you already use Optuna, you can still benefit from the following path:
+
+1. Start with the foundations to align the optimization framing.
+2. Read the chapters on search spaces, samplers, and pruning carefully.
+3. Use the diagnostics and production chapters to harden your workflows.
+4. Finish with the capstone in [Final Project](modules/15-final-project.qmd).
+
+The next chapter, [Foundations of Modern Optimization](modules/01-foundations-modern-optimization.qmd), starts with the fundamental question behind everything that follows: what kind of optimization problem are we really trying to solve when we reach for a tool like Optuna?
