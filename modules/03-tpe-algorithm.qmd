@@ -111,8 +111,8 @@ $$
 
 For a minimization problem, we then split the trials into:
 
-- Good observations, where $y < y^*$.
-- Bad observations, where $y \ge y^*$.
+-   Good observations, where $y < y^*$.
+-   Bad observations, where $y \ge y^*$.
 
 That split is what allows TPE to build two separate models of the search space.
 
@@ -130,10 +130,10 @@ $$
 
 Interpretation:
 
-| Density | Meaning |
-| --- | --- |
-| $\ell(x)$ | Parameter values associated with good objective values |
-| $g(x)$ | Parameter values associated with worse objective values |
+| Density   | Meaning                                                 |
+|-----------|---------------------------------------------------------|
+| $\ell(x)$ | Parameter values associated with good objective values  |
+| $g(x)$    | Parameter values associated with worse objective values |
 
 The optimizer then searches for candidates that score well under the good density and poorly under the bad density.
 
@@ -149,23 +149,23 @@ This plays a role similar to an acquisition function in classical Bayesian optim
 
 Candidates with a high ratio are appealing because they:
 
-- Resemble parameter settings that produced strong results.
-- Avoid regions already associated with weak results.
+-   Resemble parameter settings that produced strong results.
+-   Avoid regions already associated with weak results.
 
 This is the core decision rule behind TPE.
 
 ```{mermaid}
 flowchart LR
-	A[Observed trials] --> B[Split by quantile threshold]
-	B --> C[Good trials]
-	B --> D[Bad trials]
-	C --> E[Estimate l(x)]
-	D --> F[Estimate g(x)]
-	E --> G[Sample candidates]
-	F --> G
-	G --> H[Choose candidate with high l(x) / g(x)]
-	H --> I[Evaluate objective]
-	I --> A
+    A[Observed trials] --> B[Split by quantile threshold]
+    B --> C[Good trials]
+    B --> D[Bad trials]
+    C --> E["Estimate l(x)"]
+    D --> F["Estimate g(x)"]
+    E --> G[Sample candidates]
+    F --> G
+    G --> H["Choose candidate with high l(x) / g(x)"]
+    H --> I[Evaluate objective]
+    I --> A
 ```
 
 ## How Parzen Estimators Build the Densities
@@ -216,19 +216,19 @@ $$
 
 A simplified TPE workflow looks like this:
 
-1. Sample an initial set of random trials.
-2. Evaluate the objective.
-3. Split the observed trials into good and bad sets.
-4. Estimate $\ell(x)$ and $g(x)$.
-5. Sample candidate points from the promising region.
-6. Score candidates using $\ell(x) / g(x)$.
-7. Evaluate the best-scoring candidate.
-8. Update the observed trial set.
-9. Repeat.
+1.  Sample an initial set of random trials.
+2.  Evaluate the objective.
+3.  Split the observed trials into good and bad sets.
+4.  Estimate $\ell(x)$ and $g(x)$.
+5.  Sample candidate points from the promising region.
+6.  Score candidates using $\ell(x) / g(x)$.
+7.  Evaluate the best-scoring candidate.
+8.  Update the observed trial set.
+9.  Repeat.
 
 The crucial detail is that TPE samples many candidates and chooses among them, rather than solving a closed-form acquisition optimization problem.
 
-::: {.callout-warning}
+::: callout-warning
 ## Common Mistake
 
 Do not interpret TPE as directly estimating the optimum or directly predicting the objective value. TPE is ranking candidates through density comparison. That is a different kind of model from GP regression, and misunderstanding that difference often leads to confused explanations of how Optuna's sampler works.
@@ -248,10 +248,10 @@ TPE handles categorical parameters naturally, which is a major advantage in real
 
 For example, an Optuna search space may contain a categorical branch such as:
 
-```python
+``` python
 optimizer = trial.suggest_categorical(
-	"optimizer",
-	["adam", "sgd", "rmsprop"],
+    "optimizer",
+    ["adam", "sgd", "rmsprop"],
 )
 ```
 
@@ -259,11 +259,11 @@ optimizer = trial.suggest_categorical(
 
 TPE is especially well suited for conditional search spaces, which is where the "tree-structured" part of its name becomes practical.
 
-```python
+``` python
 model = trial.suggest_categorical("model", ["xgboost", "svm"])
 
 if model == "xgboost":
-	depth = trial.suggest_int("depth", 3, 10)
+    depth = trial.suggest_int("depth", 3, 10)
 ```
 
 This kind of conditional structure is common in Optuna studies and awkward for classical GP formulations.
@@ -276,9 +276,9 @@ In broad terms, TPE tends to scale much more gracefully than Gaussian-process ap
 
 Optuna is designed around three practical goals:
 
-- Strong performance in hyperparameter optimization.
-- Flexible search spaces.
-- Scalability to realistic workloads.
+-   Strong performance in hyperparameter optimization.
+-   Flexible search spaces.
+-   Scalability to realistic workloads.
 
 TPE aligns well with all three, which is why Optuna uses it as the default sampler.
 
@@ -288,10 +288,10 @@ That does not mean TPE is the only valid strategy. Optuna also supports alternat
 
 Extend the fast example at the top of the chapter in four steps:
 
-1. Add a loop so the newly suggested point is appended to the observed trials.
-2. Recompute the good and bad split after each new evaluation.
-3. Change the value of `gamma` and observe how the search behavior shifts.
-4. Replace the candidate grid with random candidate sampling and compare the selected points.
+1.  Add a loop so the newly suggested point is appended to the observed trials.
+2.  Recompute the good and bad split after each new evaluation.
+3.  Change the value of `gamma` and observe how the search behavior shifts.
+4.  Replace the candidate grid with random candidate sampling and compare the selected points.
 
 The goal is not to reproduce Optuna's production sampler exactly. The goal is to internalize the density-ratio idea that drives the algorithm.
 
@@ -317,9 +317,9 @@ This leads to two densities, $\ell(x)$ and $g(x)$, and a candidate-selection rul
 
 Use the following mental model:
 
-- Think of TPE as Bayesian optimization through density comparison rather than surrogate regression.
-- Use it when the search space includes categorical or conditional choices.
-- Expect it to be a strong default for practical Optuna studies.
-- Do not expect it to provide the same style of uncertainty model as a Gaussian process.
+-   Think of TPE as Bayesian optimization through density comparison rather than surrogate regression.
+-   Use it when the search space includes categorical or conditional choices.
+-   Expect it to be a strong default for practical Optuna studies.
+-   Do not expect it to provide the same style of uncertainty model as a Gaussian process.
 
 Next, [Optuna Architecture](04-optuna-architecture.qmd) connects this optimization logic to the concrete building blocks of an Optuna study: studies, trials, samplers, pruners, and storage.

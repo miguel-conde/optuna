@@ -1,11 +1,34 @@
 ---
 name: optuna-qmd-chapter-writer
 description: Convert raw chapter notes or AI-generated draft text into polished Quarto .qmd chapter files for this Optuna book, following the syllabus, the book style guide, and the existing chapter conventions. Use this skill when you need to turn raw text into a finished or near-finished Quarto chapter for this repository.
+
 ---
 
 # Optuna QMD Chapter Writer
 
 Use this skill when you need to turn raw text into a finished or near-finished Quarto chapter for this repository.
+
+## Workflow Checklist
+
+Copy this checklist into session memory at the start of any chapter-writing task. Check off each item as it is completed. **Do not consider the task done until the user explicitly approves the final chapter content and the branch is merged.**
+
+- [ ] **Git: create branch** — `git checkout -b chapter/<module-slug>`
+- [ ] **Step 1 — Confirm chapter target** — Map raw text to module; check target file state
+- [ ] **Step 2 — Extract the instructional promise** — Identify learning outcomes; declare what is deferred
+- [ ] **Step 3 — Normalize raw source material** — Clean notes into prose; fix math and terminology
+- [ ] **Git: commit scaffold** — `git commit -m "chore(chapter-N): add initial scaffold"`
+- [ ] **Step 4 — Apply the book chapter structure** — Build all required sections
+- [ ] **Step 5 — Add Quarto-specific formatting** — Math, callouts, code blocks, visuals
+- [ ] **Git: commit first draft** — `git commit -m "draft(chapter-N): first complete draft"`
+- [ ] **Step 6 — Enforce book-specific quality checks** — Verify all minimum elements are present
+- [ ] **Step 7 — Keep scope disciplined** — Cut or defer anything outside the module boundary
+- [ ] **Step 8 — Validate the result** — Render, check syntax, fix any errors
+- [ ] **Git: commit validated draft** — `git commit -m "draft(chapter-N): validated draft ready for review"`
+- [ ] **Step 9 — Present to user for review** — Share the chapter; wait for explicit approval or revision requests
+- [ ] **Step 10 — Apply revisions** — Incorporate user feedback; iterate until approved
+- [ ] **Git: finalize** — `git commit -m "feat(chapter-N): approved chapter"` then merge to `main`
+
+---
 
 This skill is specific to the Optuna book in this workspace. It assumes:
 
@@ -53,6 +76,17 @@ Before drafting or editing a chapter, read and align with:
 
 ## Workflow
 
+### 0. Create a git branch
+
+Before touching any file, create a dedicated branch for the chapter:
+
+```bash
+git checkout -b chapter/<module-slug>
+# e.g. chapter/02-bayesian-optimization-fundamentals
+```
+
+This isolates work in progress and allows intermediate commits without affecting `main`. The branch is merged only after the user approves the final content.
+
 ### 1. Confirm chapter target
 
 Map the raw text to the intended module and target file.
@@ -90,6 +124,13 @@ Typical cleanup tasks:
 - Preserve useful examples, definitions, and comparisons.
 - Correct terminology so terms like study, trial, sampler, pruner, and objective remain consistent.
 
+After normalization, commit the file with the initial scaffold in place:
+
+```bash
+git add modules/<chapter-file>.qmd
+git commit -m "chore(chapter-N): add initial scaffold from raw notes"
+```
+
 ### 4. Apply the book chapter structure
 
 Default chapter pattern:
@@ -118,6 +159,13 @@ Ensure the chapter uses proper Quarto conventions:
 - Mermaid or plots when a lightweight visual improves comprehension.
 
 Prefer small runnable examples that fit on one screen.
+
+Once the structure is complete and all formatting is applied, commit the first full draft:
+
+```bash
+git add modules/<chapter-file>.qmd
+git commit -m "draft(chapter-N): first complete draft with structure and formatting"
+```
 
 ### 6. Enforce book-specific quality checks
 
@@ -155,6 +203,52 @@ After editing:
 - Confirm that math, callouts, code blocks, and links are valid.
 
 If rendering fails because of environment issues, separate content problems from tooling problems.
+
+Once the chapter renders cleanly, commit the validated draft:
+
+```bash
+git add modules/<chapter-file>.qmd
+git commit -m "draft(chapter-N): validated draft ready for review"
+```
+
+### 9. Request user approval
+
+Present the chapter to the user. Do not proceed to merge until the user explicitly approves the content.
+
+Show a brief summary of what was written:
+
+- Module number and title.
+- Sections included.
+- Any content deliberately deferred and where it was cross-linked.
+- Any open questions or sections that need the user's input.
+
+Then ask explicitly: **"Does this chapter meet your expectations, or would you like revisions?"**
+
+### 10. Apply revisions and finalize
+
+For each round of revisions:
+
+1. Make the requested changes to the `.qmd` file.
+2. Commit each revision round:
+
+```bash
+git add modules/<chapter-file>.qmd
+git commit -m "fix(chapter-N): revisions from user review"
+```
+
+3. Present the updated chapter again.
+4. Repeat until the user gives explicit approval.
+
+Once the user approves, create the final commit and merge to `main`:
+
+```bash
+git add modules/<chapter-file>.qmd
+git commit -m "feat(chapter-N): approved chapter – <short title>"
+git checkout main
+git merge chapter/<module-slug>
+```
+
+Only after this merge is the task considered complete.
 
 ## Decision Points
 

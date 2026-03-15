@@ -1,327 +1,386 @@
-# Module 2 — Bayesian Optimization Fundamentals
+# Module 3 — The TPE Algorithm (Core of Optuna)
 
-**Goal:** Understand the theory behind modern hyperparameter optimization and why algorithms like **Optuna’s TPE** work.
+**Goal:** Understand the algorithm Optuna actually uses to perform optimization:
+**TPE — Tree-structured Parzen Estimator**.
 
-Bayesian Optimization (BO) is designed for problems where:
-
-* evaluations are **expensive**
-* gradients are **not available**
-* the function is **unknown**
-
-Instead of directly optimizing the objective function (f(x)), BO builds a **probabilistic model of the function** and uses it to decide **where to evaluate next**.
+Unlike classical Bayesian Optimization based on **Gaussian Processes**, TPE uses **density estimation**. This allows it to scale better to high-dimensional and structured search spaces.
 
 ---
 
-# 1. Surrogate Models
+# 1. Density Estimation Approach
 
-The key idea of Bayesian Optimization is replacing the true function with an **approximate probabilistic model**.
-
-Let:
+Traditional Bayesian optimization models:
 
 [
-f(x)
+p(y|x)
 ]
 
-be the true objective function.
+meaning:
 
-We construct a **surrogate model**:
+> What is the distribution of the objective value given parameters (x)?
+
+TPE flips the problem.
+
+Instead it models:
 
 [
-\hat{f}(x)
+p(x|y)
 ]
 
-This surrogate approximates the behavior of the true function using previously observed data.
+meaning:
 
-Training data:
+> What parameter values tend to produce good objective values?
 
-[
-D = {(x_1, y_1), (x_2, y_2), ..., (x_n, y_n)}
-]
+This reformulation allows the algorithm to use **density estimation** instead of regression.
 
-where
+The core idea:
 
-[
-y_i = f(x_i)
-]
-
-The surrogate model estimates:
-
-* **expected value of the function**
-* **uncertainty of the estimate**
-
-So for every (x), we obtain:
-
-[
-p(f(x)\mid D)
-]
-
-Meaning: a **probability distribution of possible values**.
-
-This uncertainty estimate is what allows BO to balance **exploration and exploitation**.
+1. Evaluate some trials
+2. Separate **good results** and **bad results**
+3. Estimate probability densities for each group
+4. Sample new parameters likely to belong to the **good region**
 
 ---
 
-# 2. Gaussian Processes (Conceptual Overview)
+# 2. Splitting Observations into Good vs Bad Regions
 
-The most classical surrogate model in Bayesian Optimization is the **Gaussian Process (GP)**.
-
-A Gaussian Process defines a distribution over functions.
-
-Instead of modeling parameters, it models the **entire function space**.
-
-Formally:
+Assume we already evaluated (n) points:
 
 [
-f(x) \sim \mathcal{GP}(m(x), k(x,x'))
+(x_1,y_1), (x_2,y_2), ..., (x_n,y_n)
 ]
 
-Where:
+Define a threshold (y^*) such that:
 
-* (m(x)) → mean function
-* (k(x,x')) → covariance kernel
+* the **best γ fraction** of trials are considered **good**
+* the rest are considered **bad**
+
+Typically:
+
+[
+\gamma \approx 0.1\text{–}0.25
+]
+
+Then we define two datasets:
+
+Good observations:
+
+[
+y < y^*
+]
+
+Bad observations:
+
+[
+y \ge y^*
+]
+
+From these we estimate two probability densities.
+
+---
+
+# 3. Two Density Models
+
+TPE builds two models:
+
+[
+l(x) = p(x | y < y^*)
+]
+
+[
+g(x) = p(x | y \ge y^*)
+]
 
 Interpretation:
 
-* the mean represents the **expected function value**
-* the kernel defines **similarity between inputs**
+| Density | Meaning                                          |
+| ------- | ------------------------------------------------ |
+| (l(x))  | parameters that tend to produce **good results** |
+| (g(x))  | parameters associated with **bad results**       |
 
-Common kernels:
+The goal becomes:
 
-* RBF kernel
-* Matern kernel
-* Rational quadratic
-
-Intuition:
-
-Points close together in input space should have **similar outputs**.
+> Sample parameters that look like **good trials**, but not like **bad trials**.
 
 ---
 
-### Prediction with a GP
+# 4. Likelihood Ratio Optimization
 
-For a candidate point (x), the GP predicts:
-
-* mean:
+The next evaluation point is chosen by maximizing:
 
 [
-\mu(x)
+\frac{l(x)}{g(x)}
 ]
-
-* variance:
-
-[
-\sigma^2(x)
-]
-
-Meaning we estimate:
-
-[
-f(x) \sim \mathcal{N}(\mu(x), \sigma^2(x))
-]
-
-So each candidate point has:
-
-* **expected value**
-* **uncertainty**
-
-These two quantities drive the **acquisition function**.
-
----
-
-# 3. Acquisition Functions
-
-The surrogate model approximates the function.
-
-But how do we decide **where to sample next**?
-
-That decision is made using an **acquisition function**.
-
-The acquisition function determines the **utility of evaluating a candidate point**.
-
-General rule:
-
-[
-x_{next} = \arg\max a(x)
-]
-
-where (a(x)) is the acquisition function.
-
-Acquisition functions encode the **exploration–exploitation tradeoff**.
-
-They prefer points that are either:
-
-* predicted to be **good**
-* have **high uncertainty**
-
----
-
-# 4. Probability of Improvement (PI)
-
-The simplest acquisition function.
-
-Goal:
-
-Evaluate points likely to improve the best observed value.
-
-Let:
-
-* (f^*) = best observed value
-* (f(x)) = predicted distribution
-
-Probability of improvement:
-
-[
-PI(x) = P(f(x) < f^*)
-]
-
-(for minimization problems)
 
 Interpretation:
 
-Pick points with high probability of beating the current best.
+Good candidate points have:
 
-Problem:
+* high probability under **good density**
+* low probability under **bad density**
 
-PI tends to **over-exploit** promising regions.
+This ratio acts similarly to an **acquisition function**.
 
----
-
-# 5. Expected Improvement (EI)
-
-Expected Improvement solves the main weakness of PI.
-
-Instead of just asking:
-
-> “What is the probability of improvement?”
-
-we ask:
-
-> “How large might the improvement be?”
-
-Expected improvement:
-
-[
-EI(x) = E[\max(f^* - f(x),0)]
-]
-
-Meaning:
-
-Expected gain over the current best.
-
-EI balances:
-
-* **low predicted mean**
-* **high uncertainty**
-
-This makes it one of the most widely used acquisition functions.
+But instead of using a GP model, it uses **density ratios**.
 
 ---
 
-# 6. Upper Confidence Bound (UCB)
+# 5. Parzen Density Estimators
 
-Another widely used acquisition strategy.
+How do we estimate (l(x)) and (g(x))?
 
-Upper confidence bound:
+Using **Kernel Density Estimation (KDE)**.
 
-[
-UCB(x) = \mu(x) + \kappa \sigma(x)
-]
-
-For maximization.
-
-For minimization:
+Given samples:
 
 [
-LCB(x) = \mu(x) - \kappa \sigma(x)
+x_1,x_2,...,x_n
 ]
 
-Where:
+The KDE estimate is:
 
-* ( \mu(x) ) → predicted mean
-* ( \sigma(x) ) → uncertainty
-* ( \kappa ) → exploration parameter
+[
+p(x)=\frac{1}{n}\sum_{i=1}^{n}K(x-x_i)
+]
 
-Large ( \kappa ):
+Where (K) is a kernel function (often Gaussian).
+
+Interpretation:
+
+Each observation contributes a **smooth bump** in the probability distribution.
+
+This produces a continuous density estimate.
+
+---
+
+# 6. Exploration vs Exploitation in TPE
+
+TPE balances exploration and exploitation through:
+
+### 1. Density ratio
+
+[
+\frac{l(x)}{g(x)}
+]
+
+High values indicate promising regions.
+
+---
+
+### 2. Random sampling
+
+TPE samples multiple candidates and evaluates their ratios.
+
+This keeps exploration alive.
+
+---
+
+### 3. Quantile threshold
+
+The parameter γ controls exploration.
+
+Typical value:
+
+[
+\gamma = 0.15
+]
+
+Lower γ:
+
+* stronger exploitation
+
+Higher γ:
 
 * more exploration
 
-Small ( \kappa ):
-
-* more exploitation
-
-This provides a **direct exploration control parameter**.
-
 ---
 
-# 7. Bayesian Optimization Loop
+# 7. The TPE Algorithm (Full Procedure)
 
-The full optimization procedure is:
+Simplified algorithm:
 
-```
-1. Sample initial random points
-2. Fit surrogate model (e.g., Gaussian Process)
-3. Compute acquisition function
-4. Select next point maximizing acquisition
-5. Evaluate objective function
-6. Update surrogate model
-7. Repeat
+```text
+1. Sample N random points
+2. Evaluate objective function
+3. Split trials into good and bad sets
+4. Estimate densities l(x) and g(x)
+5. Sample candidate parameters from l(x)
+6. Compute l(x) / g(x)
+7. Select best candidate
+8. Evaluate objective
+9. Update densities
+10. Repeat
 ```
 
-This allows the algorithm to **focus evaluations in promising areas**.
+Important detail:
+
+TPE **samples many candidates**, then chooses the best according to the likelihood ratio.
 
 ---
 
-# 8. Limitations of Gaussian Process Optimization
+# 8. Why TPE Works Well in Practice
 
-Although GP-based Bayesian optimization is powerful, it has several limitations.
+TPE has several advantages compared to GP-based optimization.
 
-### 1. Computational Complexity
+### Handles High Dimensions
 
-Training a Gaussian Process requires:
-
-[
-O(n^3)
-]
-
-where (n) is the number of observations.
-
-This limits scalability beyond a few thousand evaluations.
-
----
-
-### 2. High Dimensionality
-
-Gaussian Processes perform poorly when:
+Gaussian Processes struggle when:
 
 [
 d > 20
 ]
 
-Many ML problems involve **dozens of hyperparameters**.
+TPE works well with **dozens of parameters**.
 
 ---
 
-### 3. Handling Categorical Variables
+### Handles Categorical Variables
 
-GP kernels are designed for **continuous spaces**.
+TPE can easily model:
 
-Categorical parameters are awkward to represent.
+* discrete variables
+* categorical variables
+* conditional search spaces
+
+Example:
+
+```python
+optimizer = trial.suggest_categorical(
+    "optimizer",
+    ["adam","sgd","rmsprop"]
+)
+```
+
+---
+
+### Works with Tree-Structured Search Spaces
 
 Example:
 
 ```
-optimizer = ["adam", "sgd", "rmsprop"]
+model = trial.suggest_categorical("model", ["xgboost","svm"])
+
+if model == "xgboost":
+    depth = trial.suggest_int("depth",3,10)
 ```
 
-GP models struggle with this type of structure.
+This creates a **tree-structured parameter space**, which is hard for Gaussian processes.
 
 ---
 
-# 9. Transition to TPE (Tree-structured Parzen Estimator)
+### Efficient in Practice
 
-Optuna does **not** use Gaussian Processes.
+TPE has complexity roughly:
 
-Instead it uses **TPE**, which reformulates the optimization problem.
+[
+O(n)
+]
+
+per iteration.
+
+Much more scalable than:
+
+[
+O(n^3)
+]
+
+for Gaussian processes.
+
+---
+
+# 9. Why Optuna Uses TPE
+
+Optuna’s design goals:
+
+* high scalability
+* flexible search spaces
+* strong performance in ML hyperparameter tuning
+
+TPE satisfies all three.
+
+This is why **Optuna uses TPE as its default sampler**.
+
+Other samplers exist (we will study them later):
+
+* RandomSampler
+* CMA-ES
+* NSGA-II (multi-objective)
+
+---
+
+# Practical Exercise — Implement a Simplified TPE
+
+This simplified version captures the core idea.
+
+### Step 1 — Define the objective
+
+```python
+import numpy as np
+
+def objective(x):
+    return (x-2)**2 + np.sin(3*x)
+```
+
+---
+
+### Step 2 — Initial random sampling
+
+```python
+X = np.random.uniform(-5,5,20)
+Y = objective(X)
+```
+
+---
+
+### Step 3 — Split good vs bad trials
+
+```python
+gamma = 0.2
+threshold = np.quantile(Y, gamma)
+
+good = X[Y < threshold]
+bad = X[Y >= threshold]
+```
+
+---
+
+### Step 4 — Density estimation
+
+```python
+from scipy.stats import gaussian_kde
+
+l_density = gaussian_kde(good)
+g_density = gaussian_kde(bad)
+```
+
+---
+
+### Step 5 — Sample candidates
+
+```python
+candidates = np.random.uniform(-5,5,100)
+ratio = l_density(candidates) / g_density(candidates)
+
+x_next = candidates[np.argmax(ratio)]
+```
+
+---
+
+### Step 6 — Evaluate new point
+
+```python
+y_next = objective(x_next)
+```
+
+Append and repeat.
+
+This simplified version reproduces the **core mechanism behind TPE**.
+
+---
+
+# Key Takeaways
+
+TPE reformulates Bayesian optimization using **density estimation**.
 
 Instead of modeling:
 
@@ -329,117 +388,46 @@ Instead of modeling:
 p(y|x)
 ]
 
-TPE models:
+it models:
 
 [
 p(x|y)
 ]
 
-The algorithm splits observations into:
+This allows:
 
-* **good points**
-* **bad points**
+* better scalability
+* handling categorical variables
+* flexible search spaces
 
-Then it builds density estimators for both.
-
-Optimization becomes:
+The algorithm selects new candidates by maximizing:
 
 [
-\arg\max \frac{l(x)}{g(x)}
+\frac{l(x)}{g(x)}
 ]
 
-where:
-
-* (l(x)) → density of good observations
-* (g(x)) → density of bad observations
-
-Advantages:
-
-* scales better
-* handles categorical variables
-* works well in high dimensions
-* easy to implement
-
-This is why **Optuna uses TPE as its default sampler**.
-
-We will study the full TPE algorithm in **Module 3**.
+which favors parameters similar to **good trials** but different from **bad ones**.
 
 ---
 
-# Practical Exercise — Visualizing Acquisition Functions
-
-Let’s visualize **exploration vs exploitation**.
-
-We simulate a surrogate model prediction.
-
-```python
-import numpy as np
-import matplotlib.pyplot as plt
-from scipy.stats import norm
-
-x = np.linspace(-2, 6, 200)
-
-mu = np.sin(x) + 0.5
-sigma = 0.3 + 0.2*np.cos(x)
-
-f_best = -0.2
-
-z = (f_best - mu) / sigma
-EI = (f_best - mu) * norm.cdf(z) + sigma * norm.pdf(z)
-
-plt.figure(figsize=(8,5))
-plt.plot(x, mu, label="Predicted mean")
-plt.fill_between(x, mu-sigma, mu+sigma, alpha=0.2, label="Uncertainty")
-plt.plot(x, EI, label="Expected Improvement")
-plt.legend()
-plt.title("Acquisition Function Visualization")
-plt.show()
-```
-
-What to observe:
-
-* uncertainty drives exploration
-* low predicted mean drives exploitation
-* EI balances both
-
----
-
-# Key Takeaways
-
-Bayesian Optimization works by combining three components:
-
-1️⃣ **Surrogate model**
-
-Approximates the unknown function.
-
-2️⃣ **Uncertainty estimation**
-
-Allows exploration.
-
-3️⃣ **Acquisition function**
-
-Selects the next evaluation point.
-
-However, classical GP-based BO has limitations.
-
-Modern frameworks like **Optuna** use **TPE**, which is more scalable and flexible.
-
----
-
-# Before Moving to Module 3
+# Before Moving to Module 4
 
 Next module:
 
-**Module 3 — The TPE Algorithm (Core of Optuna)**
+# Module 4 — Optuna Architecture
 
-We will cover:
+We will study the internal components:
 
-* the mathematics of **Parzen estimators**
-* how Optuna splits good vs bad trials
-* the **likelihood ratio optimization**
-* how TPE replaces acquisition functions.
+* **Study**
+* **Trial**
+* **Objective functions**
+* **Samplers**
+* **Pruners**
+* **Storage backends**
+
+This is where theory meets **actual Optuna usage**.
 
 Before continuing, quick check:
 
-1️⃣ Is the intuition behind **surrogate models and acquisition functions** clear?
-2️⃣ Would you like a **step-by-step numerical example of Expected Improvement** before moving to TPE?
+1️⃣ Is the **density-ratio idea behind TPE** clear?
+2️⃣ Would you like a **visual explanation of how KDE builds the densities (l(x)) and (g(x))** before we move on?
