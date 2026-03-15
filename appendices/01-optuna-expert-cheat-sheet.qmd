@@ -1,0 +1,443 @@
+# Optuna Expert Cheat Sheet
+
+Use this appendix as a compact reference for the patterns, APIs, and decision rules that matter most in day-to-day Optuna work. It is meant to complement the main chapters, not replace them. When you need the full reasoning behind a recommendation, follow the cross-links back into the corresponding module.
+
+## How To Use This Appendix
+
+This appendix is organized around practical tasks:
+
+- defining an objective
+- choosing parameter types
+- selecting samplers and pruners
+- persisting and scaling studies
+- diagnosing search behavior
+- applying Optuna in machine-learning and production settings
+
+If you only need a quick reminder, jump to [One-Screen Summary](#one-screen-summary). If you need a slightly more complete operational reference, scan the sections in order.
+
+## 1. Basic Optimization Workflow
+
+Minimal Optuna workflow:
+
+```python
+import optuna
+
+
+def objective(trial):
+    x = trial.suggest_float("x", -10, 10)
+    return (x - 2) ** 2
+
+
+study = optuna.create_study(direction="minimize")
+study.optimize(objective, n_trials=100)
+
+print(study.best_params)
+print(study.best_value)
+```
+
+Core workflow:
+
+```text
+define objective
+create study
+run optimization
+inspect results
+```
+
+For the deeper conceptual picture, see [Basic Optuna Usage](../modules/05-basic-optuna-usage.qmd) and [Optuna Architecture](../modules/04-optuna-architecture.qmd).
+
+## 2. Parameter Suggestion API
+
+### Continuous parameters
+
+```python
+trial.suggest_float("lr", 1e-5, 1e-1)
+```
+
+### Log-scale parameters
+
+Use log scaling for multiplicative parameters such as learning rate, regularization, tolerances, and other quantities that span several orders of magnitude.
+
+```python
+trial.suggest_float("lr", 1e-5, 1e-1, log=True)
+```
+
+### Integer parameters
+
+```python
+trial.suggest_int("depth", 2, 10)
+```
+
+### Categorical parameters
+
+```python
+trial.suggest_categorical("optimizer", ["adam", "sgd"])
+```
+
+For search-space design guidance, see [Designing Search Spaces](../modules/06-designing-search-spaces.qmd).
+
+## 3. Conditional Search Spaces
+
+Optuna supports dynamic, define-by-run spaces.
+
+```python
+model = trial.suggest_categorical("model", ["rf", "svm"])
+
+if model == "rf":
+    depth = trial.suggest_int("depth", 3, 10)
+else:
+    c_value = trial.suggest_float("C", 1e-3, 10, log=True)
+```
+
+This creates hierarchical parameter spaces where later decisions depend on earlier choices.
+
+That pattern becomes essential once model families, pipeline branches, or architectural decisions vary across trials.
+
+## 4. Study Configuration
+
+### Default study
+
+```python
+study = optuna.create_study(direction="minimize")
+```
+
+### Custom sampler
+
+```python
+study = optuna.create_study(
+    sampler=optuna.samplers.TPESampler()
+)
+```
+
+### Persistent storage
+
+```python
+study = optuna.create_study(
+    storage="sqlite:///study.db",
+    study_name="experiment",
+    load_if_exists=True,
+)
+```
+
+Persistent storage is the default choice once a study matters beyond one local session. See [Distributed and Scalable Optimization](../modules/11-distributed-scalable-optimization.qmd) and [Production Workflows](../modules/14-production-workflows.qmd).
+
+## 5. Common Samplers
+
+| Sampler | Use case |
+| --- | --- |
+| `TPESampler` | General hyperparameter tuning and mixed spaces |
+| `RandomSampler` | Baselines and debugging |
+| `CmaEsSampler` | Continuous optimization |
+| `GridSampler` | Very small discrete search spaces |
+| `NSGAIISampler` | Multi-objective optimization |
+
+Example:
+
+```python
+sampler = optuna.samplers.CmaEsSampler()
+
+study = optuna.create_study(
+    sampler=sampler,
+    direction="minimize",
+)
+```
+
+The practical default for many problems remains TPE. Use other samplers when the geometry or objective structure clearly justifies it. See [Samplers](../modules/07-samplers.qmd).
+
+## 6. Pruning Pattern
+
+Pruning is useful for iterative training loops.
+
+```python
+for epoch in range(100):
+    loss = train()
+    trial.report(loss, epoch)
+
+    if trial.should_prune():
+        raise optuna.TrialPruned()
+```
+
+Create the study with a pruner:
+
+```python
+study = optuna.create_study(
+    pruner=optuna.pruners.MedianPruner()
+)
+```
+
+Use pruning only when intermediate values are genuinely meaningful. See [Pruning](../modules/08-pruning.qmd).
+
+## 7. Best Trial Retrieval
+
+After optimization:
+
+```python
+study.best_value
+study.best_params
+study.best_trial
+```
+
+Those are the first values you usually inspect, but they are not the whole story. Diagnostics and trial history still matter.
+
+## 8. Access All Trials
+
+```python
+for trial in study.trials:
+    print(trial.number)
+    print(trial.params)
+    print(trial.value)
+```
+
+The full trial list is useful for debugging, visualization, reporting, and understanding whether the study is converging or drifting.
+
+## 9. Visualization Tools
+
+Requires:
+
+```bash
+pip install plotly
+```
+
+### Optimization history
+
+```python
+optuna.visualization.plot_optimization_history(study)
+```
+
+### Parameter importance
+
+```python
+optuna.visualization.plot_param_importances(study)
+```
+
+### Slice plot
+
+```python
+optuna.visualization.plot_slice(study)
+```
+
+### Parallel coordinate
+
+```python
+optuna.visualization.plot_parallel_coordinate(study)
+```
+
+### Contour plots
+
+```python
+optuna.visualization.plot_contour(study)
+```
+
+These plots are most useful when treated as diagnostic tools rather than presentation extras. See [Visualization and Diagnostics](../modules/10-visualization-diagnostics.qmd).
+
+## 10. Dashboard
+
+Interactive monitoring:
+
+```bash
+optuna-dashboard sqlite:///study.db
+```
+
+It helps inspect:
+
+- trials
+- parameters
+- performance history
+- Pareto frontiers
+
+## 11. Distributed Optimization
+
+Shared database example:
+
+```python
+study = optuna.create_study(
+    storage="postgresql://user:pass@host/db",
+    load_if_exists=True,
+)
+```
+
+Run multiple workers:
+
+```text
+python worker.py
+python worker.py
+python worker.py
+```
+
+All workers collaborate on the same study. For scaling trade-offs and storage choices, see [Distributed and Scalable Optimization](../modules/11-distributed-scalable-optimization.qmd).
+
+## 12. Parallel Execution
+
+Single-machine parallelization:
+
+```python
+study.optimize(objective, n_trials=200, n_jobs=4)
+```
+
+This is usually the first scaling step before moving to shared-storage distributed execution.
+
+## 13. Multi-objective Optimization
+
+Create the study:
+
+```python
+study = optuna.create_study(
+    directions=["minimize", "maximize"],
+    sampler=optuna.samplers.NSGAIISampler(),
+)
+```
+
+Objective:
+
+```python
+return loss, model_size
+```
+
+Get the Pareto front:
+
+```python
+study.best_trials
+```
+
+See [Advanced Optimization Techniques](../modules/09-advanced-optimization-techniques.qmd).
+
+## 14. Reproducibility
+
+Set seeds in Optuna:
+
+```python
+sampler = optuna.samplers.TPESampler(seed=42)
+```
+
+Also control randomness in:
+
+- `numpy`
+- `torch`
+- `tensorflow`
+
+Reproducibility also depends on data versioning, environment control, and explicit evaluation logic.
+
+## 15. Production Setup
+
+One reasonable architecture is:
+
+```text
+ML pipeline
+   -> Optuna optimization
+   -> PostgreSQL storage
+   -> Optuna dashboard
+   -> experiment tracking (MLflow)
+```
+
+See [Production Workflows](../modules/14-production-workflows.qmd).
+
+## 16. Common Best Practices
+
+### Use log scales when scale matters
+
+Good:
+
+```python
+trial.suggest_float("lr", 1e-5, 1e-1, log=True)
+```
+
+### Avoid huge ranges without justification
+
+Bad:
+
+```text
+learning rate: [1e-6, 10]
+```
+
+### Use cross-validation when appropriate
+
+```python
+cross_val_score(model, X, y, cv=5)
+```
+
+### Use pipelines to avoid leakage
+
+```python
+Pipeline([
+    ("scaler", StandardScaler()),
+    ("model", RandomForest()),
+])
+```
+
+### Use pruning for iterative workloads
+
+Pruning is often valuable in deep learning, boosting, and long-running iterative objectives.
+
+## 17. Common Optimization Pattern
+
+Recommended workflow:
+
+```text
+1 design search space
+2 run 100-300 trials
+3 visualize results
+4 refine search space
+5 run second optimization
+```
+
+Optimization is usually iterative. The first study often teaches you how to design the second one better.
+
+## 18. Debugging Optimization
+
+Signs of a weak search space or unstable objective:
+
+| Symptom | Likely cause |
+| --- | --- |
+| no convergence | space too large |
+| flat slice plot | parameter irrelevant or poorly explored |
+| boundary solutions | range too narrow or badly centered |
+| unstable results | noisy objective |
+
+## 19. Typical Trial Budgets
+
+| Problem | Trials |
+| --- | ---: |
+| small models | 50-100 |
+| ML pipelines | 100-300 |
+| deep learning | 200-1000 |
+| simulation optimization | 500+ |
+
+These are practical heuristics, not rules. Objective cost and noise matter as much as problem type.
+
+## 20. Mental Model Of Optuna
+
+Optuna optimization loop:
+
+```text
+Sampler proposes parameters
+        ↓
+Objective evaluates
+        ↓
+Result stored
+        ↓
+Sampler updates strategy
+        ↓
+Next trial
+```
+
+This continues until one of the stopping criteria is met:
+
+- `n_trials`
+- timeout
+- manual stop
+
+## One-Screen Summary
+
+```text
+trial.suggest_* -> define search space
+objective()     -> compute metric
+study.optimize  -> run trials
+sampler         -> choose parameters
+pruner          -> stop bad trials
+visualization   -> analyze results
+storage         -> persist experiments
+```
+
+## Final Note
+
+This cheat sheet is a quick reference, not a substitute for workflow judgment. The strongest Optuna users are not the ones who memorize the most methods. They are the ones who design the objective carefully, shape the search space thoughtfully, and interpret optimization results with discipline.

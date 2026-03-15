@@ -36,6 +36,8 @@ book:
         - modules/15-final-project.qmd
     - summary.qmd
     - references.qmd
+  appendices:
+    - appendices/01-optuna-expert-cheat-sheet.qmd
 
 bibliography: references.bib
 
