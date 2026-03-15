@@ -2,3 +2,4 @@ jupyter
 ipykernel
 jupyter-cache
 optuna
+scikit-learn

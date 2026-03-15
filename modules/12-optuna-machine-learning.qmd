@@ -1,3 +1,367 @@
 ---
 title: "Optuna for Machine Learning"
 ---
+
+This chapter applies Optuna to real machine-learning workflows rather than toy functions. By the end, you should be able to structure an Optuna study around robust model evaluation, tune scikit-learn pipelines safely, understand how Optuna integrates with major ML frameworks, and avoid the most common evaluation errors such as leakage and validation overfitting.
+
+## Why This Matters
+
+In machine learning, a good optimizer is not enough. If the evaluation loop is flawed, Optuna will simply optimize the wrong target more efficiently.
+
+That is why ML optimization is a distinct topic. The hard part is often not parameter suggestion itself, but building an objective function that reflects generalization performance, respects data boundaries, and remains reproducible across runs.
+
+## Fast First Win: Tune a Real Classifier Safely
+
+Start with a compact but realistic workflow: a scikit-learn pipeline evaluated with cross-validation on a real dataset.
+
+```{python}
+import optuna
+from sklearn.datasets import load_breast_cancer
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import cross_val_score
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+
+
+X, y = load_breast_cancer(return_X_y=True)
+
+
+def objective(trial):
+	n_estimators = trial.suggest_int("n_estimators", 50, 250)
+	max_depth = trial.suggest_int("max_depth", 2, 16)
+	min_samples_split = trial.suggest_int("min_samples_split", 2, 10)
+
+	model = Pipeline(
+		[
+			("scaler", StandardScaler()),
+			(
+				"clf",
+				RandomForestClassifier(
+					n_estimators=n_estimators,
+					max_depth=max_depth,
+					min_samples_split=min_samples_split,
+					random_state=42,
+				),
+			),
+		]
+	)
+
+	scores = cross_val_score(model, X, y, cv=5, scoring="accuracy")
+	return scores.mean()
+
+
+sampler = optuna.samplers.TPESampler(seed=42)
+study = optuna.create_study(direction="maximize", sampler=sampler)
+study.optimize(objective, n_trials=30)
+
+print("Best score:", round(study.best_value, 4))
+print("Best params:", study.best_params)
+```
+
+This example captures the essential structure of ML optimization with Optuna: define hyperparameters inside an objective, evaluate the model with a stable validation protocol, and optimize the metric that actually matters.
+
+## Why Are Pipelines So Important?
+
+Real ML systems rarely consist of a model in isolation. They usually combine preprocessing, feature engineering, and a predictive model.
+
+```text
+raw data
+   -> preprocessing
+   -> feature transformation
+   -> model
+   -> evaluation metric
+```
+
+In scikit-learn, pipelines are not just a convenience. They are a safety mechanism. They ensure every preprocessing step is fitted only on the training portion of each fold.
+
+That is exactly what prevents leakage during hyperparameter optimization.
+
+## How Should You Structure a Scikit-Learn Objective?
+
+The objective function should do three things:
+
+1. Suggest hyperparameters.
+2. Build a complete pipeline or estimator.
+3. Return a robust validation score.
+
+```python
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import cross_val_score
+
+
+def objective(trial):
+	n_estimators = trial.suggest_int("n_estimators", 50, 300)
+	max_depth = trial.suggest_int("max_depth", 2, 20)
+
+	model = Pipeline(
+		[
+			("scaler", StandardScaler()),
+			(
+				"clf",
+				RandomForestClassifier(
+					n_estimators=n_estimators,
+					max_depth=max_depth,
+					random_state=42,
+				),
+			),
+		]
+	)
+
+	return cross_val_score(model, X, y, cv=5).mean()
+```
+
+This pattern is intentionally simple, but it scales well to feature selectors, imputers, encoders, and different estimator families.
+
+## What Changes With Gradient Boosting Libraries?
+
+Optuna is widely used with XGBoost and LightGBM because these models have large, interaction-heavy hyperparameter spaces and expensive training loops.
+
+### XGBoost Pattern
+
+```python
+import xgboost as xgb
+
+
+def objective(trial):
+	params = {
+		"max_depth": trial.suggest_int("max_depth", 3, 10),
+		"learning_rate": trial.suggest_float("learning_rate", 1e-3, 0.3, log=True),
+		"subsample": trial.suggest_float("subsample", 0.5, 1.0),
+		"colsample_bytree": trial.suggest_float("colsample_bytree", 0.5, 1.0),
+	}
+
+	model = xgb.XGBClassifier(**params)
+	return cross_val_score(model, X, y, cv=5).mean()
+```
+
+### LightGBM Pattern
+
+```python
+import lightgbm as lgb
+
+
+def objective(trial):
+	params = {
+		"num_leaves": trial.suggest_int("num_leaves", 16, 128),
+		"learning_rate": trial.suggest_float("learning_rate", 1e-3, 0.1, log=True),
+		"feature_fraction": trial.suggest_float("feature_fraction", 0.5, 1.0),
+	}
+
+	model = lgb.LGBMClassifier(**params)
+	return cross_val_score(model, X, y, cv=5).mean()
+```
+
+These libraries are especially good candidates for Optuna because pruning can save a significant amount of training time when bad trials become obvious early.
+
+## How Does Optuna Fit Deep Learning Loops?
+
+For PyTorch or TensorFlow, the objective function usually wraps a training loop rather than a ready-made estimator API.
+
+### PyTorch Pattern
+
+```python
+def objective(trial):
+	lr = trial.suggest_float("lr", 1e-5, 1e-2, log=True)
+	hidden_size = trial.suggest_int("hidden_size", 32, 256)
+
+	model = NeuralNet(hidden_size)
+	optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+
+	for epoch in range(20):
+		train(model)
+		val_loss = validate(model)
+
+		trial.report(val_loss, epoch)
+		if trial.should_prune():
+			raise optuna.TrialPruned()
+
+	return val_loss
+```
+
+### TensorFlow / Keras Pattern
+
+```python
+def objective(trial):
+	units = trial.suggest_int("units", 32, 256)
+	lr = trial.suggest_float("lr", 1e-4, 1e-2, log=True)
+
+	model = tf.keras.Sequential(
+		[
+			tf.keras.layers.Dense(units, activation="relu"),
+			tf.keras.layers.Dense(1),
+		]
+	)
+
+	optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
+	model.compile(optimizer=optimizer, loss="mse")
+
+	history = model.fit(
+		X_train,
+		y_train,
+		validation_data=(X_val, y_val),
+		epochs=20,
+		verbose=0,
+	)
+
+	return min(history.history["val_loss"])
+```
+
+The main advantage here is flexibility. Optuna can tune architecture choices, optimizers, regularization, and early-stopping-aware training loops using the same study abstraction.
+
+## Why Is Cross-Validation Still Central?
+
+Machine-learning objectives are vulnerable to noise, data splits, and accidental overfitting to one validation set.
+
+Cross-validation reduces that instability by averaging performance over several train-validation partitions.
+
+```python
+cross_val_score(model, X, y, cv=5)
+```
+
+For many tabular problems, this is the default baseline you should trust before reaching for more elaborate evaluation schemes.
+
+```{mermaid}
+flowchart LR
+	A[Suggest hyperparameters] --> B[Build pipeline]
+	B --> C[Run cross-validation]
+	C --> D[Aggregate validation score]
+	D --> E[Return objective value]
+	E --> A
+```
+
+This is also where ML optimization differs from simpler examples earlier in the book. The objective value is not just a formula; it is the output of an evaluation protocol.
+
+## When Do You Need Nested Cross-Validation?
+
+If you want an unbiased estimate of the performance of the full optimization procedure, nested cross-validation is the correct design.
+
+```text
+outer split
+   -> training partition
+	  -> inner cross-validation
+	  -> Optuna hyperparameter search
+   -> outer validation score
+```
+
+This matters because ordinary cross-validation inside Optuna estimates the best hyperparameters for a dataset, while nested cross-validation estimates the generalization performance of the whole tuning workflow.
+
+It is more expensive, but it is the right tool when you care about honest model assessment rather than only parameter selection.
+
+## How Do You Avoid Data Leakage?
+
+Leakage is one of the easiest ways to get optimistic results.
+
+The classic mistake is to preprocess the full dataset before cross-validation.
+
+```text
+Wrong: scale entire dataset -> then split into folds
+Right: split into folds -> fit preprocessing inside each training fold
+```
+
+This is precisely why pipelines matter so much in ML optimization. They make the correct evaluation path the default path.
+
+## What Makes an ML Study Reproducible?
+
+Reproducibility is not a cosmetic concern. It is the difference between tuning knowledge and tuning folklore.
+
+Key practices include:
+
+- fixing Optuna sampler seeds
+- fixing framework random seeds where appropriate
+- storing study results in persistent storage
+- recording dataset versions and code versions
+- making train/validation boundaries explicit
+
+```python
+sampler = optuna.samplers.TPESampler(seed=42)
+```
+
+```python
+storage = "sqlite:///experiment.db"
+```
+
+Once optimization becomes part of a team workflow, these details matter as much as the sampler choice.
+
+::: callout-warning
+## Common Mistake
+
+Do not optimize directly on a single validation split and treat the best score as trustworthy. Optuna will optimize whatever signal you provide, including leakage, unstable folds, and accidental validation-specific patterns.
+:::
+
+## Practical Exercise: End-to-End Pipeline Optimization
+
+Extend the opening example into a more realistic ML workflow.
+
+Use the breast-cancer dataset and optimize a scikit-learn pipeline with at least one preprocessing step and one model.
+
+```{python}
+import optuna
+from sklearn.datasets import load_breast_cancer
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import cross_val_score
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+
+
+X, y = load_breast_cancer(return_X_y=True)
+
+
+def objective(trial):
+	n_estimators = trial.suggest_int("n_estimators", 50, 300)
+	max_depth = trial.suggest_int("max_depth", 2, 20)
+	min_samples_split = trial.suggest_int("min_samples_split", 2, 10)
+
+	model = Pipeline(
+		[
+			("scaler", StandardScaler()),
+			(
+				"clf",
+				RandomForestClassifier(
+					n_estimators=n_estimators,
+					max_depth=max_depth,
+					min_samples_split=min_samples_split,
+					random_state=42,
+				),
+			),
+		]
+	)
+
+	return cross_val_score(model, X, y, cv=5, scoring="accuracy").mean()
+```
+
+Then work through the exercise in four passes:
+
+1. Run a 30-trial study and record the best score and best parameter set.
+2. Add one more hyperparameter, such as `max_features`, and check whether performance changes materially.
+3. Replace the single estimator with a pipeline that includes feature selection or a different classifier.
+4. Explain whether the search-space expansion improved the model or merely made optimization noisier.
+
+Questions to answer after the run:
+
+- Did cross-validation produce stable rankings between trials?
+- Which hyperparameters actually mattered according to the study history or later visualization?
+- Would nested cross-validation be worth the extra cost for this problem?
+- Where would leakage appear if preprocessing were done outside the pipeline?
+
+## Recap
+
+Optuna becomes genuinely useful in ML once the evaluation protocol is as carefully designed as the search itself.
+
+- Pipelines prevent leakage and keep preprocessing inside the fold structure.
+- Cross-validation usually provides a stronger objective than a single validation split.
+- Gradient boosting and deep learning integrations benefit from Optuna because their spaces are large and training can be pruned.
+- Reproducibility depends on seeds, storage, and explicit evaluation design.
+
+## Decision Guide
+
+Choose the evaluation protocol before you choose the sampler.
+
+- Use scikit-learn pipelines whenever preprocessing is part of the model workflow.
+- Use cross-validation as the default for tabular ML unless cost is prohibitive.
+- Use nested cross-validation when you need an unbiased estimate of the whole tuning procedure.
+- Use pruning when the training loop exposes useful intermediate metrics.
+- Treat reproducibility and leakage prevention as first-class parts of the optimization problem.
+
+The next chapter broadens the scope again. In [Optuna for General Optimization](13-optuna-general-optimization.qmd), we will leave machine learning behind and use Optuna as a general-purpose optimizer for mathematical, simulation-based, and algorithmic objectives.
