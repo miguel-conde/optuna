@@ -1,0 +1,1547 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.7.31">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>2&nbsp; Bayesian Optimization Fundamentals – Optimization with Optuna: A Practical and Theoretical Guide to Modern Black-Box Optimization</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<link href="../modules/03-tpe-algorithm.html" rel="next">
+<link href="../modules/01-foundations-modern-optimization.html" rel="prev">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-e1a5c8363afafaef2c763b6775fbf3ca.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-84201f73209b7bbc7d36810704c07685.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script src="../site_libs/quarto-diagram/mermaid.min.js"></script>
+<script src="../site_libs/quarto-diagram/mermaid-init.js"></script>
+<link href="../site_libs/quarto-diagram/mermaid.css" rel="stylesheet">
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN") {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body class="nav-sidebar floating quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../modules/01-foundations-modern-optimization.html">Part I: Foundations</a></li><li class="breadcrumb-item"><a href="../modules/02-bayesian-optimization-fundamentals.html"><span class="chapter-number">2</span>&nbsp; <span class="chapter-title">Bayesian Optimization Fundamentals</span></a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="../">Optimization with Optuna: A Practical and Theoretical Guide to Modern Black-Box Optimization</a> 
+    </div>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Preface</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../intro.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Introduction</span></a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
+ <span class="menu-text">Part I: Foundations</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/01-foundations-modern-optimization.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">1</span>&nbsp; <span class="chapter-title">Foundations of Modern Optimization</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/02-bayesian-optimization-fundamentals.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text"><span class="chapter-number">2</span>&nbsp; <span class="chapter-title">Bayesian Optimization Fundamentals</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/03-tpe-algorithm.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">3</span>&nbsp; <span class="chapter-title">The TPE Algorithm</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/04-optuna-architecture.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">4</span>&nbsp; <span class="chapter-title">Optuna Architecture</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true">
+ <span class="menu-text">Part II: Core Usage</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/05-basic-optuna-usage.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">5</span>&nbsp; <span class="chapter-title">Basic Optuna Usage</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/06-designing-search-spaces.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">Designing Search Spaces</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/07-samplers.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">7</span>&nbsp; <span class="chapter-title">Samplers</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/08-pruning.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">8</span>&nbsp; <span class="chapter-title">Pruning</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true">
+ <span class="menu-text">Part III: Advanced Techniques</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/09-advanced-optimization-techniques.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">9</span>&nbsp; <span class="chapter-title">Advanced Optimization Techniques</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/10-visualization-diagnostics.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">10</span>&nbsp; <span class="chapter-title">Visualization and Diagnostics</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/11-distributed-scalable-optimization.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">11</span>&nbsp; <span class="chapter-title">Distributed and Scalable Optimization</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true">
+ <span class="menu-text">Part IV: Applications</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-4" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/12-optuna-machine-learning.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">12</span>&nbsp; <span class="chapter-title">Optuna for Machine Learning</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/13-optuna-general-optimization.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">13</span>&nbsp; <span class="chapter-title">Optuna for General Optimization</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/14-production-workflows.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">14</span>&nbsp; <span class="chapter-title">Production Workflows</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/15-final-project.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">15</span>&nbsp; <span class="chapter-title">Final Project</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../summary.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Summary</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../references.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">References</span></a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true">
+ <span class="menu-text">Appendices</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-5" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../appendices/01-optuna-expert-cheat-sheet.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">A</span>&nbsp; <span class="chapter-title">Optuna Expert Cheat Sheet</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul>
+  <li><a href="#why-this-matters" id="toc-why-this-matters" class="nav-link active" data-scroll-target="#why-this-matters"><span class="header-section-number">2.1</span> Why This Matters</a></li>
+  <li><a href="#a-fast-first-win" id="toc-a-fast-first-win" class="nav-link" data-scroll-target="#a-fast-first-win"><span class="header-section-number">2.2</span> A Fast First Win</a></li>
+  <li><a href="#why-surrogate-models-matter" id="toc-why-surrogate-models-matter" class="nav-link" data-scroll-target="#why-surrogate-models-matter"><span class="header-section-number">2.3</span> Why Surrogate Models Matter</a></li>
+  <li><a href="#gaussian-processes-the-classical-view" id="toc-gaussian-processes-the-classical-view" class="nav-link" data-scroll-target="#gaussian-processes-the-classical-view"><span class="header-section-number">2.4</span> Gaussian Processes: The Classical View</a></li>
+  <li><a href="#what-does-a-gp-predict" id="toc-what-does-a-gp-predict" class="nav-link" data-scroll-target="#what-does-a-gp-predict"><span class="header-section-number">2.5</span> What Does a GP Predict?</a></li>
+  <li><a href="#how-the-acquisition-function-chooses-the-next-point" id="toc-how-the-acquisition-function-chooses-the-next-point" class="nav-link" data-scroll-target="#how-the-acquisition-function-chooses-the-next-point"><span class="header-section-number">2.6</span> How the Acquisition Function Chooses the Next Point</a></li>
+  <li><a href="#probability-of-improvement" id="toc-probability-of-improvement" class="nav-link" data-scroll-target="#probability-of-improvement"><span class="header-section-number">2.7</span> Probability of Improvement</a></li>
+  <li><a href="#expected-improvement" id="toc-expected-improvement" class="nav-link" data-scroll-target="#expected-improvement"><span class="header-section-number">2.8</span> Expected Improvement</a></li>
+  <li><a href="#upper-and-lower-confidence-bounds" id="toc-upper-and-lower-confidence-bounds" class="nav-link" data-scroll-target="#upper-and-lower-confidence-bounds"><span class="header-section-number">2.9</span> Upper and Lower Confidence Bounds</a></li>
+  <li><a href="#the-bayesian-optimization-loop" id="toc-the-bayesian-optimization-loop" class="nav-link" data-scroll-target="#the-bayesian-optimization-loop"><span class="header-section-number">2.10</span> The Bayesian Optimization Loop</a></li>
+  <li><a href="#where-gaussian-process-bayesian-optimization-struggles" id="toc-where-gaussian-process-bayesian-optimization-struggles" class="nav-link" data-scroll-target="#where-gaussian-process-bayesian-optimization-struggles"><span class="header-section-number">2.11</span> Where Gaussian-Process Bayesian Optimization Struggles</a>
+  <ul class="collapse">
+  <li><a href="#computational-complexity" id="toc-computational-complexity" class="nav-link" data-scroll-target="#computational-complexity"><span class="header-section-number">2.11.1</span> Computational Complexity</a></li>
+  <li><a href="#high-dimensional-search-spaces" id="toc-high-dimensional-search-spaces" class="nav-link" data-scroll-target="#high-dimensional-search-spaces"><span class="header-section-number">2.11.2</span> High-Dimensional Search Spaces</a></li>
+  <li><a href="#categorical-and-conditional-variables" id="toc-categorical-and-conditional-variables" class="nav-link" data-scroll-target="#categorical-and-conditional-variables"><span class="header-section-number">2.11.3</span> Categorical and Conditional Variables</a></li>
+  </ul></li>
+  <li><a href="#why-optuna-transitions-to-tpe-instead" id="toc-why-optuna-transitions-to-tpe-instead" class="nav-link" data-scroll-target="#why-optuna-transitions-to-tpe-instead"><span class="header-section-number">2.12</span> Why Optuna Transitions to TPE Instead</a></li>
+  <li><a href="#practical-exercise-compare-mean-and-improvement" id="toc-practical-exercise-compare-mean-and-improvement" class="nav-link" data-scroll-target="#practical-exercise-compare-mean-and-improvement"><span class="header-section-number">2.13</span> Practical Exercise: Compare Mean and Improvement</a></li>
+  <li><a href="#recap" id="toc-recap" class="nav-link" data-scroll-target="#recap"><span class="header-section-number">2.14</span> Recap</a></li>
+  <li><a href="#decision-guide" id="toc-decision-guide" class="nav-link" data-scroll-target="#decision-guide"><span class="header-section-number">2.15</span> Decision Guide</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../modules/01-foundations-modern-optimization.html">Part I: Foundations</a></li><li class="breadcrumb-item"><a href="../modules/02-bayesian-optimization-fundamentals.html"><span class="chapter-number">2</span>&nbsp; <span class="chapter-title">Bayesian Optimization Fundamentals</span></a></li></ol></nav>
+<div class="quarto-title">
+<div class="quarto-title-block"><div><h1 class="title"><span class="chapter-number">2</span>&nbsp; <span class="chapter-title">Bayesian Optimization Fundamentals</span></h1><button type="button" class="btn code-tools-button" id="quarto-code-tools-source"><i class="bi"></i> Code</button></div></div>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>This chapter introduces the core logic behind Bayesian optimization: build a probabilistic model of an expensive objective, estimate where information is most valuable, and decide where to evaluate next. That is the conceptual bridge between the search intuition in <a href="../modules/01-foundations-modern-optimization.html">Foundations of Modern Optimization</a> and Optuna’s default TPE-based workflow.</p>
+<p>By the end of the chapter, you should be able to explain the role of surrogate models, why acquisition functions are needed, and why classical Gaussian-process-based Bayesian optimization is both powerful and limited.</p>
+<p>This chapter assumes you are already comfortable with the optimization vocabulary from <a href="../modules/01-foundations-modern-optimization.html">Foundations of Modern Optimization</a>, along with basic probability concepts such as mean, variance, and normal distributions.</p>
+<section id="why-this-matters" class="level2" data-number="2.1">
+<h2 data-number="2.1" class="anchored" data-anchor-id="why-this-matters"><span class="header-section-number">2.1</span> Why This Matters</h2>
+<p>Suppose each hyperparameter trial for a large model takes two hours. You cannot afford to evaluate hundreds or thousands of random configurations just to discover where the promising region might be. You need a strategy that treats each evaluation as expensive and uses prior results to make better decisions.</p>
+<p>That is the problem Bayesian optimization is built to solve.</p>
+</section>
+<section id="a-fast-first-win" class="level2" data-number="2.2">
+<h2 data-number="2.2" class="anchored" data-anchor-id="a-fast-first-win"><span class="header-section-number">2.2</span> A Fast First Win</h2>
+<p>Before discussing Gaussian processes formally, it helps to see what the optimizer is trying to do. In Bayesian optimization, each candidate point gets a predicted mean, a predicted uncertainty, and an acquisition score that decides whether it is worth evaluating.</p>
+<p>The following example computes Expected Improvement for a few candidate points using only the Python standard library.</p>
+<div id="293eec19" class="cell" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> math</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> normal_pdf(z):</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> math.exp(<span class="op">-</span><span class="fl">0.5</span> <span class="op">*</span> z <span class="op">*</span> z) <span class="op">/</span> math.sqrt(<span class="dv">2</span> <span class="op">*</span> math.pi)</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> normal_cdf(z):</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="fl">0.5</span> <span class="op">*</span> (<span class="dv">1</span> <span class="op">+</span> math.erf(z <span class="op">/</span> math.sqrt(<span class="dv">2</span>)))</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> expected_improvement(mu, sigma, f_best):</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> sigma <span class="op">&lt;=</span> <span class="fl">1e-12</span>:</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="bu">max</span>(f_best <span class="op">-</span> mu, <span class="fl">0.0</span>)</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>    z <span class="op">=</span> (f_best <span class="op">-</span> mu) <span class="op">/</span> sigma</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (f_best <span class="op">-</span> mu) <span class="op">*</span> normal_cdf(z) <span class="op">+</span> sigma <span class="op">*</span> normal_pdf(z)</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>f_best <span class="op">=</span> <span class="fl">0.18</span></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>candidates <span class="op">=</span> [</span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>    {<span class="st">"x"</span>: <span class="fl">0.5</span>, <span class="st">"mu"</span>: <span class="fl">0.30</span>, <span class="st">"sigma"</span>: <span class="fl">0.05</span>},</span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>    {<span class="st">"x"</span>: <span class="fl">1.0</span>, <span class="st">"mu"</span>: <span class="fl">0.24</span>, <span class="st">"sigma"</span>: <span class="fl">0.12</span>},</span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>    {<span class="st">"x"</span>: <span class="fl">1.5</span>, <span class="st">"mu"</span>: <span class="fl">0.28</span>, <span class="st">"sigma"</span>: <span class="fl">0.30</span>},</span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a>    {<span class="st">"x"</span>: <span class="fl">2.0</span>, <span class="st">"mu"</span>: <span class="fl">0.16</span>, <span class="st">"sigma"</span>: <span class="fl">0.02</span>},</span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a>]</span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> candidate <span class="kw">in</span> candidates:</span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a>    candidate[<span class="st">"ei"</span>] <span class="op">=</span> expected_improvement(</span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a>        candidate[<span class="st">"mu"</span>],</span>
+<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a>        candidate[<span class="st">"sigma"</span>],</span>
+<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a>        f_best,</span>
+<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a>best_candidate <span class="op">=</span> <span class="bu">max</span>(candidates, key<span class="op">=</span><span class="kw">lambda</span> candidate: candidate[<span class="st">"ei"</span>])</span>
+<span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-36"><a href="#cb1-36" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> candidate <span class="kw">in</span> candidates:</span>
+<span id="cb1-37"><a href="#cb1-37" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(candidate)</span>
+<span id="cb1-38"><a href="#cb1-38" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-39"><a href="#cb1-39" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Next point to evaluate:"</span>, best_candidate)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>{'x': 0.5, 'mu': 0.3, 'sigma': 0.05, 'ei': 0.00013602220379060653}
+{'x': 1.0, 'mu': 0.24, 'sigma': 0.12, 'ei': 0.023735586888156728}
+{'x': 1.5, 'mu': 0.28, 'sigma': 0.3, 'ei': 0.07627083428972159}
+{'x': 2.0, 'mu': 0.16, 'sigma': 0.02, 'ei': 0.021666309411753716}
+Next point to evaluate: {'x': 1.5, 'mu': 0.28, 'sigma': 0.3, 'ei': 0.07627083428972159}</code></pre>
+</div>
+</div>
+<p>The key observation is that the best next point is not always the one with the lowest predicted mean. A point with slightly worse predicted performance may still be more valuable if its uncertainty is high enough.</p>
+</section>
+<section id="why-surrogate-models-matter" class="level2" data-number="2.3">
+<h2 data-number="2.3" class="anchored" data-anchor-id="why-surrogate-models-matter"><span class="header-section-number">2.3</span> Why Surrogate Models Matter</h2>
+<p>Bayesian optimization starts from a simple idea: instead of optimizing the true objective function directly, we build an approximate probabilistic model from the observations we already have.</p>
+<p>Let the true objective be:</p>
+<p><span class="math display">\[
+f(x)
+\]</span></p>
+<p>We build a surrogate model:</p>
+<p><span class="math display">\[
+\hat{f}(x)
+\]</span></p>
+<p>using observed data:</p>
+<p><span class="math display">\[
+D = \{(x_1, y_1), (x_2, y_2), \ldots, (x_n, y_n)\}
+\]</span></p>
+<p>where:</p>
+<p><span class="math display">\[
+y_i = f(x_i)
+\]</span></p>
+<p>The purpose of the surrogate is not just to estimate the function value. It must also estimate uncertainty. In other words, for each candidate point <span class="math inline">\(x\)</span>, we want a predictive distribution:</p>
+<p><span class="math display">\[
+p(f(x) \mid D)
+\]</span></p>
+<p>That uncertainty estimate is what makes exploration possible.</p>
+</section>
+<section id="gaussian-processes-the-classical-view" class="level2" data-number="2.4">
+<h2 data-number="2.4" class="anchored" data-anchor-id="gaussian-processes-the-classical-view"><span class="header-section-number">2.4</span> Gaussian Processes: The Classical View</h2>
+<p>The most classical surrogate model in Bayesian optimization is the Gaussian process, usually abbreviated GP.</p>
+<p>A Gaussian process defines a distribution over functions rather than a single best-fit curve. Formally:</p>
+<p><span class="math display">\[
+f(x) \sim \mathcal{GP}(m(x), k(x, x'))
+\]</span></p>
+<p>where:</p>
+<ul>
+<li><span class="math inline">\(m(x)\)</span> is the mean function.</li>
+<li><span class="math inline">\(k(x, x')\)</span> is the covariance kernel.</li>
+</ul>
+<p>The mean function captures the expected value of the objective, and the kernel encodes similarity between inputs. If two inputs are close according to the kernel, the GP expects their outputs to be similar as well.</p>
+<p>Common kernels include:</p>
+<ul>
+<li>Radial basis function (RBF).</li>
+<li>Matern.</li>
+<li>Rational quadratic.</li>
+</ul>
+<p>The intuition is more important than the formulas at this stage: a Gaussian process gives you both a prediction and a measure of confidence in that prediction.</p>
+</section>
+<section id="what-does-a-gp-predict" class="level2" data-number="2.5">
+<h2 data-number="2.5" class="anchored" data-anchor-id="what-does-a-gp-predict"><span class="header-section-number">2.5</span> What Does a GP Predict?</h2>
+<p>At a candidate point <span class="math inline">\(x\)</span>, a GP provides:</p>
+<ul>
+<li>A predictive mean:</li>
+</ul>
+<p><span class="math display">\[
+\mu(x)
+\]</span></p>
+<ul>
+<li>A predictive variance:</li>
+</ul>
+<p><span class="math display">\[
+\sigma^2(x)
+\]</span></p>
+<p>So the prediction can be summarized as:</p>
+<p><span class="math display">\[
+f(x) \sim \mathcal{N}(\mu(x), \sigma^2(x))
+\]</span></p>
+<p>This is the core output that drives Bayesian optimization. The optimizer now has two pieces of information:</p>
+<ul>
+<li>What value looks plausible at this point.</li>
+<li>How uncertain that estimate is.</li>
+</ul>
+</section>
+<section id="how-the-acquisition-function-chooses-the-next-point" class="level2" data-number="2.6">
+<h2 data-number="2.6" class="anchored" data-anchor-id="how-the-acquisition-function-chooses-the-next-point"><span class="header-section-number">2.6</span> How the Acquisition Function Chooses the Next Point</h2>
+<p>The surrogate model tells us what we currently believe about the objective. The acquisition function tells us what to do next.</p>
+<p>In general, the next evaluation point is chosen by solving:</p>
+<p><span class="math display">\[
+x_{\text{next}} = \arg\max a(x)
+\]</span></p>
+<p>where <span class="math inline">\(a(x)\)</span> is the acquisition function.</p>
+<p>Acquisition functions encode the exploration-exploitation tradeoff. They prefer points that either:</p>
+<ul>
+<li>Look promising according to the predicted mean.</li>
+<li>Remain uncertain enough that evaluating them could reveal something better.</li>
+</ul>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">flowchart LR
+    A[Observed trials] --&gt; B[Fit surrogate model]
+    B --&gt; C[Estimate mean and uncertainty]
+    C --&gt; D[Compute acquisition score]
+    D --&gt; E[Choose next point]
+    E --&gt; F[Evaluate objective]
+    F --&gt; A
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</section>
+<section id="probability-of-improvement" class="level2" data-number="2.7">
+<h2 data-number="2.7" class="anchored" data-anchor-id="probability-of-improvement"><span class="header-section-number">2.7</span> Probability of Improvement</h2>
+<p>Probability of Improvement, or PI, is the simplest acquisition function.</p>
+<p>For minimization, let <span class="math inline">\(f^*\)</span> denote the best observed value so far. Then PI measures the probability that a candidate point beats that value:</p>
+<p><span class="math display">\[
+PI(x) = P(f(x) &lt; f^*)
+\]</span></p>
+<p>Its interpretation is straightforward: rank points by how likely they are to improve the current best.</p>
+<p>The limitation is equally straightforward: PI often over-exploits. A point that is only marginally better but very certain can dominate a riskier point that could lead to a much larger improvement.</p>
+</section>
+<section id="expected-improvement" class="level2" data-number="2.8">
+<h2 data-number="2.8" class="anchored" data-anchor-id="expected-improvement"><span class="header-section-number">2.8</span> Expected Improvement</h2>
+<p>Expected Improvement, or EI, fixes the main weakness of PI by asking not only whether improvement is likely, but how large that improvement might be.</p>
+<p>For minimization:</p>
+<p><span class="math display">\[
+EI(x) = \mathbb{E}[\max(f^* - f(x), 0)]
+\]</span></p>
+<p>This combines:</p>
+<ul>
+<li>Low predicted values.</li>
+<li>High uncertainty.</li>
+</ul>
+<p>That balance is why EI became one of the standard acquisition rules in Bayesian optimization.</p>
+<p>The fast example at the start of the chapter is an explicit EI calculation, and it shows the core idea: the next point is chosen for decision value, not just predicted objective value.</p>
+</section>
+<section id="upper-and-lower-confidence-bounds" class="level2" data-number="2.9">
+<h2 data-number="2.9" class="anchored" data-anchor-id="upper-and-lower-confidence-bounds"><span class="header-section-number">2.9</span> Upper and Lower Confidence Bounds</h2>
+<p>Another family of acquisition functions uses confidence bounds directly.</p>
+<p>For maximization:</p>
+<p><span class="math display">\[
+UCB(x) = \mu(x) + \kappa \sigma(x)
+\]</span></p>
+<p>For minimization, the analogous lower confidence bound is:</p>
+<p><span class="math display">\[
+LCB(x) = \mu(x) - \kappa \sigma(x)
+\]</span></p>
+<p>where:</p>
+<ul>
+<li><span class="math inline">\(\mu(x)\)</span> is the predicted mean.</li>
+<li><span class="math inline">\(\sigma(x)\)</span> is the predictive standard deviation.</li>
+<li><span class="math inline">\(\kappa\)</span> controls how aggressively the optimizer explores.</li>
+</ul>
+<p>Large <span class="math inline">\(\kappa\)</span> favors exploration. Small <span class="math inline">\(\kappa\)</span> favors exploitation. This makes confidence-bound strategies attractive when you want a direct knob for controlling search behavior.</p>
+</section>
+<section id="the-bayesian-optimization-loop" class="level2" data-number="2.10">
+<h2 data-number="2.10" class="anchored" data-anchor-id="the-bayesian-optimization-loop"><span class="header-section-number">2.10</span> The Bayesian Optimization Loop</h2>
+<p>Putting the pieces together, the classical Bayesian optimization loop is:</p>
+<ol type="1">
+<li>Sample a small set of initial points.</li>
+<li>Fit a surrogate model such as a Gaussian process.</li>
+<li>Compute an acquisition function over the search space.</li>
+<li>Select the point that maximizes the acquisition score.</li>
+<li>Evaluate the true objective.</li>
+<li>Update the model with the new observation.</li>
+<li>Repeat.</li>
+</ol>
+<p>This loop works because the optimizer spends evaluations where they are expected to be most informative, not merely where the search space happens to be easy to enumerate.</p>
+<div class="callout callout-style-simple callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Common Mistake
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Do not confuse optimizing the surrogate mean with performing Bayesian optimization. If you always choose the point with the best predicted mean, you remove the exploration term and the method can get trapped in regions that only look good under the current model.</p>
+</div>
+</div>
+</section>
+<section id="where-gaussian-process-bayesian-optimization-struggles" class="level2" data-number="2.11">
+<h2 data-number="2.11" class="anchored" data-anchor-id="where-gaussian-process-bayesian-optimization-struggles"><span class="header-section-number">2.11</span> Where Gaussian-Process Bayesian Optimization Struggles</h2>
+<p>Gaussian-process-based Bayesian optimization is elegant, but it has practical limits.</p>
+<section id="computational-complexity" class="level3" data-number="2.11.1">
+<h3 data-number="2.11.1" class="anchored" data-anchor-id="computational-complexity"><span class="header-section-number">2.11.1</span> Computational Complexity</h3>
+<p>Training a Gaussian process typically scales as:</p>
+<p><span class="math display">\[
+O(n^3)
+\]</span></p>
+<p>where <span class="math inline">\(n\)</span> is the number of observations. That becomes expensive once the number of evaluations grows.</p>
+</section>
+<section id="high-dimensional-search-spaces" class="level3" data-number="2.11.2">
+<h3 data-number="2.11.2" class="anchored" data-anchor-id="high-dimensional-search-spaces"><span class="header-section-number">2.11.2</span> High-Dimensional Search Spaces</h3>
+<p>Gaussian processes usually work best in relatively low-dimensional settings. Once the search space contains many interacting hyperparameters, the model quality and acquisition optimization can degrade quickly.</p>
+<p>As a rough rule of thumb, performance often becomes harder to maintain once the effective search dimension grows well beyond the small-scale regime.</p>
+</section>
+<section id="categorical-and-conditional-variables" class="level3" data-number="2.11.3">
+<h3 data-number="2.11.3" class="anchored" data-anchor-id="categorical-and-conditional-variables"><span class="header-section-number">2.11.3</span> Categorical and Conditional Variables</h3>
+<p>Many machine learning search spaces include categorical or tree-structured choices such as:</p>
+<pre class="text"><code>optimizer = ["adam", "sgd", "rmsprop"]</code></pre>
+<p>This is awkward for classical GP kernels, which are more naturally defined over continuous spaces.</p>
+</section>
+</section>
+<section id="why-optuna-transitions-to-tpe-instead" class="level2" data-number="2.12">
+<h2 data-number="2.12" class="anchored" data-anchor-id="why-optuna-transitions-to-tpe-instead"><span class="header-section-number">2.12</span> Why Optuna Transitions to TPE Instead</h2>
+<p>Optuna does not use Gaussian processes as its default strategy. Instead, it uses the Tree-structured Parzen Estimator, or TPE.</p>
+<p>The conceptual shift is important. Classical Bayesian optimization often models:</p>
+<p><span class="math display">\[
+p(y \mid x)
+\]</span></p>
+<p>TPE instead models:</p>
+<p><span class="math display">\[
+p(x \mid y)
+\]</span></p>
+<p>It separates the observed trials into good and bad regions, estimates densities for each group, and searches for points that are more likely under the good-trial density than under the bad-trial density.</p>
+<p>This leads to an optimization criterion of the form:</p>
+<p><span class="math display">\[
+\arg\max \frac{\ell(x)}{g(x)}
+\]</span></p>
+<p>where:</p>
+<ul>
+<li><span class="math inline">\(\ell(x)\)</span> is the density of good observations.</li>
+<li><span class="math inline">\(g(x)\)</span> is the density of bad observations.</li>
+</ul>
+<p>This reformulation is one reason TPE is practical for Optuna. It handles categorical variables better, scales more gracefully, and works well in higher-dimensional or conditional search spaces.</p>
+<p>We will unpack the full algorithm in <a href="../modules/03-tpe-algorithm.html">The TPE Algorithm</a>.</p>
+</section>
+<section id="practical-exercise-compare-mean-and-improvement" class="level2" data-number="2.13">
+<h2 data-number="2.13" class="anchored" data-anchor-id="practical-exercise-compare-mean-and-improvement"><span class="header-section-number">2.13</span> Practical Exercise: Compare Mean and Improvement</h2>
+<p>Use the earlier Expected Improvement example as a starting point and modify it in three steps:</p>
+<ol type="1">
+<li>Change <code>f_best</code> and observe how the acquisition ranking changes.</li>
+<li>Increase the uncertainty of one candidate and check when exploration becomes dominant.</li>
+<li>Add a new candidate with a very low mean and very low uncertainty, then compare it against a riskier candidate with higher uncertainty.</li>
+</ol>
+<p>Your goal is to build intuition for why acquisition functions do not behave like plain objective minimization.</p>
+</section>
+<section id="recap" class="level2" data-number="2.14">
+<h2 data-number="2.14" class="anchored" data-anchor-id="recap"><span class="header-section-number">2.14</span> Recap</h2>
+<p>Bayesian optimization combines three components:</p>
+<ul>
+<li>A surrogate model that approximates the unknown objective.</li>
+<li>An uncertainty estimate that makes exploration possible.</li>
+<li>An acquisition function that selects the next evaluation point.</li>
+</ul>
+<p>Gaussian processes provide the classical picture of this workflow, and they remain useful as a conceptual foundation. But the same chapter also explains why Optuna’s default strategy moves away from GP-based optimization in practice.</p>
+</section>
+<section id="decision-guide" class="level2" data-number="2.15">
+<h2 data-number="2.15" class="anchored" data-anchor-id="decision-guide"><span class="header-section-number">2.15</span> Decision Guide</h2>
+<p>Use the following mental model:</p>
+<ul>
+<li>Use Bayesian optimization when each objective evaluation is expensive enough that learning from earlier trials matters.</li>
+<li>Use Gaussian-process intuition to understand surrogate modeling and acquisition functions.</li>
+<li>Expect GP-based methods to struggle once the space becomes highly dimensional, categorical, or heavily conditional.</li>
+<li>Expect Optuna’s TPE-based approach to be a better practical default for many real hyperparameter-search workloads.</li>
+</ul>
+<p>Next, <a href="../modules/03-tpe-algorithm.html">The TPE Algorithm</a> turns that transition into a concrete optimization method.</p>
+
+
+<!-- -->
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+        const codeEl = trigger.previousElementSibling.cloneNode(true);
+        for (const childEl of codeEl.children) {
+          if (isCodeAnnotation(childEl)) {
+            childEl.remove();
+          }
+        }
+        return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+    const viewSource = window.document.getElementById('quarto-view-source') ||
+                       window.document.getElementById('quarto-code-tools-source');
+    if (viewSource) {
+      const sourceUrl = viewSource.getAttribute("data-quarto-source-url");
+      viewSource.addEventListener("click", function(e) {
+        if (sourceUrl) {
+          // rstudio viewer pane
+          if (/\bcapabilities=\b/.test(window.location)) {
+            window.open(sourceUrl);
+          } else {
+            window.location.href = sourceUrl;
+          }
+        } else {
+          const modal = new bootstrap.Modal(document.getElementById('quarto-embedded-source-code-modal'));
+          modal.show();
+        }
+        return false;
+      });
+    }
+    function toggleCodeHandler(show) {
+      return function(e) {
+        const detailsSrc = window.document.querySelectorAll(".cell > details > .sourceCode");
+        for (let i=0; i<detailsSrc.length; i++) {
+          const details = detailsSrc[i].parentElement;
+          if (show) {
+            details.open = true;
+          } else {
+            details.removeAttribute("open");
+          }
+        }
+        const cellCodeDivs = window.document.querySelectorAll(".cell > .sourceCode");
+        const fromCls = show ? "hidden" : "unhidden";
+        const toCls = show ? "unhidden" : "hidden";
+        for (let i=0; i<cellCodeDivs.length; i++) {
+          const codeDiv = cellCodeDivs[i];
+          if (codeDiv.classList.contains(fromCls)) {
+            codeDiv.classList.remove(fromCls);
+            codeDiv.classList.add(toCls);
+          } 
+        }
+        return false;
+      }
+    }
+    const hideAllCode = window.document.getElementById("quarto-hide-all-code");
+    if (hideAllCode) {
+      hideAllCode.addEventListener("click", toggleCodeHandler(false));
+    }
+    const showAllCode = window.document.getElementById("quarto-show-all-code");
+    if (showAllCode) {
+      showAllCode.addEventListener("click", toggleCodeHandler(true));
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+<nav class="page-navigation">
+  <div class="nav-page nav-page-previous">
+      <a href="../modules/01-foundations-modern-optimization.html" class="pagination-link" aria-label="Foundations of Modern Optimization">
+        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text"><span class="chapter-number">1</span>&nbsp; <span class="chapter-title">Foundations of Modern Optimization</span></span>
+      </a>          
+  </div>
+  <div class="nav-page nav-page-next">
+      <a href="../modules/03-tpe-algorithm.html" class="pagination-link" aria-label="The TPE Algorithm">
+        <span class="nav-page-text"><span class="chapter-number">3</span>&nbsp; <span class="chapter-title">The TPE Algorithm</span></span> <i class="bi bi-arrow-right-short"></i>
+      </a>
+  </div>
+</nav><div class="modal fade" id="quarto-embedded-source-code-modal" tabindex="-1" aria-labelledby="quarto-embedded-source-code-modal-label" aria-hidden="true"><div class="modal-dialog modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="quarto-embedded-source-code-modal-label">Source Code</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="">
+<div class="sourceCode" id="cb4" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="an">title:</span><span class="co"> "Bayesian Optimization Fundamentals"</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>This chapter introduces the core logic behind Bayesian optimization: build a probabilistic model of an expensive objective, estimate where information is most valuable, and decide where to evaluate next. That is the conceptual bridge between the search intuition in <span class="co">[</span><span class="ot">Foundations of Modern Optimization</span><span class="co">](01-foundations-modern-optimization.qmd)</span> and Optuna's default TPE-based workflow.</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>By the end of the chapter, you should be able to explain the role of surrogate models, why acquisition functions are needed, and why classical Gaussian-process-based Bayesian optimization is both powerful and limited.</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>This chapter assumes you are already comfortable with the optimization vocabulary from <span class="co">[</span><span class="ot">Foundations of Modern Optimization</span><span class="co">](01-foundations-modern-optimization.qmd)</span>, along with basic probability concepts such as mean, variance, and normal distributions.</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a><span class="fu">## Why This Matters</span></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>Suppose each hyperparameter trial for a large model takes two hours. You cannot afford to evaluate hundreds or thousands of random configurations just to discover where the promising region might be. You need a strategy that treats each evaluation as expensive and uses prior results to make better decisions.</span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>That is the problem Bayesian optimization is built to solve.</span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a><span class="fu">## A Fast First Win</span></span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>Before discussing Gaussian processes formally, it helps to see what the optimizer is trying to do. In Bayesian optimization, each candidate point gets a predicted mean, a predicted uncertainty, and an acquisition score that decides whether it is worth evaluating.</span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a>The following example computes Expected Improvement for a few candidate points using only the Python standard library.</span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> math</span>
+<span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-29"><a href="#cb4-29" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> normal_pdf(z):</span>
+<span id="cb4-30"><a href="#cb4-30" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> math.exp(<span class="op">-</span><span class="fl">0.5</span> <span class="op">*</span> z <span class="op">*</span> z) <span class="op">/</span> math.sqrt(<span class="dv">2</span> <span class="op">*</span> math.pi)</span>
+<span id="cb4-31"><a href="#cb4-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-32"><a href="#cb4-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-33"><a href="#cb4-33" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> normal_cdf(z):</span>
+<span id="cb4-34"><a href="#cb4-34" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="fl">0.5</span> <span class="op">*</span> (<span class="dv">1</span> <span class="op">+</span> math.erf(z <span class="op">/</span> math.sqrt(<span class="dv">2</span>)))</span>
+<span id="cb4-35"><a href="#cb4-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-36"><a href="#cb4-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-37"><a href="#cb4-37" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> expected_improvement(mu, sigma, f_best):</span>
+<span id="cb4-38"><a href="#cb4-38" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> sigma <span class="op">&lt;=</span> <span class="fl">1e-12</span>:</span>
+<span id="cb4-39"><a href="#cb4-39" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="bu">max</span>(f_best <span class="op">-</span> mu, <span class="fl">0.0</span>)</span>
+<span id="cb4-40"><a href="#cb4-40" aria-hidden="true" tabindex="-1"></a>    z <span class="op">=</span> (f_best <span class="op">-</span> mu) <span class="op">/</span> sigma</span>
+<span id="cb4-41"><a href="#cb4-41" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (f_best <span class="op">-</span> mu) <span class="op">*</span> normal_cdf(z) <span class="op">+</span> sigma <span class="op">*</span> normal_pdf(z)</span>
+<span id="cb4-42"><a href="#cb4-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-43"><a href="#cb4-43" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-44"><a href="#cb4-44" aria-hidden="true" tabindex="-1"></a>f_best <span class="op">=</span> <span class="fl">0.18</span></span>
+<span id="cb4-45"><a href="#cb4-45" aria-hidden="true" tabindex="-1"></a>candidates <span class="op">=</span> [</span>
+<span id="cb4-46"><a href="#cb4-46" aria-hidden="true" tabindex="-1"></a>    {<span class="st">"x"</span>: <span class="fl">0.5</span>, <span class="st">"mu"</span>: <span class="fl">0.30</span>, <span class="st">"sigma"</span>: <span class="fl">0.05</span>},</span>
+<span id="cb4-47"><a href="#cb4-47" aria-hidden="true" tabindex="-1"></a>    {<span class="st">"x"</span>: <span class="fl">1.0</span>, <span class="st">"mu"</span>: <span class="fl">0.24</span>, <span class="st">"sigma"</span>: <span class="fl">0.12</span>},</span>
+<span id="cb4-48"><a href="#cb4-48" aria-hidden="true" tabindex="-1"></a>    {<span class="st">"x"</span>: <span class="fl">1.5</span>, <span class="st">"mu"</span>: <span class="fl">0.28</span>, <span class="st">"sigma"</span>: <span class="fl">0.30</span>},</span>
+<span id="cb4-49"><a href="#cb4-49" aria-hidden="true" tabindex="-1"></a>    {<span class="st">"x"</span>: <span class="fl">2.0</span>, <span class="st">"mu"</span>: <span class="fl">0.16</span>, <span class="st">"sigma"</span>: <span class="fl">0.02</span>},</span>
+<span id="cb4-50"><a href="#cb4-50" aria-hidden="true" tabindex="-1"></a>]</span>
+<span id="cb4-51"><a href="#cb4-51" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-52"><a href="#cb4-52" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> candidate <span class="kw">in</span> candidates:</span>
+<span id="cb4-53"><a href="#cb4-53" aria-hidden="true" tabindex="-1"></a>    candidate[<span class="st">"ei"</span>] <span class="op">=</span> expected_improvement(</span>
+<span id="cb4-54"><a href="#cb4-54" aria-hidden="true" tabindex="-1"></a>        candidate[<span class="st">"mu"</span>],</span>
+<span id="cb4-55"><a href="#cb4-55" aria-hidden="true" tabindex="-1"></a>        candidate[<span class="st">"sigma"</span>],</span>
+<span id="cb4-56"><a href="#cb4-56" aria-hidden="true" tabindex="-1"></a>        f_best,</span>
+<span id="cb4-57"><a href="#cb4-57" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb4-58"><a href="#cb4-58" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-59"><a href="#cb4-59" aria-hidden="true" tabindex="-1"></a>best_candidate <span class="op">=</span> <span class="bu">max</span>(candidates, key<span class="op">=</span><span class="kw">lambda</span> candidate: candidate[<span class="st">"ei"</span>])</span>
+<span id="cb4-60"><a href="#cb4-60" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-61"><a href="#cb4-61" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> candidate <span class="kw">in</span> candidates:</span>
+<span id="cb4-62"><a href="#cb4-62" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(candidate)</span>
+<span id="cb4-63"><a href="#cb4-63" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-64"><a href="#cb4-64" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Next point to evaluate:"</span>, best_candidate)</span>
+<span id="cb4-65"><a href="#cb4-65" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb4-66"><a href="#cb4-66" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-67"><a href="#cb4-67" aria-hidden="true" tabindex="-1"></a>The key observation is that the best next point is not always the one with the lowest predicted mean. A point with slightly worse predicted performance may still be more valuable if its uncertainty is high enough.</span>
+<span id="cb4-68"><a href="#cb4-68" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-69"><a href="#cb4-69" aria-hidden="true" tabindex="-1"></a><span class="fu">## Why Surrogate Models Matter</span></span>
+<span id="cb4-70"><a href="#cb4-70" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-71"><a href="#cb4-71" aria-hidden="true" tabindex="-1"></a>Bayesian optimization starts from a simple idea: instead of optimizing the true objective function directly, we build an approximate probabilistic model from the observations we already have.</span>
+<span id="cb4-72"><a href="#cb4-72" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-73"><a href="#cb4-73" aria-hidden="true" tabindex="-1"></a>Let the true objective be:</span>
+<span id="cb4-74"><a href="#cb4-74" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-75"><a href="#cb4-75" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-76"><a href="#cb4-76" aria-hidden="true" tabindex="-1"></a>f(x)</span>
+<span id="cb4-77"><a href="#cb4-77" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-78"><a href="#cb4-78" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-79"><a href="#cb4-79" aria-hidden="true" tabindex="-1"></a>We build a surrogate model:</span>
+<span id="cb4-80"><a href="#cb4-80" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-81"><a href="#cb4-81" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-82"><a href="#cb4-82" aria-hidden="true" tabindex="-1"></a>\hat{f}(x)</span>
+<span id="cb4-83"><a href="#cb4-83" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-84"><a href="#cb4-84" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-85"><a href="#cb4-85" aria-hidden="true" tabindex="-1"></a>using observed data:</span>
+<span id="cb4-86"><a href="#cb4-86" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-87"><a href="#cb4-87" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-88"><a href="#cb4-88" aria-hidden="true" tabindex="-1"></a>D = <span class="sc">\{</span>(x_1, y_1), (x_2, y_2), \ldots, (x_n, y_n)<span class="sc">\}</span></span>
+<span id="cb4-89"><a href="#cb4-89" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-90"><a href="#cb4-90" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-91"><a href="#cb4-91" aria-hidden="true" tabindex="-1"></a>where:</span>
+<span id="cb4-92"><a href="#cb4-92" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-93"><a href="#cb4-93" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-94"><a href="#cb4-94" aria-hidden="true" tabindex="-1"></a>y_i = f(x_i)</span>
+<span id="cb4-95"><a href="#cb4-95" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-96"><a href="#cb4-96" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-97"><a href="#cb4-97" aria-hidden="true" tabindex="-1"></a>The purpose of the surrogate is not just to estimate the function value. It must also estimate uncertainty. In other words, for each candidate point $x$, we want a predictive distribution:</span>
+<span id="cb4-98"><a href="#cb4-98" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-99"><a href="#cb4-99" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-100"><a href="#cb4-100" aria-hidden="true" tabindex="-1"></a>p(f(x) \mid D)</span>
+<span id="cb4-101"><a href="#cb4-101" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-102"><a href="#cb4-102" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-103"><a href="#cb4-103" aria-hidden="true" tabindex="-1"></a>That uncertainty estimate is what makes exploration possible.</span>
+<span id="cb4-104"><a href="#cb4-104" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-105"><a href="#cb4-105" aria-hidden="true" tabindex="-1"></a><span class="fu">## Gaussian Processes: The Classical View</span></span>
+<span id="cb4-106"><a href="#cb4-106" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-107"><a href="#cb4-107" aria-hidden="true" tabindex="-1"></a>The most classical surrogate model in Bayesian optimization is the Gaussian process, usually abbreviated GP.</span>
+<span id="cb4-108"><a href="#cb4-108" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-109"><a href="#cb4-109" aria-hidden="true" tabindex="-1"></a>A Gaussian process defines a distribution over functions rather than a single best-fit curve. Formally:</span>
+<span id="cb4-110"><a href="#cb4-110" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-111"><a href="#cb4-111" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-112"><a href="#cb4-112" aria-hidden="true" tabindex="-1"></a>f(x) \sim \mathcal{GP}(m(x), k(x, x'))</span>
+<span id="cb4-113"><a href="#cb4-113" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-114"><a href="#cb4-114" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-115"><a href="#cb4-115" aria-hidden="true" tabindex="-1"></a>where:</span>
+<span id="cb4-116"><a href="#cb4-116" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-117"><a href="#cb4-117" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>$m(x)$ is the mean function.</span>
+<span id="cb4-118"><a href="#cb4-118" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>$k(x, x')$ is the covariance kernel.</span>
+<span id="cb4-119"><a href="#cb4-119" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-120"><a href="#cb4-120" aria-hidden="true" tabindex="-1"></a>The mean function captures the expected value of the objective, and the kernel encodes similarity between inputs. If two inputs are close according to the kernel, the GP expects their outputs to be similar as well.</span>
+<span id="cb4-121"><a href="#cb4-121" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-122"><a href="#cb4-122" aria-hidden="true" tabindex="-1"></a>Common kernels include:</span>
+<span id="cb4-123"><a href="#cb4-123" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-124"><a href="#cb4-124" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Radial basis function (RBF).</span>
+<span id="cb4-125"><a href="#cb4-125" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Matern.</span>
+<span id="cb4-126"><a href="#cb4-126" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Rational quadratic.</span>
+<span id="cb4-127"><a href="#cb4-127" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-128"><a href="#cb4-128" aria-hidden="true" tabindex="-1"></a>The intuition is more important than the formulas at this stage: a Gaussian process gives you both a prediction and a measure of confidence in that prediction.</span>
+<span id="cb4-129"><a href="#cb4-129" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-130"><a href="#cb4-130" aria-hidden="true" tabindex="-1"></a><span class="fu">## What Does a GP Predict?</span></span>
+<span id="cb4-131"><a href="#cb4-131" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-132"><a href="#cb4-132" aria-hidden="true" tabindex="-1"></a>At a candidate point $x$, a GP provides:</span>
+<span id="cb4-133"><a href="#cb4-133" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-134"><a href="#cb4-134" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>A predictive mean:</span>
+<span id="cb4-135"><a href="#cb4-135" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-136"><a href="#cb4-136" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-137"><a href="#cb4-137" aria-hidden="true" tabindex="-1"></a>\mu(x)</span>
+<span id="cb4-138"><a href="#cb4-138" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-139"><a href="#cb4-139" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-140"><a href="#cb4-140" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>A predictive variance:</span>
+<span id="cb4-141"><a href="#cb4-141" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-142"><a href="#cb4-142" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-143"><a href="#cb4-143" aria-hidden="true" tabindex="-1"></a>\sigma^2(x)</span>
+<span id="cb4-144"><a href="#cb4-144" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-145"><a href="#cb4-145" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-146"><a href="#cb4-146" aria-hidden="true" tabindex="-1"></a>So the prediction can be summarized as:</span>
+<span id="cb4-147"><a href="#cb4-147" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-148"><a href="#cb4-148" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-149"><a href="#cb4-149" aria-hidden="true" tabindex="-1"></a>f(x) \sim \mathcal{N}(\mu(x), \sigma^2(x))</span>
+<span id="cb4-150"><a href="#cb4-150" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-151"><a href="#cb4-151" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-152"><a href="#cb4-152" aria-hidden="true" tabindex="-1"></a>This is the core output that drives Bayesian optimization. The optimizer now has two pieces of information:</span>
+<span id="cb4-153"><a href="#cb4-153" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-154"><a href="#cb4-154" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>What value looks plausible at this point.</span>
+<span id="cb4-155"><a href="#cb4-155" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>How uncertain that estimate is.</span>
+<span id="cb4-156"><a href="#cb4-156" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-157"><a href="#cb4-157" aria-hidden="true" tabindex="-1"></a><span class="fu">## How the Acquisition Function Chooses the Next Point</span></span>
+<span id="cb4-158"><a href="#cb4-158" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-159"><a href="#cb4-159" aria-hidden="true" tabindex="-1"></a>The surrogate model tells us what we currently believe about the objective. The acquisition function tells us what to do next.</span>
+<span id="cb4-160"><a href="#cb4-160" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-161"><a href="#cb4-161" aria-hidden="true" tabindex="-1"></a>In general, the next evaluation point is chosen by solving:</span>
+<span id="cb4-162"><a href="#cb4-162" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-163"><a href="#cb4-163" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-164"><a href="#cb4-164" aria-hidden="true" tabindex="-1"></a>x_{\text{next}} = \arg\max a(x)</span>
+<span id="cb4-165"><a href="#cb4-165" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-166"><a href="#cb4-166" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-167"><a href="#cb4-167" aria-hidden="true" tabindex="-1"></a>where $a(x)$ is the acquisition function.</span>
+<span id="cb4-168"><a href="#cb4-168" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-169"><a href="#cb4-169" aria-hidden="true" tabindex="-1"></a>Acquisition functions encode the exploration-exploitation tradeoff. They prefer points that either:</span>
+<span id="cb4-170"><a href="#cb4-170" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-171"><a href="#cb4-171" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Look promising according to the predicted mean.</span>
+<span id="cb4-172"><a href="#cb4-172" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Remain uncertain enough that evaluating them could reveal something better.</span>
+<span id="cb4-173"><a href="#cb4-173" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-176"><a href="#cb4-176" aria-hidden="true" tabindex="-1"></a><span class="in">```{mermaid}</span></span>
+<span id="cb4-177"><a href="#cb4-177" aria-hidden="true" tabindex="-1"></a>flowchart LR</span>
+<span id="cb4-178"><a href="#cb4-178" aria-hidden="true" tabindex="-1"></a>    A[Observed trials] --&gt; B[Fit surrogate model]</span>
+<span id="cb4-179"><a href="#cb4-179" aria-hidden="true" tabindex="-1"></a>    B --&gt; C[Estimate mean <span class="ot">and</span> uncertainty]</span>
+<span id="cb4-180"><a href="#cb4-180" aria-hidden="true" tabindex="-1"></a>    C --&gt; D[Compute acquisition score]</span>
+<span id="cb4-181"><a href="#cb4-181" aria-hidden="true" tabindex="-1"></a>    D --&gt; E[Choose <span class="kw">next</span> point]</span>
+<span id="cb4-182"><a href="#cb4-182" aria-hidden="true" tabindex="-1"></a>    E --&gt; F[Evaluate objective]</span>
+<span id="cb4-183"><a href="#cb4-183" aria-hidden="true" tabindex="-1"></a>    F --&gt; A</span>
+<span id="cb4-184"><a href="#cb4-184" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb4-185"><a href="#cb4-185" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-186"><a href="#cb4-186" aria-hidden="true" tabindex="-1"></a><span class="fu">## Probability of Improvement</span></span>
+<span id="cb4-187"><a href="#cb4-187" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-188"><a href="#cb4-188" aria-hidden="true" tabindex="-1"></a>Probability of Improvement, or PI, is the simplest acquisition function.</span>
+<span id="cb4-189"><a href="#cb4-189" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-190"><a href="#cb4-190" aria-hidden="true" tabindex="-1"></a>For minimization, let $f^*$ denote the best observed value so far. Then PI measures the probability that a candidate point beats that value:</span>
+<span id="cb4-191"><a href="#cb4-191" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-192"><a href="#cb4-192" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-193"><a href="#cb4-193" aria-hidden="true" tabindex="-1"></a>PI(x) = P(f(x) &lt; f^*)</span>
+<span id="cb4-194"><a href="#cb4-194" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-195"><a href="#cb4-195" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-196"><a href="#cb4-196" aria-hidden="true" tabindex="-1"></a>Its interpretation is straightforward: rank points by how likely they are to improve the current best.</span>
+<span id="cb4-197"><a href="#cb4-197" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-198"><a href="#cb4-198" aria-hidden="true" tabindex="-1"></a>The limitation is equally straightforward: PI often over-exploits. A point that is only marginally better but very certain can dominate a riskier point that could lead to a much larger improvement.</span>
+<span id="cb4-199"><a href="#cb4-199" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-200"><a href="#cb4-200" aria-hidden="true" tabindex="-1"></a><span class="fu">## Expected Improvement</span></span>
+<span id="cb4-201"><a href="#cb4-201" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-202"><a href="#cb4-202" aria-hidden="true" tabindex="-1"></a>Expected Improvement, or EI, fixes the main weakness of PI by asking not only whether improvement is likely, but how large that improvement might be.</span>
+<span id="cb4-203"><a href="#cb4-203" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-204"><a href="#cb4-204" aria-hidden="true" tabindex="-1"></a>For minimization:</span>
+<span id="cb4-205"><a href="#cb4-205" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-206"><a href="#cb4-206" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-207"><a href="#cb4-207" aria-hidden="true" tabindex="-1"></a>EI(x) = \mathbb{E}<span class="co">[</span><span class="ot">\max(f^* - f(x), 0)</span><span class="co">]</span></span>
+<span id="cb4-208"><a href="#cb4-208" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-209"><a href="#cb4-209" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-210"><a href="#cb4-210" aria-hidden="true" tabindex="-1"></a>This combines:</span>
+<span id="cb4-211"><a href="#cb4-211" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-212"><a href="#cb4-212" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Low predicted values.</span>
+<span id="cb4-213"><a href="#cb4-213" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>High uncertainty.</span>
+<span id="cb4-214"><a href="#cb4-214" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-215"><a href="#cb4-215" aria-hidden="true" tabindex="-1"></a>That balance is why EI became one of the standard acquisition rules in Bayesian optimization.</span>
+<span id="cb4-216"><a href="#cb4-216" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-217"><a href="#cb4-217" aria-hidden="true" tabindex="-1"></a>The fast example at the start of the chapter is an explicit EI calculation, and it shows the core idea: the next point is chosen for decision value, not just predicted objective value.</span>
+<span id="cb4-218"><a href="#cb4-218" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-219"><a href="#cb4-219" aria-hidden="true" tabindex="-1"></a><span class="fu">## Upper and Lower Confidence Bounds</span></span>
+<span id="cb4-220"><a href="#cb4-220" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-221"><a href="#cb4-221" aria-hidden="true" tabindex="-1"></a>Another family of acquisition functions uses confidence bounds directly.</span>
+<span id="cb4-222"><a href="#cb4-222" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-223"><a href="#cb4-223" aria-hidden="true" tabindex="-1"></a>For maximization:</span>
+<span id="cb4-224"><a href="#cb4-224" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-225"><a href="#cb4-225" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-226"><a href="#cb4-226" aria-hidden="true" tabindex="-1"></a>UCB(x) = \mu(x) + \kappa \sigma(x)</span>
+<span id="cb4-227"><a href="#cb4-227" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-228"><a href="#cb4-228" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-229"><a href="#cb4-229" aria-hidden="true" tabindex="-1"></a>For minimization, the analogous lower confidence bound is:</span>
+<span id="cb4-230"><a href="#cb4-230" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-231"><a href="#cb4-231" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-232"><a href="#cb4-232" aria-hidden="true" tabindex="-1"></a>LCB(x) = \mu(x) - \kappa \sigma(x)</span>
+<span id="cb4-233"><a href="#cb4-233" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-234"><a href="#cb4-234" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-235"><a href="#cb4-235" aria-hidden="true" tabindex="-1"></a>where:</span>
+<span id="cb4-236"><a href="#cb4-236" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-237"><a href="#cb4-237" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>$\mu(x)$ is the predicted mean.</span>
+<span id="cb4-238"><a href="#cb4-238" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>$\sigma(x)$ is the predictive standard deviation.</span>
+<span id="cb4-239"><a href="#cb4-239" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>$\kappa$ controls how aggressively the optimizer explores.</span>
+<span id="cb4-240"><a href="#cb4-240" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-241"><a href="#cb4-241" aria-hidden="true" tabindex="-1"></a>Large $\kappa$ favors exploration. Small $\kappa$ favors exploitation. This makes confidence-bound strategies attractive when you want a direct knob for controlling search behavior.</span>
+<span id="cb4-242"><a href="#cb4-242" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-243"><a href="#cb4-243" aria-hidden="true" tabindex="-1"></a><span class="fu">## The Bayesian Optimization Loop</span></span>
+<span id="cb4-244"><a href="#cb4-244" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-245"><a href="#cb4-245" aria-hidden="true" tabindex="-1"></a>Putting the pieces together, the classical Bayesian optimization loop is:</span>
+<span id="cb4-246"><a href="#cb4-246" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-247"><a href="#cb4-247" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>Sample a small set of initial points.</span>
+<span id="cb4-248"><a href="#cb4-248" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>Fit a surrogate model such as a Gaussian process.</span>
+<span id="cb4-249"><a href="#cb4-249" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>Compute an acquisition function over the search space.</span>
+<span id="cb4-250"><a href="#cb4-250" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>Select the point that maximizes the acquisition score.</span>
+<span id="cb4-251"><a href="#cb4-251" aria-hidden="true" tabindex="-1"></a><span class="ss">5. </span>Evaluate the true objective.</span>
+<span id="cb4-252"><a href="#cb4-252" aria-hidden="true" tabindex="-1"></a><span class="ss">6. </span>Update the model with the new observation.</span>
+<span id="cb4-253"><a href="#cb4-253" aria-hidden="true" tabindex="-1"></a><span class="ss">7. </span>Repeat.</span>
+<span id="cb4-254"><a href="#cb4-254" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-255"><a href="#cb4-255" aria-hidden="true" tabindex="-1"></a>This loop works because the optimizer spends evaluations where they are expected to be most informative, not merely where the search space happens to be easy to enumerate.</span>
+<span id="cb4-256"><a href="#cb4-256" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-257"><a href="#cb4-257" aria-hidden="true" tabindex="-1"></a>::: {.callout-warning}</span>
+<span id="cb4-258"><a href="#cb4-258" aria-hidden="true" tabindex="-1"></a><span class="fu">## Common Mistake</span></span>
+<span id="cb4-259"><a href="#cb4-259" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-260"><a href="#cb4-260" aria-hidden="true" tabindex="-1"></a>Do not confuse optimizing the surrogate mean with performing Bayesian optimization. If you always choose the point with the best predicted mean, you remove the exploration term and the method can get trapped in regions that only look good under the current model.</span>
+<span id="cb4-261"><a href="#cb4-261" aria-hidden="true" tabindex="-1"></a>:::</span>
+<span id="cb4-262"><a href="#cb4-262" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-263"><a href="#cb4-263" aria-hidden="true" tabindex="-1"></a><span class="fu">## Where Gaussian-Process Bayesian Optimization Struggles</span></span>
+<span id="cb4-264"><a href="#cb4-264" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-265"><a href="#cb4-265" aria-hidden="true" tabindex="-1"></a>Gaussian-process-based Bayesian optimization is elegant, but it has practical limits.</span>
+<span id="cb4-266"><a href="#cb4-266" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-267"><a href="#cb4-267" aria-hidden="true" tabindex="-1"></a><span class="fu">### Computational Complexity</span></span>
+<span id="cb4-268"><a href="#cb4-268" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-269"><a href="#cb4-269" aria-hidden="true" tabindex="-1"></a>Training a Gaussian process typically scales as:</span>
+<span id="cb4-270"><a href="#cb4-270" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-271"><a href="#cb4-271" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-272"><a href="#cb4-272" aria-hidden="true" tabindex="-1"></a>O(n^3)</span>
+<span id="cb4-273"><a href="#cb4-273" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-274"><a href="#cb4-274" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-275"><a href="#cb4-275" aria-hidden="true" tabindex="-1"></a>where $n$ is the number of observations. That becomes expensive once the number of evaluations grows.</span>
+<span id="cb4-276"><a href="#cb4-276" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-277"><a href="#cb4-277" aria-hidden="true" tabindex="-1"></a><span class="fu">### High-Dimensional Search Spaces</span></span>
+<span id="cb4-278"><a href="#cb4-278" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-279"><a href="#cb4-279" aria-hidden="true" tabindex="-1"></a>Gaussian processes usually work best in relatively low-dimensional settings. Once the search space contains many interacting hyperparameters, the model quality and acquisition optimization can degrade quickly.</span>
+<span id="cb4-280"><a href="#cb4-280" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-281"><a href="#cb4-281" aria-hidden="true" tabindex="-1"></a>As a rough rule of thumb, performance often becomes harder to maintain once the effective search dimension grows well beyond the small-scale regime.</span>
+<span id="cb4-282"><a href="#cb4-282" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-283"><a href="#cb4-283" aria-hidden="true" tabindex="-1"></a><span class="fu">### Categorical and Conditional Variables</span></span>
+<span id="cb4-284"><a href="#cb4-284" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-285"><a href="#cb4-285" aria-hidden="true" tabindex="-1"></a>Many machine learning search spaces include categorical or tree-structured choices such as:</span>
+<span id="cb4-286"><a href="#cb4-286" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-287"><a href="#cb4-287" aria-hidden="true" tabindex="-1"></a><span class="in">```text</span></span>
+<span id="cb4-288"><a href="#cb4-288" aria-hidden="true" tabindex="-1"></a><span class="in">optimizer = ["adam", "sgd", "rmsprop"]</span></span>
+<span id="cb4-289"><a href="#cb4-289" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb4-290"><a href="#cb4-290" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-291"><a href="#cb4-291" aria-hidden="true" tabindex="-1"></a>This is awkward for classical GP kernels, which are more naturally defined over continuous spaces.</span>
+<span id="cb4-292"><a href="#cb4-292" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-293"><a href="#cb4-293" aria-hidden="true" tabindex="-1"></a><span class="fu">## Why Optuna Transitions to TPE Instead</span></span>
+<span id="cb4-294"><a href="#cb4-294" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-295"><a href="#cb4-295" aria-hidden="true" tabindex="-1"></a>Optuna does not use Gaussian processes as its default strategy. Instead, it uses the Tree-structured Parzen Estimator, or TPE.</span>
+<span id="cb4-296"><a href="#cb4-296" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-297"><a href="#cb4-297" aria-hidden="true" tabindex="-1"></a>The conceptual shift is important. Classical Bayesian optimization often models:</span>
+<span id="cb4-298"><a href="#cb4-298" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-299"><a href="#cb4-299" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-300"><a href="#cb4-300" aria-hidden="true" tabindex="-1"></a>p(y \mid x)</span>
+<span id="cb4-301"><a href="#cb4-301" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-302"><a href="#cb4-302" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-303"><a href="#cb4-303" aria-hidden="true" tabindex="-1"></a>TPE instead models:</span>
+<span id="cb4-304"><a href="#cb4-304" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-305"><a href="#cb4-305" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-306"><a href="#cb4-306" aria-hidden="true" tabindex="-1"></a>p(x \mid y)</span>
+<span id="cb4-307"><a href="#cb4-307" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-308"><a href="#cb4-308" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-309"><a href="#cb4-309" aria-hidden="true" tabindex="-1"></a>It separates the observed trials into good and bad regions, estimates densities for each group, and searches for points that are more likely under the good-trial density than under the bad-trial density.</span>
+<span id="cb4-310"><a href="#cb4-310" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-311"><a href="#cb4-311" aria-hidden="true" tabindex="-1"></a>This leads to an optimization criterion of the form:</span>
+<span id="cb4-312"><a href="#cb4-312" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-313"><a href="#cb4-313" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-314"><a href="#cb4-314" aria-hidden="true" tabindex="-1"></a>\arg\max \frac{\ell(x)}{g(x)}</span>
+<span id="cb4-315"><a href="#cb4-315" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-316"><a href="#cb4-316" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-317"><a href="#cb4-317" aria-hidden="true" tabindex="-1"></a>where:</span>
+<span id="cb4-318"><a href="#cb4-318" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-319"><a href="#cb4-319" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>$\ell(x)$ is the density of good observations.</span>
+<span id="cb4-320"><a href="#cb4-320" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>$g(x)$ is the density of bad observations.</span>
+<span id="cb4-321"><a href="#cb4-321" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-322"><a href="#cb4-322" aria-hidden="true" tabindex="-1"></a>This reformulation is one reason TPE is practical for Optuna. It handles categorical variables better, scales more gracefully, and works well in higher-dimensional or conditional search spaces.</span>
+<span id="cb4-323"><a href="#cb4-323" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-324"><a href="#cb4-324" aria-hidden="true" tabindex="-1"></a>We will unpack the full algorithm in <span class="co">[</span><span class="ot">The TPE Algorithm</span><span class="co">](03-tpe-algorithm.qmd)</span>.</span>
+<span id="cb4-325"><a href="#cb4-325" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-326"><a href="#cb4-326" aria-hidden="true" tabindex="-1"></a><span class="fu">## Practical Exercise: Compare Mean and Improvement</span></span>
+<span id="cb4-327"><a href="#cb4-327" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-328"><a href="#cb4-328" aria-hidden="true" tabindex="-1"></a>Use the earlier Expected Improvement example as a starting point and modify it in three steps:</span>
+<span id="cb4-329"><a href="#cb4-329" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-330"><a href="#cb4-330" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>Change <span class="in">`f_best`</span> and observe how the acquisition ranking changes.</span>
+<span id="cb4-331"><a href="#cb4-331" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>Increase the uncertainty of one candidate and check when exploration becomes dominant.</span>
+<span id="cb4-332"><a href="#cb4-332" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>Add a new candidate with a very low mean and very low uncertainty, then compare it against a riskier candidate with higher uncertainty.</span>
+<span id="cb4-333"><a href="#cb4-333" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-334"><a href="#cb4-334" aria-hidden="true" tabindex="-1"></a>Your goal is to build intuition for why acquisition functions do not behave like plain objective minimization.</span>
+<span id="cb4-335"><a href="#cb4-335" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-336"><a href="#cb4-336" aria-hidden="true" tabindex="-1"></a><span class="fu">## Recap</span></span>
+<span id="cb4-337"><a href="#cb4-337" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-338"><a href="#cb4-338" aria-hidden="true" tabindex="-1"></a>Bayesian optimization combines three components:</span>
+<span id="cb4-339"><a href="#cb4-339" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-340"><a href="#cb4-340" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>A surrogate model that approximates the unknown objective.</span>
+<span id="cb4-341"><a href="#cb4-341" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>An uncertainty estimate that makes exploration possible.</span>
+<span id="cb4-342"><a href="#cb4-342" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>An acquisition function that selects the next evaluation point.</span>
+<span id="cb4-343"><a href="#cb4-343" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-344"><a href="#cb4-344" aria-hidden="true" tabindex="-1"></a>Gaussian processes provide the classical picture of this workflow, and they remain useful as a conceptual foundation. But the same chapter also explains why Optuna's default strategy moves away from GP-based optimization in practice.</span>
+<span id="cb4-345"><a href="#cb4-345" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-346"><a href="#cb4-346" aria-hidden="true" tabindex="-1"></a><span class="fu">## Decision Guide</span></span>
+<span id="cb4-347"><a href="#cb4-347" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-348"><a href="#cb4-348" aria-hidden="true" tabindex="-1"></a>Use the following mental model:</span>
+<span id="cb4-349"><a href="#cb4-349" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-350"><a href="#cb4-350" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Use Bayesian optimization when each objective evaluation is expensive enough that learning from earlier trials matters.</span>
+<span id="cb4-351"><a href="#cb4-351" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Use Gaussian-process intuition to understand surrogate modeling and acquisition functions.</span>
+<span id="cb4-352"><a href="#cb4-352" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Expect GP-based methods to struggle once the space becomes highly dimensional, categorical, or heavily conditional.</span>
+<span id="cb4-353"><a href="#cb4-353" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Expect Optuna's TPE-based approach to be a better practical default for many real hyperparameter-search workloads.</span>
+<span id="cb4-354"><a href="#cb4-354" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-355"><a href="#cb4-355" aria-hidden="true" tabindex="-1"></a>Next, <span class="co">[</span><span class="ot">The TPE Algorithm</span><span class="co">](03-tpe-algorithm.qmd)</span> turns that transition into a concrete optimization method.</span>
+</code><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></pre></div>
+</div></div></div></div></div>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

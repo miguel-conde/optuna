@@ -1,0 +1,1624 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.7.31">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>11&nbsp; Distributed and Scalable Optimization – Optimization with Optuna: A Practical and Theoretical Guide to Modern Black-Box Optimization</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<link href="../modules/12-optuna-machine-learning.html" rel="next">
+<link href="../modules/10-visualization-diagnostics.html" rel="prev">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-e1a5c8363afafaef2c763b6775fbf3ca.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-84201f73209b7bbc7d36810704c07685.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script src="../site_libs/quarto-diagram/mermaid.min.js"></script>
+<script src="../site_libs/quarto-diagram/mermaid-init.js"></script>
+<link href="../site_libs/quarto-diagram/mermaid.css" rel="stylesheet">
+
+
+</head>
+
+<body class="nav-sidebar floating quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../modules/09-advanced-optimization-techniques.html">Part III: Advanced Techniques</a></li><li class="breadcrumb-item"><a href="../modules/11-distributed-scalable-optimization.html"><span class="chapter-number">11</span>&nbsp; <span class="chapter-title">Distributed and Scalable Optimization</span></a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="../">Optimization with Optuna: A Practical and Theoretical Guide to Modern Black-Box Optimization</a> 
+    </div>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Preface</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../intro.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Introduction</span></a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
+ <span class="menu-text">Part I: Foundations</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/01-foundations-modern-optimization.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">1</span>&nbsp; <span class="chapter-title">Foundations of Modern Optimization</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/02-bayesian-optimization-fundamentals.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">2</span>&nbsp; <span class="chapter-title">Bayesian Optimization Fundamentals</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/03-tpe-algorithm.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">3</span>&nbsp; <span class="chapter-title">The TPE Algorithm</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/04-optuna-architecture.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">4</span>&nbsp; <span class="chapter-title">Optuna Architecture</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true">
+ <span class="menu-text">Part II: Core Usage</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/05-basic-optuna-usage.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">5</span>&nbsp; <span class="chapter-title">Basic Optuna Usage</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/06-designing-search-spaces.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">Designing Search Spaces</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/07-samplers.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">7</span>&nbsp; <span class="chapter-title">Samplers</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/08-pruning.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">8</span>&nbsp; <span class="chapter-title">Pruning</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true">
+ <span class="menu-text">Part III: Advanced Techniques</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/09-advanced-optimization-techniques.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">9</span>&nbsp; <span class="chapter-title">Advanced Optimization Techniques</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/10-visualization-diagnostics.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">10</span>&nbsp; <span class="chapter-title">Visualization and Diagnostics</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/11-distributed-scalable-optimization.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text"><span class="chapter-number">11</span>&nbsp; <span class="chapter-title">Distributed and Scalable Optimization</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true">
+ <span class="menu-text">Part IV: Applications</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-4" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/12-optuna-machine-learning.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">12</span>&nbsp; <span class="chapter-title">Optuna for Machine Learning</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/13-optuna-general-optimization.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">13</span>&nbsp; <span class="chapter-title">Optuna for General Optimization</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/14-production-workflows.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">14</span>&nbsp; <span class="chapter-title">Production Workflows</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/15-final-project.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">15</span>&nbsp; <span class="chapter-title">Final Project</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../summary.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Summary</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../references.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">References</span></a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true">
+ <span class="menu-text">Appendices</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-5" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../appendices/01-optuna-expert-cheat-sheet.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">A</span>&nbsp; <span class="chapter-title">Optuna Expert Cheat Sheet</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul>
+  <li><a href="#why-this-matters" id="toc-why-this-matters" class="nav-link active" data-scroll-target="#why-this-matters"><span class="header-section-number">11.1</span> Why This Matters</a></li>
+  <li><a href="#fast-first-win-local-parallel-optimization" id="toc-fast-first-win-local-parallel-optimization" class="nav-link" data-scroll-target="#fast-first-win-local-parallel-optimization"><span class="header-section-number">11.2</span> Fast First Win: Local Parallel Optimization</a></li>
+  <li><a href="#what-does-n_jobs-actually-buy-you" id="toc-what-does-n_jobs-actually-buy-you" class="nav-link" data-scroll-target="#what-does-n_jobs-actually-buy-you"><span class="header-section-number">11.3</span> What Does <code>n_jobs</code> Actually Buy You?</a></li>
+  <li><a href="#when-do-you-need-shared-storage" id="toc-when-do-you-need-shared-storage" class="nav-link" data-scroll-target="#when-do-you-need-shared-storage"><span class="header-section-number">11.4</span> When Do You Need Shared Storage?</a></li>
+  <li><a href="#which-storage-backend-should-you-use" id="toc-which-storage-backend-should-you-use" class="nav-link" data-scroll-target="#which-storage-backend-should-you-use"><span class="header-section-number">11.5</span> Which Storage Backend Should You Use?</a>
+  <ul class="collapse">
+  <li><a href="#in-memory-storage" id="toc-in-memory-storage" class="nav-link" data-scroll-target="#in-memory-storage"><span class="header-section-number">11.5.1</span> In-Memory Storage</a></li>
+  <li><a href="#sqlite-storage" id="toc-sqlite-storage" class="nav-link" data-scroll-target="#sqlite-storage"><span class="header-section-number">11.5.2</span> SQLite Storage</a></li>
+  <li><a href="#postgresql-or-mysql" id="toc-postgresql-or-mysql" class="nav-link" data-scroll-target="#postgresql-or-mysql"><span class="header-section-number">11.5.3</span> PostgreSQL or MySQL</a></li>
+  </ul></li>
+  <li><a href="#how-does-distributed-execution-work" id="toc-how-does-distributed-execution-work" class="nav-link" data-scroll-target="#how-does-distributed-execution-work"><span class="header-section-number">11.6</span> How Does Distributed Execution Work?</a></li>
+  <li><a href="#what-happens-when-workers-fail" id="toc-what-happens-when-workers-fail" class="nav-link" data-scroll-target="#what-happens-when-workers-fail"><span class="header-section-number">11.7</span> What Happens When Workers Fail?</a></li>
+  <li><a href="#how-should-you-think-about-scalability" id="toc-how-should-you-think-about-scalability" class="nav-link" data-scroll-target="#how-should-you-think-about-scalability"><span class="header-section-number">11.8</span> How Should You Think About Scalability?</a></li>
+  <li><a href="#what-does-a-multi-worker-setup-look-like" id="toc-what-does-a-multi-worker-setup-look-like" class="nav-link" data-scroll-target="#what-does-a-multi-worker-setup-look-like"><span class="header-section-number">11.9</span> What Does a Multi-Worker Setup Look Like?</a>
+  <ul class="collapse">
+  <li><a href="#step-1-create-or-load-the-study" id="toc-step-1-create-or-load-the-study" class="nav-link" data-scroll-target="#step-1-create-or-load-the-study"><span class="header-section-number">11.9.1</span> Step 1: Create or Load the Study</a></li>
+  <li><a href="#step-2-define-the-worker-objective" id="toc-step-2-define-the-worker-objective" class="nav-link" data-scroll-target="#step-2-define-the-worker-objective"><span class="header-section-number">11.9.2</span> Step 2: Define the Worker Objective</a></li>
+  <li><a href="#step-3-run-the-worker" id="toc-step-3-run-the-worker" class="nav-link" data-scroll-target="#step-3-run-the-worker"><span class="header-section-number">11.9.3</span> Step 3: Run the Worker</a></li>
+  </ul></li>
+  <li><a href="#how-do-you-monitor-a-large-study" id="toc-how-do-you-monitor-a-large-study" class="nav-link" data-scroll-target="#how-do-you-monitor-a-large-study"><span class="header-section-number">11.10</span> How Do You Monitor a Large Study?</a></li>
+  <li><a href="#how-does-optuna-fit-into-larger-distributed-systems" id="toc-how-does-optuna-fit-into-larger-distributed-systems" class="nav-link" data-scroll-target="#how-does-optuna-fit-into-larger-distributed-systems"><span class="header-section-number">11.11</span> How Does Optuna Fit Into Larger Distributed Systems?</a></li>
+  <li><a href="#practical-exercise-turn-a-local-study-into-a-shared-study" id="toc-practical-exercise-turn-a-local-study-into-a-shared-study" class="nav-link" data-scroll-target="#practical-exercise-turn-a-local-study-into-a-shared-study"><span class="header-section-number">11.12</span> Practical Exercise: Turn a Local Study Into a Shared Study</a></li>
+  <li><a href="#recap" id="toc-recap" class="nav-link" data-scroll-target="#recap"><span class="header-section-number">11.13</span> Recap</a></li>
+  <li><a href="#decision-guide" id="toc-decision-guide" class="nav-link" data-scroll-target="#decision-guide"><span class="header-section-number">11.14</span> Decision Guide</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../modules/09-advanced-optimization-techniques.html">Part III: Advanced Techniques</a></li><li class="breadcrumb-item"><a href="../modules/11-distributed-scalable-optimization.html"><span class="chapter-number">11</span>&nbsp; <span class="chapter-title">Distributed and Scalable Optimization</span></a></li></ol></nav>
+<div class="quarto-title">
+<div class="quarto-title-block"><div><h1 class="title"><span class="chapter-number">11</span>&nbsp; <span class="chapter-title">Distributed and Scalable Optimization</span></h1><button type="button" class="btn code-tools-button" id="quarto-code-tools-source"><i class="bi"></i> Code</button></div></div>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>This chapter explains how to scale Optuna beyond the single-process workflow used in earlier modules. By the end, you should be able to choose between local parallelism and shared-storage distributed execution, understand the operational role of storage backends, and recognize the failure modes that appear once many workers collaborate on the same study.</p>
+<section id="why-this-matters" class="level2" data-number="11.1">
+<h2 data-number="11.1" class="anchored" data-anchor-id="why-this-matters"><span class="header-section-number">11.1</span> Why This Matters</h2>
+<p>Many real optimization problems are limited less by the quality of the sampler than by the cost of objective evaluation. If a single trial takes minutes or hours, sequential optimization quickly becomes the real bottleneck.</p>
+<p>Scaling Optuna is therefore not an infrastructure afterthought. It is part of the optimization design itself. The storage backend, worker model, and failure handling strategy determine whether a large study is reproducible, efficient, and resumable.</p>
+</section>
+<section id="fast-first-win-local-parallel-optimization" class="level2" data-number="11.2">
+<h2 data-number="11.2" class="anchored" data-anchor-id="fast-first-win-local-parallel-optimization"><span class="header-section-number">11.2</span> Fast First Win: Local Parallel Optimization</h2>
+<p>The simplest form of scaling is to run several trials concurrently on one machine.</p>
+<div id="8e238e5e" class="cell" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> math</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> time</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> optuna</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective(trial):</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    x <span class="op">=</span> trial.suggest_float(<span class="st">"x"</span>, <span class="op">-</span><span class="fl">10.0</span>, <span class="fl">10.0</span>)</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>    time.sleep(<span class="fl">0.02</span>)</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (x <span class="op">-</span> <span class="fl">2.0</span>) <span class="op">**</span> <span class="dv">2</span> <span class="op">+</span> math.sin(<span class="fl">5.0</span> <span class="op">*</span> x)</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>study <span class="op">=</span> optuna.create_study(direction<span class="op">=</span><span class="st">"minimize"</span>)</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>study.optimize(objective, n_trials<span class="op">=</span><span class="dv">40</span>, n_jobs<span class="op">=</span><span class="dv">4</span>)</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Best value:"</span>, <span class="bu">round</span>(study.best_value, <span class="dv">4</span>))</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Best params:"</span>, study.best_params)</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Completed trials:"</span>, <span class="bu">len</span>(study.trials))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<div class="ansi-escaped-output">
+<pre><span class="ansi-green-fg">[I 2026-03-15 08:41:19,021]</span> A new study created in memory with name: no-name-7ec61df4-8dbb-472b-92f6-f2fc6ac3242e
+
+<span class="ansi-green-fg">[I 2026-03-15 08:41:19,057]</span> Trial 0 finished with value: 4.079624241949535 and parameters: {'x': 0.20201238522770382}. Best is trial 0 with value: 4.079624241949535.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:41:19,058]</span> Trial 1 finished with value: 30.224850177207824 and parameters: {'x': -3.4085632074933603}. Best is trial 0 with value: 4.079624241949535.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:41:19,060]</span> Trial 3 finished with value: 44.91549589684011 and parameters: {'x': 8.727183101491853}. Best is trial 0 with value: 4.079624241949535.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:41:19,060]</span> Trial 2 finished with value: 48.81288480289257 and parameters: {'x': 8.9395257159334}. Best is trial 0 with value: 4.079624241949535.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:41:19,084]</span> Trial 4 finished with value: 28.045787869601337 and parameters: {'x': 7.3671157032383725}. Best is trial 0 with value: 4.079624241949535.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:41:19,086]</span> Trial 5 finished with value: 107.5464972257188 and parameters: {'x': -8.334727380138357}. Best is trial 0 with value: 4.079624241949535.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:41:19,088]</span> Trial 6 finished with value: 135.70245044890058 and parameters: {'x': -9.614241213125652}. Best is trial 0 with value: 4.079624241949535.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:41:19,089]</span> Trial 7 finished with value: -0.04320401895630446 and parameters: {'x': 2.46146572289323}. Best is trial 7 with value: -0.04320401895630446.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:41:19,109]</span> Trial 8 finished with value: 21.480921373463815 and parameters: {'x': 6.531512663604026}. Best is trial 7 with value: -0.04320401895630446.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:41:19,112]</span> Trial 9 finished with value: 1.686374637123837 and parameters: {'x': 2.977907083274115}. Best is trial 7 with value: -0.04320401895630446.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:41:19,116]</span> Trial 10 finished with value: 79.30584791327242 and parameters: {'x': -6.906724544255192}. Best is trial 7 with value: -0.04320401895630446.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:41:19,119]</span> Trial 11 finished with value: 20.367425437799778 and parameters: {'x': -2.512723236543845}. Best is trial 7 with value: -0.04320401895630446.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:41:19,131]</span> Trial 12 finished with value: 9.153466883758634 and parameters: {'x': 5.025957664349736}. Best is trial 7 with value: -0.04320401895630446.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:41:19,136]</span> Trial 13 finished with value: 33.16296278760209 and parameters: {'x': -3.7501641818970533}. Best is trial 7 with value: -0.04320401895630446.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:41:19,143]</span> Trial 14 finished with value: 1.4431108369647085 and parameters: {'x': 3.090038011024147}. Best is trial 7 with value: -0.04320401895630446.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:41:19,147]</span> Trial 15 finished with value: 1.6518103688835883 and parameters: {'x': 2.999150551299043}. Best is trial 7 with value: -0.04320401895630446.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:41:19,155]</span> Trial 16 finished with value: 1.7333602447606218 and parameters: {'x': 2.9345421959871274}. Best is trial 7 with value: -0.04320401895630446.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:41:19,160]</span> Trial 17 finished with value: 0.023406035154730036 and parameters: {'x': 1.8830116111386448}. Best is trial 7 with value: -0.04320401895630446.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:41:19,167]</span> Trial 18 finished with value: -0.579813924412971 and parameters: {'x': 2.356292949268914}. Best is trial 18 with value: -0.579813924412971.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:41:19,171]</span> Trial 19 finished with value: 1.214237820287001 and parameters: {'x': 0.7173999180375792}. Best is trial 18 with value: -0.579813924412971.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:41:19,180]</span> Trial 20 finished with value: 0.03766606348001167 and parameters: {'x': 1.006930522239391}. Best is trial 18 with value: -0.579813924412971.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:41:19,184]</span> Trial 21 finished with value: 3.770889949386787 and parameters: {'x': 0.33393450870116226}. Best is trial 18 with value: -0.579813924412971.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:41:19,191]</span> Trial 22 finished with value: 7.3936290681414585 and parameters: {'x': -0.6756570199812351}. Best is trial 18 with value: -0.579813924412971.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:41:19,195]</span> Trial 23 finished with value: 13.079363257263951 and parameters: {'x': -1.717720730240425}. Best is trial 18 with value: -0.579813924412971.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:41:19,204]</span> Trial 24 finished with value: 9.951917019935003 and parameters: {'x': -0.9984761684226933}. Best is trial 18 with value: -0.579813924412971.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:41:19,208]</span> Trial 25 finished with value: 11.556398187492265 and parameters: {'x': 5.261076543422133}. Best is trial 18 with value: -0.579813924412971.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:41:19,217]</span> Trial 26 finished with value: 10.004323393266821 and parameters: {'x': 5.103248725435329}. Best is trial 18 with value: -0.579813924412971.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:41:19,219]</span> Trial 27 finished with value: 5.951823530858832 and parameters: {'x': 4.614084887805188}. Best is trial 18 with value: -0.579813924412971.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:41:19,231]</span> Trial 28 finished with value: 10.661116525648001 and parameters: {'x': 5.165551725126312}. Best is trial 18 with value: -0.579813924412971.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:41:19,235]</span> Trial 29 finished with value: 1.1085440953846373 and parameters: {'x': 1.6228592982911294}. Best is trial 18 with value: -0.579813924412971.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:41:19,247]</span> Trial 30 finished with value: 0.863571904956128 and parameters: {'x': 1.3471767364151652}. Best is trial 18 with value: -0.579813924412971.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:41:19,248]</span> Trial 31 finished with value: 46.71597098671725 and parameters: {'x': -4.763786756757243}. Best is trial 18 with value: -0.579813924412971.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:41:19,256]</span> Trial 32 finished with value: -0.015810048884811398 and parameters: {'x': 1.890515681310464}. Best is trial 18 with value: -0.579813924412971.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:41:19,261]</span> Trial 33 finished with value: 48.50645049391603 and parameters: {'x': -4.931840427238287}. Best is trial 18 with value: -0.579813924412971.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:41:19,281]</span> Trial 34 finished with value: 1.0666051454677983 and parameters: {'x': 1.6415316808806204}. Best is trial 18 with value: -0.579813924412971.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:41:19,293]</span> Trial 36 finished with value: 3.5859117717964475 and parameters: {'x': 3.8230289172536454}. Best is trial 18 with value: -0.579813924412971.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:41:19,296]</span> Trial 35 finished with value: 0.39114813628674916 and parameters: {'x': 1.8121857767435272}. Best is trial 18 with value: -0.579813924412971.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:41:19,299]</span> Trial 37 finished with value: 0.6294653380168252 and parameters: {'x': 1.7628663869214465}. Best is trial 18 with value: -0.579813924412971.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:41:19,306]</span> Trial 38 finished with value: 2.922481667835468 and parameters: {'x': 3.745200049743026}. Best is trial 18 with value: -0.579813924412971.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:41:19,323]</span> Trial 39 finished with value: 24.31367910130307 and parameters: {'x': 6.9504953080758085}. Best is trial 18 with value: -0.579813924412971.
+</pre>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Best value: -0.5798
+Best params: {'x': 2.356292949268914}
+Completed trials: 40</code></pre>
+</div>
+</div>
+<p>This does not make the optimization distributed, but it does make the concurrency model visible. Multiple workers are evaluating different trials concurrently while the study coordinates results in one process.</p>
+</section>
+<section id="what-does-n_jobs-actually-buy-you" class="level2" data-number="11.3">
+<h2 data-number="11.3" class="anchored" data-anchor-id="what-does-n_jobs-actually-buy-you"><span class="header-section-number">11.3</span> What Does <code>n_jobs</code> Actually Buy You?</h2>
+<p>For many users, <code>n_jobs</code> is the first scaling lever:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>study.optimize(objective, n_trials<span class="op">=</span><span class="dv">100</span>, n_jobs<span class="op">=</span><span class="dv">4</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>Conceptually, the scheduler is simple:</p>
+<pre class="text"><code>Trial 1 -&gt; worker slot 1
+Trial 2 -&gt; worker slot 2
+Trial 3 -&gt; worker slot 3
+Trial 4 -&gt; worker slot 4</code></pre>
+<p>This is attractive because it requires no extra infrastructure, but it has limits.</p>
+<ul>
+<li>It is easiest when all workers live on one machine.</li>
+<li>It does not solve cross-machine coordination.</li>
+<li>CPU-bound Python workloads may not scale the same way as I/O-bound or external-process workloads.</li>
+</ul>
+<p>So <code>n_jobs</code> is the right place to start, but not the right answer for every large experiment.</p>
+</section>
+<section id="when-do-you-need-shared-storage" class="level2" data-number="11.4">
+<h2 data-number="11.4" class="anchored" data-anchor-id="when-do-you-need-shared-storage"><span class="header-section-number">11.4</span> When Do You Need Shared Storage?</h2>
+<p>Once multiple processes or machines need to collaborate on the same study, Optuna needs persistent shared state. That state lives in the storage backend.</p>
+<p>At that point, each worker follows the same loop:</p>
+<ol type="1">
+<li>Ask storage for the next trial.</li>
+<li>Evaluate the objective.</li>
+<li>Write the result back.</li>
+<li>Request another trial.</li>
+</ol>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">flowchart LR
+    A[Shared study storage] --&gt; B[Worker requests trial]
+    B --&gt; C[Sampler proposes parameters]
+    C --&gt; D[Worker evaluates objective]
+    D --&gt; E[Result stored]
+    E --&gt; F[Next worker request]
+    F --&gt; A
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p>The critical design shift is that storage is no longer just for persistence. It becomes the coordination mechanism for the whole experiment.</p>
+</section>
+<section id="which-storage-backend-should-you-use" class="level2" data-number="11.5">
+<h2 data-number="11.5" class="anchored" data-anchor-id="which-storage-backend-should-you-use"><span class="header-section-number">11.5</span> Which Storage Backend Should You Use?</h2>
+<p>Optuna can work with several relational databases, but they are not interchangeable in practice.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Backend</th>
+<th>Best fit</th>
+<th>Main limitation</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>In-memory</td>
+<td>quick local experiments</td>
+<td>no persistence, no cross-process coordination</td>
+</tr>
+<tr class="even">
+<td>SQLite</td>
+<td>small local shared studies</td>
+<td>limited concurrency under heavier parallel load</td>
+</tr>
+<tr class="odd">
+<td>PostgreSQL</td>
+<td>serious distributed experiments</td>
+<td>requires external service management</td>
+</tr>
+<tr class="even">
+<td>MySQL</td>
+<td>distributed environments with existing MySQL ops</td>
+<td>operational tuning still matters</td>
+</tr>
+</tbody>
+</table>
+<section id="in-memory-storage" class="level3" data-number="11.5.1">
+<h3 data-number="11.5.1" class="anchored" data-anchor-id="in-memory-storage"><span class="header-section-number">11.5.1</span> In-Memory Storage</h3>
+<div id="ce4f9d7f" class="cell" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>study <span class="op">=</span> optuna.create_study(direction<span class="op">=</span><span class="st">"minimize"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<div class="ansi-escaped-output">
+<pre><span class="ansi-green-fg">[I 2026-03-15 08:41:19,340]</span> A new study created in memory with name: no-name-ed1084f2-9b92-4551-99d5-77ca8ff82542
+</pre>
+</div>
+</div>
+</div>
+<p>This is ideal for exploratory work, but once the process exits, the study is gone.</p>
+</section>
+<section id="sqlite-storage" class="level3" data-number="11.5.2">
+<h3 data-number="11.5.2" class="anchored" data-anchor-id="sqlite-storage"><span class="header-section-number">11.5.2</span> SQLite Storage</h3>
+<div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>study <span class="op">=</span> optuna.create_study(</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    direction<span class="op">=</span><span class="st">"minimize"</span>,</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    study_name<span class="op">=</span><span class="st">"demo"</span>,</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>    storage<span class="op">=</span><span class="st">"sqlite:///example.db"</span>,</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>    load_if_exists<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>SQLite is a useful stepping stone for local experiments and demonstrations. It is not the backend you should automatically choose for many concurrent workers across serious production workloads.</p>
+</section>
+<section id="postgresql-or-mysql" class="level3" data-number="11.5.3">
+<h3 data-number="11.5.3" class="anchored" data-anchor-id="postgresql-or-mysql"><span class="header-section-number">11.5.3</span> PostgreSQL or MySQL</h3>
+<div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>study <span class="op">=</span> optuna.create_study(</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    direction<span class="op">=</span><span class="st">"minimize"</span>,</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    study_name<span class="op">=</span><span class="st">"experiment"</span>,</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    storage<span class="op">=</span><span class="st">"postgresql://user:pass@host/db"</span>,</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    load_if_exists<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>For real distributed optimization, PostgreSQL is often the safest default because it handles concurrency, transactions, and failure recovery more robustly than SQLite.</p>
+</section>
+</section>
+<section id="how-does-distributed-execution-work" class="level2" data-number="11.6">
+<h2 data-number="11.6" class="anchored" data-anchor-id="how-does-distributed-execution-work"><span class="header-section-number">11.6</span> How Does Distributed Execution Work?</h2>
+<p>Distributed Optuna usually follows a producer-consumer pattern, but the important detail is that workers are asynchronous.</p>
+<p>They do not advance in lockstep. Fast workers complete more trials. Slow workers may still be evaluating while others have already requested new configurations.</p>
+<p>That means the system can keep hardware busy even when objective runtimes vary widely.</p>
+<pre class="text"><code>Create study
+   -&gt; worker requests trial
+   -&gt; sampler proposes parameters
+   -&gt; worker evaluates objective
+   -&gt; result written to storage
+   -&gt; next available worker requests another trial</code></pre>
+<p>Asynchronous behavior is usually an advantage, because synchronization barriers would waste compute. But it also means your study history reflects real system timing, not a clean round-based schedule.</p>
+</section>
+<section id="what-happens-when-workers-fail" class="level2" data-number="11.7">
+<h2 data-number="11.7" class="anchored" data-anchor-id="what-happens-when-workers-fail"><span class="header-section-number">11.7</span> What Happens When Workers Fail?</h2>
+<p>Distributed experiments are only useful if they survive crashes, interruptions, and restarts.</p>
+<p>If a worker dies mid-trial, Optuna does not lose the whole study. Completed trials remain in storage, and other workers can continue. This is the operational reason storage matters so much.</p>
+<p>Typical failure scenarios include:</p>
+<ul>
+<li>a worker process crashes</li>
+<li>a machine is preempted</li>
+<li>a container restarts</li>
+<li>a cluster job times out</li>
+</ul>
+<p>With persistent storage, the study can be resumed instead of recomputed from scratch.</p>
+<p>This is especially important in long-running workloads where trial budgets are expensive and experiments span multiple sessions.</p>
+</section>
+<section id="how-should-you-think-about-scalability" class="level2" data-number="11.8">
+<h2 data-number="11.8" class="anchored" data-anchor-id="how-should-you-think-about-scalability"><span class="header-section-number">11.8</span> How Should You Think About Scalability?</h2>
+<p>There are different scaling regimes, and they imply different engineering choices.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 30%">
+<col style="width: 40%">
+<col style="width: 30%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Scale</th>
+<th style="text-align: right;">Typical budget</th>
+<th>Natural strategy</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Small</td>
+<td style="text-align: right;">50-200 trials</td>
+<td>single process or <code>n_jobs</code></td>
+</tr>
+<tr class="even">
+<td>Medium</td>
+<td style="text-align: right;">hundreds to low thousands</td>
+<td>multiple local or remote workers with persistent storage</td>
+</tr>
+<tr class="odd">
+<td>Large</td>
+<td style="text-align: right;">10,000+ trials</td>
+<td>cluster execution with robust shared database and monitoring</td>
+</tr>
+</tbody>
+</table>
+<p>The question is not simply “how many workers can I launch?” The real question is whether the objective function, storage backend, and monitoring stack can support that many workers without creating coordination or observability problems.</p>
+</section>
+<section id="what-does-a-multi-worker-setup-look-like" class="level2" data-number="11.9">
+<h2 data-number="11.9" class="anchored" data-anchor-id="what-does-a-multi-worker-setup-look-like"><span class="header-section-number">11.9</span> What Does a Multi-Worker Setup Look Like?</h2>
+<p>At the code level, all workers typically run the same script and point to the same study.</p>
+<section id="step-1-create-or-load-the-study" class="level3" data-number="11.9.1">
+<h3 data-number="11.9.1" class="anchored" data-anchor-id="step-1-create-or-load-the-study"><span class="header-section-number">11.9.1</span> Step 1: Create or Load the Study</h3>
+<div class="sourceCode" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> optuna</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>study <span class="op">=</span> optuna.create_study(</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>    study_name<span class="op">=</span><span class="st">"distributed-demo"</span>,</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>    storage<span class="op">=</span><span class="st">"sqlite:///example.db"</span>,</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>    load_if_exists<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>    direction<span class="op">=</span><span class="st">"minimize"</span>,</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="step-2-define-the-worker-objective" class="level3" data-number="11.9.2">
+<h3 data-number="11.9.2" class="anchored" data-anchor-id="step-2-define-the-worker-objective"><span class="header-section-number">11.9.2</span> Step 2: Define the Worker Objective</h3>
+<div class="sourceCode" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective(trial):</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>    x <span class="op">=</span> trial.suggest_float(<span class="st">"x"</span>, <span class="op">-</span><span class="fl">10.0</span>, <span class="fl">10.0</span>)</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (x <span class="op">-</span> <span class="fl">2.0</span>) <span class="op">**</span> <span class="dv">2</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="step-3-run-the-worker" class="level3" data-number="11.9.3">
+<h3 data-number="11.9.3" class="anchored" data-anchor-id="step-3-run-the-worker"><span class="header-section-number">11.9.3</span> Step 3: Run the Worker</h3>
+<div class="sourceCode" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>study.optimize(objective, n_trials<span class="op">=</span><span class="dv">100</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>Launch the same worker script multiple times:</p>
+<pre class="text"><code>python worker.py
+python worker.py
+python worker.py</code></pre>
+<p>All workers collaborate through the same storage backend. That is the core distributed pattern.</p>
+</section>
+</section>
+<section id="how-do-you-monitor-a-large-study" class="level2" data-number="11.10">
+<h2 data-number="11.10" class="anchored" data-anchor-id="how-do-you-monitor-a-large-study"><span class="header-section-number">11.10</span> How Do You Monitor a Large Study?</h2>
+<p>Once experiments become large, you need visibility while the optimization is still running.</p>
+<p>Programmatic monitoring is the minimum level:</p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Best value:"</span>, study.best_value)</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Completed trials:"</span>, <span class="bu">len</span>(study.trials))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>For interactive monitoring, the dashboard is more useful:</p>
+<div class="sourceCode" id="cb14"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="ex">optuna-dashboard</span> sqlite:///example.db</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>This is especially helpful when you want to inspect trial progress, compare parameter regions, or review multi-objective frontiers without writing custom reporting code.</p>
+</section>
+<section id="how-does-optuna-fit-into-larger-distributed-systems" class="level2" data-number="11.11">
+<h2 data-number="11.11" class="anchored" data-anchor-id="how-does-optuna-fit-into-larger-distributed-systems"><span class="header-section-number">11.11</span> How Does Optuna Fit Into Larger Distributed Systems?</h2>
+<p>Optuna is often not the orchestrator itself. Instead, it is the optimization layer inside a broader execution environment.</p>
+<p>Common combinations include:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>System</th>
+<th>Typical role</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Ray</td>
+<td>distributed ML workloads and task execution</td>
+</tr>
+<tr class="even">
+<td>Dask</td>
+<td>parallel Python workflows</td>
+</tr>
+<tr class="odd">
+<td>Kubernetes</td>
+<td>container orchestration for scalable workers</td>
+</tr>
+<tr class="even">
+<td>SLURM</td>
+<td>batch scheduling on HPC clusters</td>
+</tr>
+</tbody>
+</table>
+<p>The pattern is usually the same:</p>
+<ul>
+<li>the external platform launches workers</li>
+<li>Optuna storage coordinates the study</li>
+<li>workers report results back into the shared study state</li>
+</ul>
+<p>That separation of concerns is useful. Optuna handles optimization logic, while the surrounding platform handles resource scheduling.</p>
+<div class="callout callout-style-simple callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Common Mistake
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Do not assume SQLite is a production-grade answer for every distributed setup just because it works for a small demo. Once concurrency, fault tolerance, and worker count increase, backend limitations become part of the optimization bottleneck.</p>
+</div>
+</div>
+</section>
+<section id="practical-exercise-turn-a-local-study-into-a-shared-study" class="level2" data-number="11.12">
+<h2 data-number="11.12" class="anchored" data-anchor-id="practical-exercise-turn-a-local-study-into-a-shared-study"><span class="header-section-number">11.12</span> Practical Exercise: Turn a Local Study Into a Shared Study</h2>
+<p>Start from a simple single-process optimization script and upgrade it into a shared-storage workflow.</p>
+<p>Use this objective:</p>
+<div id="b6f212e3" class="cell" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> math</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> optuna</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective(trial):</span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>    x <span class="op">=</span> trial.suggest_float(<span class="st">"x"</span>, <span class="op">-</span><span class="fl">10.0</span>, <span class="fl">10.0</span>)</span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (x <span class="op">-</span> <span class="fl">2.0</span>) <span class="op">**</span> <span class="dv">2</span> <span class="op">+</span> math.sin(<span class="fl">5.0</span> <span class="op">*</span> x)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Then work through the exercise in four passes:</p>
+<ol type="1">
+<li>Run the study in a single process and record the best value after 50 trials.</li>
+<li>Run it again with <code>n_jobs=4</code> and compare wall-clock behavior.</li>
+<li>Move the study to shared SQLite storage using <code>load_if_exists=True</code> and launch the worker script from multiple terminals.</li>
+<li>Replace SQLite with PostgreSQL conceptually and list what operational risks improve when you move to a stronger backend.</li>
+</ol>
+<p>Questions to answer after the run:</p>
+<ul>
+<li>Which part of the speedup came from concurrency and which part was still limited by the objective?</li>
+<li>Did local parallelism solve the problem, or did you still need shared storage for resumability?</li>
+<li>At what point would SQLite stop being a comfortable choice?</li>
+<li>If your workers lived on Kubernetes, Ray, or SLURM, what would Optuna handle and what would the platform handle?</li>
+</ul>
+</section>
+<section id="recap" class="level2" data-number="11.13">
+<h2 data-number="11.13" class="anchored" data-anchor-id="recap"><span class="header-section-number">11.13</span> Recap</h2>
+<p>Distributed Optuna is fundamentally about coordination, not just raw worker count.</p>
+<ul>
+<li><code>n_jobs</code> provides the simplest local concurrency.</li>
+<li>Shared storage is required once multiple processes or machines collaborate on the same study.</li>
+<li>SQLite is useful for small shared experiments, while PostgreSQL or MySQL are better suited to serious distributed workloads.</li>
+<li>Persistent storage enables fault tolerance, resumability, and monitoring.</li>
+</ul>
+</section>
+<section id="decision-guide" class="level2" data-number="11.14">
+<h2 data-number="11.14" class="anchored" data-anchor-id="decision-guide"><span class="header-section-number">11.14</span> Decision Guide</h2>
+<p>Choose the simplest scaling model that matches the workload.</p>
+<ul>
+<li>Use a single process for cheap exploratory studies.</li>
+<li>Use <code>n_jobs</code> when one machine is enough and concurrency is the main need.</li>
+<li>Use shared storage when workers must coordinate across processes or hosts.</li>
+<li>Prefer PostgreSQL-class backends when the study is important enough that failures, locking, and concurrency behavior matter.</li>
+<li>Use external platforms such as Ray, Dask, Kubernetes, or SLURM for resource orchestration, while letting Optuna remain the optimization layer.</li>
+</ul>
+<p>The next chapter moves from infrastructure back to applications. In <a href="../modules/12-optuna-machine-learning.html">Optuna for Machine Learning</a>, we will apply the ideas from this book to realistic model-selection and pipeline-tuning workflows.</p>
+
+
+<!-- -->
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+        const codeEl = trigger.previousElementSibling.cloneNode(true);
+        for (const childEl of codeEl.children) {
+          if (isCodeAnnotation(childEl)) {
+            childEl.remove();
+          }
+        }
+        return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+    const viewSource = window.document.getElementById('quarto-view-source') ||
+                       window.document.getElementById('quarto-code-tools-source');
+    if (viewSource) {
+      const sourceUrl = viewSource.getAttribute("data-quarto-source-url");
+      viewSource.addEventListener("click", function(e) {
+        if (sourceUrl) {
+          // rstudio viewer pane
+          if (/\bcapabilities=\b/.test(window.location)) {
+            window.open(sourceUrl);
+          } else {
+            window.location.href = sourceUrl;
+          }
+        } else {
+          const modal = new bootstrap.Modal(document.getElementById('quarto-embedded-source-code-modal'));
+          modal.show();
+        }
+        return false;
+      });
+    }
+    function toggleCodeHandler(show) {
+      return function(e) {
+        const detailsSrc = window.document.querySelectorAll(".cell > details > .sourceCode");
+        for (let i=0; i<detailsSrc.length; i++) {
+          const details = detailsSrc[i].parentElement;
+          if (show) {
+            details.open = true;
+          } else {
+            details.removeAttribute("open");
+          }
+        }
+        const cellCodeDivs = window.document.querySelectorAll(".cell > .sourceCode");
+        const fromCls = show ? "hidden" : "unhidden";
+        const toCls = show ? "unhidden" : "hidden";
+        for (let i=0; i<cellCodeDivs.length; i++) {
+          const codeDiv = cellCodeDivs[i];
+          if (codeDiv.classList.contains(fromCls)) {
+            codeDiv.classList.remove(fromCls);
+            codeDiv.classList.add(toCls);
+          } 
+        }
+        return false;
+      }
+    }
+    const hideAllCode = window.document.getElementById("quarto-hide-all-code");
+    if (hideAllCode) {
+      hideAllCode.addEventListener("click", toggleCodeHandler(false));
+    }
+    const showAllCode = window.document.getElementById("quarto-show-all-code");
+    if (showAllCode) {
+      showAllCode.addEventListener("click", toggleCodeHandler(true));
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+<nav class="page-navigation">
+  <div class="nav-page nav-page-previous">
+      <a href="../modules/10-visualization-diagnostics.html" class="pagination-link" aria-label="Visualization and Diagnostics">
+        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text"><span class="chapter-number">10</span>&nbsp; <span class="chapter-title">Visualization and Diagnostics</span></span>
+      </a>          
+  </div>
+  <div class="nav-page nav-page-next">
+      <a href="../modules/12-optuna-machine-learning.html" class="pagination-link" aria-label="Optuna for Machine Learning">
+        <span class="nav-page-text"><span class="chapter-number">12</span>&nbsp; <span class="chapter-title">Optuna for Machine Learning</span></span> <i class="bi bi-arrow-right-short"></i>
+      </a>
+  </div>
+</nav><div class="modal fade" id="quarto-embedded-source-code-modal" tabindex="-1" aria-labelledby="quarto-embedded-source-code-modal-label" aria-hidden="true"><div class="modal-dialog modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="quarto-embedded-source-code-modal-label">Source Code</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="">
+<div class="sourceCode" id="cb16" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a><span class="an">title:</span><span class="co"> "Distributed and Scalable Optimization"</span></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>This chapter explains how to scale Optuna beyond the single-process workflow used in earlier modules. By the end, you should be able to choose between local parallelism and shared-storage distributed execution, understand the operational role of storage backends, and recognize the failure modes that appear once many workers collaborate on the same study.</span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a><span class="fu">## Why This Matters</span></span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>Many real optimization problems are limited less by the quality of the sampler than by the cost of objective evaluation. If a single trial takes minutes or hours, sequential optimization quickly becomes the real bottleneck.</span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a>Scaling Optuna is therefore not an infrastructure afterthought. It is part of the optimization design itself. The storage backend, worker model, and failure handling strategy determine whether a large study is reproducible, efficient, and resumable.</span>
+<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a><span class="fu">## Fast First Win: Local Parallel Optimization</span></span>
+<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-15"><a href="#cb16-15" aria-hidden="true" tabindex="-1"></a>The simplest form of scaling is to run several trials concurrently on one machine.</span>
+<span id="cb16-16"><a href="#cb16-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-19"><a href="#cb16-19" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb16-20"><a href="#cb16-20" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> math</span>
+<span id="cb16-21"><a href="#cb16-21" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> time</span>
+<span id="cb16-22"><a href="#cb16-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-23"><a href="#cb16-23" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> optuna</span>
+<span id="cb16-24"><a href="#cb16-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-25"><a href="#cb16-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-26"><a href="#cb16-26" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective(trial):</span>
+<span id="cb16-27"><a href="#cb16-27" aria-hidden="true" tabindex="-1"></a>    x <span class="op">=</span> trial.suggest_float(<span class="st">"x"</span>, <span class="op">-</span><span class="fl">10.0</span>, <span class="fl">10.0</span>)</span>
+<span id="cb16-28"><a href="#cb16-28" aria-hidden="true" tabindex="-1"></a>    time.sleep(<span class="fl">0.02</span>)</span>
+<span id="cb16-29"><a href="#cb16-29" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (x <span class="op">-</span> <span class="fl">2.0</span>) <span class="op">**</span> <span class="dv">2</span> <span class="op">+</span> math.sin(<span class="fl">5.0</span> <span class="op">*</span> x)</span>
+<span id="cb16-30"><a href="#cb16-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-31"><a href="#cb16-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-32"><a href="#cb16-32" aria-hidden="true" tabindex="-1"></a>study <span class="op">=</span> optuna.create_study(direction<span class="op">=</span><span class="st">"minimize"</span>)</span>
+<span id="cb16-33"><a href="#cb16-33" aria-hidden="true" tabindex="-1"></a>study.optimize(objective, n_trials<span class="op">=</span><span class="dv">40</span>, n_jobs<span class="op">=</span><span class="dv">4</span>)</span>
+<span id="cb16-34"><a href="#cb16-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-35"><a href="#cb16-35" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Best value:"</span>, <span class="bu">round</span>(study.best_value, <span class="dv">4</span>))</span>
+<span id="cb16-36"><a href="#cb16-36" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Best params:"</span>, study.best_params)</span>
+<span id="cb16-37"><a href="#cb16-37" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Completed trials:"</span>, <span class="bu">len</span>(study.trials))</span>
+<span id="cb16-38"><a href="#cb16-38" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-39"><a href="#cb16-39" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-40"><a href="#cb16-40" aria-hidden="true" tabindex="-1"></a>This does not make the optimization distributed, but it does make the concurrency model visible. Multiple workers are evaluating different trials concurrently while the study coordinates results in one process.</span>
+<span id="cb16-41"><a href="#cb16-41" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-42"><a href="#cb16-42" aria-hidden="true" tabindex="-1"></a><span class="fu">## What Does `n_jobs` Actually Buy You?</span></span>
+<span id="cb16-43"><a href="#cb16-43" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-44"><a href="#cb16-44" aria-hidden="true" tabindex="-1"></a>For many users, <span class="in">`n_jobs`</span> is the first scaling lever:</span>
+<span id="cb16-45"><a href="#cb16-45" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-46"><a href="#cb16-46" aria-hidden="true" tabindex="-1"></a><span class="in">```python</span></span>
+<span id="cb16-47"><a href="#cb16-47" aria-hidden="true" tabindex="-1"></a>study.optimize(objective, n_trials<span class="op">=</span><span class="dv">100</span>, n_jobs<span class="op">=</span><span class="dv">4</span>)</span>
+<span id="cb16-48"><a href="#cb16-48" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-49"><a href="#cb16-49" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-50"><a href="#cb16-50" aria-hidden="true" tabindex="-1"></a>Conceptually, the scheduler is simple:</span>
+<span id="cb16-51"><a href="#cb16-51" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-52"><a href="#cb16-52" aria-hidden="true" tabindex="-1"></a><span class="in">```text</span></span>
+<span id="cb16-53"><a href="#cb16-53" aria-hidden="true" tabindex="-1"></a><span class="in">Trial 1 -&gt; worker slot 1</span></span>
+<span id="cb16-54"><a href="#cb16-54" aria-hidden="true" tabindex="-1"></a><span class="in">Trial 2 -&gt; worker slot 2</span></span>
+<span id="cb16-55"><a href="#cb16-55" aria-hidden="true" tabindex="-1"></a><span class="in">Trial 3 -&gt; worker slot 3</span></span>
+<span id="cb16-56"><a href="#cb16-56" aria-hidden="true" tabindex="-1"></a><span class="in">Trial 4 -&gt; worker slot 4</span></span>
+<span id="cb16-57"><a href="#cb16-57" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-58"><a href="#cb16-58" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-59"><a href="#cb16-59" aria-hidden="true" tabindex="-1"></a>This is attractive because it requires no extra infrastructure, but it has limits.</span>
+<span id="cb16-60"><a href="#cb16-60" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-61"><a href="#cb16-61" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>It is easiest when all workers live on one machine.</span>
+<span id="cb16-62"><a href="#cb16-62" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>It does not solve cross-machine coordination.</span>
+<span id="cb16-63"><a href="#cb16-63" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>CPU-bound Python workloads may not scale the same way as I/O-bound or external-process workloads.</span>
+<span id="cb16-64"><a href="#cb16-64" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-65"><a href="#cb16-65" aria-hidden="true" tabindex="-1"></a>So <span class="in">`n_jobs`</span> is the right place to start, but not the right answer for every large experiment.</span>
+<span id="cb16-66"><a href="#cb16-66" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-67"><a href="#cb16-67" aria-hidden="true" tabindex="-1"></a><span class="fu">## When Do You Need Shared Storage?</span></span>
+<span id="cb16-68"><a href="#cb16-68" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-69"><a href="#cb16-69" aria-hidden="true" tabindex="-1"></a>Once multiple processes or machines need to collaborate on the same study, Optuna needs persistent shared state. That state lives in the storage backend.</span>
+<span id="cb16-70"><a href="#cb16-70" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-71"><a href="#cb16-71" aria-hidden="true" tabindex="-1"></a>At that point, each worker follows the same loop:</span>
+<span id="cb16-72"><a href="#cb16-72" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-73"><a href="#cb16-73" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>Ask storage for the next trial.</span>
+<span id="cb16-74"><a href="#cb16-74" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>Evaluate the objective.</span>
+<span id="cb16-75"><a href="#cb16-75" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>Write the result back.</span>
+<span id="cb16-76"><a href="#cb16-76" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>Request another trial.</span>
+<span id="cb16-77"><a href="#cb16-77" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-80"><a href="#cb16-80" aria-hidden="true" tabindex="-1"></a><span class="in">```{mermaid}</span></span>
+<span id="cb16-81"><a href="#cb16-81" aria-hidden="true" tabindex="-1"></a>flowchart LR</span>
+<span id="cb16-82"><a href="#cb16-82" aria-hidden="true" tabindex="-1"></a>    A[Shared <span class="fu">study</span> storage] --&gt; B[Worker requests trial]</span>
+<span id="cb16-83"><a href="#cb16-83" aria-hidden="true" tabindex="-1"></a>    B --&gt; C[Sampler proposes parameters]</span>
+<span id="cb16-84"><a href="#cb16-84" aria-hidden="true" tabindex="-1"></a>    C --&gt; D[Worker evaluates objective]</span>
+<span id="cb16-85"><a href="#cb16-85" aria-hidden="true" tabindex="-1"></a>    D --&gt; E[Result stored]</span>
+<span id="cb16-86"><a href="#cb16-86" aria-hidden="true" tabindex="-1"></a>    E --&gt; F[Next worker request]</span>
+<span id="cb16-87"><a href="#cb16-87" aria-hidden="true" tabindex="-1"></a>    F --&gt; A</span>
+<span id="cb16-88"><a href="#cb16-88" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-89"><a href="#cb16-89" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-90"><a href="#cb16-90" aria-hidden="true" tabindex="-1"></a>The critical design shift is that storage is no longer just for persistence. It becomes the coordination mechanism for the whole experiment.</span>
+<span id="cb16-91"><a href="#cb16-91" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-92"><a href="#cb16-92" aria-hidden="true" tabindex="-1"></a><span class="fu">## Which Storage Backend Should You Use?</span></span>
+<span id="cb16-93"><a href="#cb16-93" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-94"><a href="#cb16-94" aria-hidden="true" tabindex="-1"></a>Optuna can work with several relational databases, but they are not interchangeable in practice.</span>
+<span id="cb16-95"><a href="#cb16-95" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-96"><a href="#cb16-96" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Backend <span class="pp">|</span> Best fit <span class="pp">|</span> Main limitation <span class="pp">|</span></span>
+<span id="cb16-97"><a href="#cb16-97" aria-hidden="true" tabindex="-1"></a><span class="pp">|---|---|---|</span></span>
+<span id="cb16-98"><a href="#cb16-98" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> In-memory <span class="pp">|</span> quick local experiments <span class="pp">|</span> no persistence, no cross-process coordination <span class="pp">|</span></span>
+<span id="cb16-99"><a href="#cb16-99" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> SQLite <span class="pp">|</span> small local shared studies <span class="pp">|</span> limited concurrency under heavier parallel load <span class="pp">|</span></span>
+<span id="cb16-100"><a href="#cb16-100" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> PostgreSQL <span class="pp">|</span> serious distributed experiments <span class="pp">|</span> requires external service management <span class="pp">|</span></span>
+<span id="cb16-101"><a href="#cb16-101" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> MySQL <span class="pp">|</span> distributed environments with existing MySQL ops <span class="pp">|</span> operational tuning still matters <span class="pp">|</span></span>
+<span id="cb16-102"><a href="#cb16-102" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-103"><a href="#cb16-103" aria-hidden="true" tabindex="-1"></a><span class="fu">### In-Memory Storage</span></span>
+<span id="cb16-104"><a href="#cb16-104" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-107"><a href="#cb16-107" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb16-108"><a href="#cb16-108" aria-hidden="true" tabindex="-1"></a>study <span class="op">=</span> optuna.create_study(direction<span class="op">=</span><span class="st">"minimize"</span>)</span>
+<span id="cb16-109"><a href="#cb16-109" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-110"><a href="#cb16-110" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-111"><a href="#cb16-111" aria-hidden="true" tabindex="-1"></a>This is ideal for exploratory work, but once the process exits, the study is gone.</span>
+<span id="cb16-112"><a href="#cb16-112" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-113"><a href="#cb16-113" aria-hidden="true" tabindex="-1"></a><span class="fu">### SQLite Storage</span></span>
+<span id="cb16-114"><a href="#cb16-114" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-115"><a href="#cb16-115" aria-hidden="true" tabindex="-1"></a><span class="in">```python</span></span>
+<span id="cb16-116"><a href="#cb16-116" aria-hidden="true" tabindex="-1"></a>study <span class="op">=</span> optuna.create_study(</span>
+<span id="cb16-117"><a href="#cb16-117" aria-hidden="true" tabindex="-1"></a>    direction<span class="op">=</span><span class="st">"minimize"</span>,</span>
+<span id="cb16-118"><a href="#cb16-118" aria-hidden="true" tabindex="-1"></a>    study_name<span class="op">=</span><span class="st">"demo"</span>,</span>
+<span id="cb16-119"><a href="#cb16-119" aria-hidden="true" tabindex="-1"></a>    storage<span class="op">=</span><span class="st">"sqlite:///example.db"</span>,</span>
+<span id="cb16-120"><a href="#cb16-120" aria-hidden="true" tabindex="-1"></a>    load_if_exists<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb16-121"><a href="#cb16-121" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb16-122"><a href="#cb16-122" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-123"><a href="#cb16-123" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-124"><a href="#cb16-124" aria-hidden="true" tabindex="-1"></a>SQLite is a useful stepping stone for local experiments and demonstrations. It is not the backend you should automatically choose for many concurrent workers across serious production workloads.</span>
+<span id="cb16-125"><a href="#cb16-125" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-126"><a href="#cb16-126" aria-hidden="true" tabindex="-1"></a><span class="fu">### PostgreSQL or MySQL</span></span>
+<span id="cb16-127"><a href="#cb16-127" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-128"><a href="#cb16-128" aria-hidden="true" tabindex="-1"></a><span class="in">```python</span></span>
+<span id="cb16-129"><a href="#cb16-129" aria-hidden="true" tabindex="-1"></a>study <span class="op">=</span> optuna.create_study(</span>
+<span id="cb16-130"><a href="#cb16-130" aria-hidden="true" tabindex="-1"></a>    direction<span class="op">=</span><span class="st">"minimize"</span>,</span>
+<span id="cb16-131"><a href="#cb16-131" aria-hidden="true" tabindex="-1"></a>    study_name<span class="op">=</span><span class="st">"experiment"</span>,</span>
+<span id="cb16-132"><a href="#cb16-132" aria-hidden="true" tabindex="-1"></a>    storage<span class="op">=</span><span class="st">"postgresql://user:pass@host/db"</span>,</span>
+<span id="cb16-133"><a href="#cb16-133" aria-hidden="true" tabindex="-1"></a>    load_if_exists<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb16-134"><a href="#cb16-134" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb16-135"><a href="#cb16-135" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-136"><a href="#cb16-136" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-137"><a href="#cb16-137" aria-hidden="true" tabindex="-1"></a>For real distributed optimization, PostgreSQL is often the safest default because it handles concurrency, transactions, and failure recovery more robustly than SQLite.</span>
+<span id="cb16-138"><a href="#cb16-138" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-139"><a href="#cb16-139" aria-hidden="true" tabindex="-1"></a><span class="fu">## How Does Distributed Execution Work?</span></span>
+<span id="cb16-140"><a href="#cb16-140" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-141"><a href="#cb16-141" aria-hidden="true" tabindex="-1"></a>Distributed Optuna usually follows a producer-consumer pattern, but the important detail is that workers are asynchronous.</span>
+<span id="cb16-142"><a href="#cb16-142" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-143"><a href="#cb16-143" aria-hidden="true" tabindex="-1"></a>They do not advance in lockstep. Fast workers complete more trials. Slow workers may still be evaluating while others have already requested new configurations.</span>
+<span id="cb16-144"><a href="#cb16-144" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-145"><a href="#cb16-145" aria-hidden="true" tabindex="-1"></a>That means the system can keep hardware busy even when objective runtimes vary widely.</span>
+<span id="cb16-146"><a href="#cb16-146" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-147"><a href="#cb16-147" aria-hidden="true" tabindex="-1"></a><span class="in">```text</span></span>
+<span id="cb16-148"><a href="#cb16-148" aria-hidden="true" tabindex="-1"></a><span class="in">Create study</span></span>
+<span id="cb16-149"><a href="#cb16-149" aria-hidden="true" tabindex="-1"></a><span class="in">   -&gt; worker requests trial</span></span>
+<span id="cb16-150"><a href="#cb16-150" aria-hidden="true" tabindex="-1"></a><span class="in">   -&gt; sampler proposes parameters</span></span>
+<span id="cb16-151"><a href="#cb16-151" aria-hidden="true" tabindex="-1"></a><span class="in">   -&gt; worker evaluates objective</span></span>
+<span id="cb16-152"><a href="#cb16-152" aria-hidden="true" tabindex="-1"></a><span class="in">   -&gt; result written to storage</span></span>
+<span id="cb16-153"><a href="#cb16-153" aria-hidden="true" tabindex="-1"></a><span class="in">   -&gt; next available worker requests another trial</span></span>
+<span id="cb16-154"><a href="#cb16-154" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-155"><a href="#cb16-155" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-156"><a href="#cb16-156" aria-hidden="true" tabindex="-1"></a>Asynchronous behavior is usually an advantage, because synchronization barriers would waste compute. But it also means your study history reflects real system timing, not a clean round-based schedule.</span>
+<span id="cb16-157"><a href="#cb16-157" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-158"><a href="#cb16-158" aria-hidden="true" tabindex="-1"></a><span class="fu">## What Happens When Workers Fail?</span></span>
+<span id="cb16-159"><a href="#cb16-159" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-160"><a href="#cb16-160" aria-hidden="true" tabindex="-1"></a>Distributed experiments are only useful if they survive crashes, interruptions, and restarts.</span>
+<span id="cb16-161"><a href="#cb16-161" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-162"><a href="#cb16-162" aria-hidden="true" tabindex="-1"></a>If a worker dies mid-trial, Optuna does not lose the whole study. Completed trials remain in storage, and other workers can continue. This is the operational reason storage matters so much.</span>
+<span id="cb16-163"><a href="#cb16-163" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-164"><a href="#cb16-164" aria-hidden="true" tabindex="-1"></a>Typical failure scenarios include:</span>
+<span id="cb16-165"><a href="#cb16-165" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-166"><a href="#cb16-166" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>a worker process crashes</span>
+<span id="cb16-167"><a href="#cb16-167" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>a machine is preempted</span>
+<span id="cb16-168"><a href="#cb16-168" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>a container restarts</span>
+<span id="cb16-169"><a href="#cb16-169" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>a cluster job times out</span>
+<span id="cb16-170"><a href="#cb16-170" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-171"><a href="#cb16-171" aria-hidden="true" tabindex="-1"></a>With persistent storage, the study can be resumed instead of recomputed from scratch.</span>
+<span id="cb16-172"><a href="#cb16-172" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-173"><a href="#cb16-173" aria-hidden="true" tabindex="-1"></a>This is especially important in long-running workloads where trial budgets are expensive and experiments span multiple sessions.</span>
+<span id="cb16-174"><a href="#cb16-174" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-175"><a href="#cb16-175" aria-hidden="true" tabindex="-1"></a><span class="fu">## How Should You Think About Scalability?</span></span>
+<span id="cb16-176"><a href="#cb16-176" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-177"><a href="#cb16-177" aria-hidden="true" tabindex="-1"></a>There are different scaling regimes, and they imply different engineering choices.</span>
+<span id="cb16-178"><a href="#cb16-178" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-179"><a href="#cb16-179" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Scale <span class="pp">|</span> Typical budget <span class="pp">|</span> Natural strategy <span class="pp">|</span></span>
+<span id="cb16-180"><a href="#cb16-180" aria-hidden="true" tabindex="-1"></a><span class="pp">|---|---:|---|</span></span>
+<span id="cb16-181"><a href="#cb16-181" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Small <span class="pp">|</span> 50-200 trials <span class="pp">|</span> single process or <span class="in">`n_jobs`</span> <span class="pp">|</span></span>
+<span id="cb16-182"><a href="#cb16-182" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Medium <span class="pp">|</span> hundreds to low thousands <span class="pp">|</span> multiple local or remote workers with persistent storage <span class="pp">|</span></span>
+<span id="cb16-183"><a href="#cb16-183" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Large <span class="pp">|</span> 10,000+ trials <span class="pp">|</span> cluster execution with robust shared database and monitoring <span class="pp">|</span></span>
+<span id="cb16-184"><a href="#cb16-184" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-185"><a href="#cb16-185" aria-hidden="true" tabindex="-1"></a>The question is not simply "how many workers can I launch?" The real question is whether the objective function, storage backend, and monitoring stack can support that many workers without creating coordination or observability problems.</span>
+<span id="cb16-186"><a href="#cb16-186" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-187"><a href="#cb16-187" aria-hidden="true" tabindex="-1"></a><span class="fu">## What Does a Multi-Worker Setup Look Like?</span></span>
+<span id="cb16-188"><a href="#cb16-188" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-189"><a href="#cb16-189" aria-hidden="true" tabindex="-1"></a>At the code level, all workers typically run the same script and point to the same study.</span>
+<span id="cb16-190"><a href="#cb16-190" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-191"><a href="#cb16-191" aria-hidden="true" tabindex="-1"></a><span class="fu">### Step 1: Create or Load the Study</span></span>
+<span id="cb16-192"><a href="#cb16-192" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-193"><a href="#cb16-193" aria-hidden="true" tabindex="-1"></a><span class="in">```python</span></span>
+<span id="cb16-194"><a href="#cb16-194" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> optuna</span>
+<span id="cb16-195"><a href="#cb16-195" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-196"><a href="#cb16-196" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-197"><a href="#cb16-197" aria-hidden="true" tabindex="-1"></a>study <span class="op">=</span> optuna.create_study(</span>
+<span id="cb16-198"><a href="#cb16-198" aria-hidden="true" tabindex="-1"></a>    study_name<span class="op">=</span><span class="st">"distributed-demo"</span>,</span>
+<span id="cb16-199"><a href="#cb16-199" aria-hidden="true" tabindex="-1"></a>    storage<span class="op">=</span><span class="st">"sqlite:///example.db"</span>,</span>
+<span id="cb16-200"><a href="#cb16-200" aria-hidden="true" tabindex="-1"></a>    load_if_exists<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb16-201"><a href="#cb16-201" aria-hidden="true" tabindex="-1"></a>    direction<span class="op">=</span><span class="st">"minimize"</span>,</span>
+<span id="cb16-202"><a href="#cb16-202" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb16-203"><a href="#cb16-203" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-204"><a href="#cb16-204" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-205"><a href="#cb16-205" aria-hidden="true" tabindex="-1"></a><span class="fu">### Step 2: Define the Worker Objective</span></span>
+<span id="cb16-206"><a href="#cb16-206" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-207"><a href="#cb16-207" aria-hidden="true" tabindex="-1"></a><span class="in">```python</span></span>
+<span id="cb16-208"><a href="#cb16-208" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective(trial):</span>
+<span id="cb16-209"><a href="#cb16-209" aria-hidden="true" tabindex="-1"></a>    x <span class="op">=</span> trial.suggest_float(<span class="st">"x"</span>, <span class="op">-</span><span class="fl">10.0</span>, <span class="fl">10.0</span>)</span>
+<span id="cb16-210"><a href="#cb16-210" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (x <span class="op">-</span> <span class="fl">2.0</span>) <span class="op">**</span> <span class="dv">2</span></span>
+<span id="cb16-211"><a href="#cb16-211" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-212"><a href="#cb16-212" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-213"><a href="#cb16-213" aria-hidden="true" tabindex="-1"></a><span class="fu">### Step 3: Run the Worker</span></span>
+<span id="cb16-214"><a href="#cb16-214" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-215"><a href="#cb16-215" aria-hidden="true" tabindex="-1"></a><span class="in">```python</span></span>
+<span id="cb16-216"><a href="#cb16-216" aria-hidden="true" tabindex="-1"></a>study.optimize(objective, n_trials<span class="op">=</span><span class="dv">100</span>)</span>
+<span id="cb16-217"><a href="#cb16-217" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-218"><a href="#cb16-218" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-219"><a href="#cb16-219" aria-hidden="true" tabindex="-1"></a>Launch the same worker script multiple times:</span>
+<span id="cb16-220"><a href="#cb16-220" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-221"><a href="#cb16-221" aria-hidden="true" tabindex="-1"></a><span class="in">```text</span></span>
+<span id="cb16-222"><a href="#cb16-222" aria-hidden="true" tabindex="-1"></a><span class="in">python worker.py</span></span>
+<span id="cb16-223"><a href="#cb16-223" aria-hidden="true" tabindex="-1"></a><span class="in">python worker.py</span></span>
+<span id="cb16-224"><a href="#cb16-224" aria-hidden="true" tabindex="-1"></a><span class="in">python worker.py</span></span>
+<span id="cb16-225"><a href="#cb16-225" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-226"><a href="#cb16-226" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-227"><a href="#cb16-227" aria-hidden="true" tabindex="-1"></a>All workers collaborate through the same storage backend. That is the core distributed pattern.</span>
+<span id="cb16-228"><a href="#cb16-228" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-229"><a href="#cb16-229" aria-hidden="true" tabindex="-1"></a><span class="fu">## How Do You Monitor a Large Study?</span></span>
+<span id="cb16-230"><a href="#cb16-230" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-231"><a href="#cb16-231" aria-hidden="true" tabindex="-1"></a>Once experiments become large, you need visibility while the optimization is still running.</span>
+<span id="cb16-232"><a href="#cb16-232" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-233"><a href="#cb16-233" aria-hidden="true" tabindex="-1"></a>Programmatic monitoring is the minimum level:</span>
+<span id="cb16-234"><a href="#cb16-234" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-235"><a href="#cb16-235" aria-hidden="true" tabindex="-1"></a><span class="in">```python</span></span>
+<span id="cb16-236"><a href="#cb16-236" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Best value:"</span>, study.best_value)</span>
+<span id="cb16-237"><a href="#cb16-237" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Completed trials:"</span>, <span class="bu">len</span>(study.trials))</span>
+<span id="cb16-238"><a href="#cb16-238" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-239"><a href="#cb16-239" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-240"><a href="#cb16-240" aria-hidden="true" tabindex="-1"></a>For interactive monitoring, the dashboard is more useful:</span>
+<span id="cb16-241"><a href="#cb16-241" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-242"><a href="#cb16-242" aria-hidden="true" tabindex="-1"></a><span class="in">```bash</span></span>
+<span id="cb16-243"><a href="#cb16-243" aria-hidden="true" tabindex="-1"></a><span class="ex">optuna-dashboard</span> sqlite:///example.db</span>
+<span id="cb16-244"><a href="#cb16-244" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-245"><a href="#cb16-245" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-246"><a href="#cb16-246" aria-hidden="true" tabindex="-1"></a>This is especially helpful when you want to inspect trial progress, compare parameter regions, or review multi-objective frontiers without writing custom reporting code.</span>
+<span id="cb16-247"><a href="#cb16-247" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-248"><a href="#cb16-248" aria-hidden="true" tabindex="-1"></a><span class="fu">## How Does Optuna Fit Into Larger Distributed Systems?</span></span>
+<span id="cb16-249"><a href="#cb16-249" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-250"><a href="#cb16-250" aria-hidden="true" tabindex="-1"></a>Optuna is often not the orchestrator itself. Instead, it is the optimization layer inside a broader execution environment.</span>
+<span id="cb16-251"><a href="#cb16-251" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-252"><a href="#cb16-252" aria-hidden="true" tabindex="-1"></a>Common combinations include:</span>
+<span id="cb16-253"><a href="#cb16-253" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-254"><a href="#cb16-254" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> System <span class="pp">|</span> Typical role <span class="pp">|</span></span>
+<span id="cb16-255"><a href="#cb16-255" aria-hidden="true" tabindex="-1"></a><span class="pp">|---|---|</span></span>
+<span id="cb16-256"><a href="#cb16-256" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Ray <span class="pp">|</span> distributed ML workloads and task execution <span class="pp">|</span></span>
+<span id="cb16-257"><a href="#cb16-257" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Dask <span class="pp">|</span> parallel Python workflows <span class="pp">|</span></span>
+<span id="cb16-258"><a href="#cb16-258" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Kubernetes <span class="pp">|</span> container orchestration for scalable workers <span class="pp">|</span></span>
+<span id="cb16-259"><a href="#cb16-259" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> SLURM <span class="pp">|</span> batch scheduling on HPC clusters <span class="pp">|</span></span>
+<span id="cb16-260"><a href="#cb16-260" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-261"><a href="#cb16-261" aria-hidden="true" tabindex="-1"></a>The pattern is usually the same:</span>
+<span id="cb16-262"><a href="#cb16-262" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-263"><a href="#cb16-263" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>the external platform launches workers</span>
+<span id="cb16-264"><a href="#cb16-264" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Optuna storage coordinates the study</span>
+<span id="cb16-265"><a href="#cb16-265" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>workers report results back into the shared study state</span>
+<span id="cb16-266"><a href="#cb16-266" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-267"><a href="#cb16-267" aria-hidden="true" tabindex="-1"></a>That separation of concerns is useful. Optuna handles optimization logic, while the surrounding platform handles resource scheduling.</span>
+<span id="cb16-268"><a href="#cb16-268" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-269"><a href="#cb16-269" aria-hidden="true" tabindex="-1"></a>::: callout-warning</span>
+<span id="cb16-270"><a href="#cb16-270" aria-hidden="true" tabindex="-1"></a><span class="fu">## Common Mistake</span></span>
+<span id="cb16-271"><a href="#cb16-271" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-272"><a href="#cb16-272" aria-hidden="true" tabindex="-1"></a>Do not assume SQLite is a production-grade answer for every distributed setup just because it works for a small demo. Once concurrency, fault tolerance, and worker count increase, backend limitations become part of the optimization bottleneck.</span>
+<span id="cb16-273"><a href="#cb16-273" aria-hidden="true" tabindex="-1"></a>:::</span>
+<span id="cb16-274"><a href="#cb16-274" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-275"><a href="#cb16-275" aria-hidden="true" tabindex="-1"></a><span class="fu">## Practical Exercise: Turn a Local Study Into a Shared Study</span></span>
+<span id="cb16-276"><a href="#cb16-276" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-277"><a href="#cb16-277" aria-hidden="true" tabindex="-1"></a>Start from a simple single-process optimization script and upgrade it into a shared-storage workflow.</span>
+<span id="cb16-278"><a href="#cb16-278" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-279"><a href="#cb16-279" aria-hidden="true" tabindex="-1"></a>Use this objective:</span>
+<span id="cb16-280"><a href="#cb16-280" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-283"><a href="#cb16-283" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb16-284"><a href="#cb16-284" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> math</span>
+<span id="cb16-285"><a href="#cb16-285" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-286"><a href="#cb16-286" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> optuna</span>
+<span id="cb16-287"><a href="#cb16-287" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-288"><a href="#cb16-288" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-289"><a href="#cb16-289" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective(trial):</span>
+<span id="cb16-290"><a href="#cb16-290" aria-hidden="true" tabindex="-1"></a>    x <span class="op">=</span> trial.suggest_float(<span class="st">"x"</span>, <span class="op">-</span><span class="fl">10.0</span>, <span class="fl">10.0</span>)</span>
+<span id="cb16-291"><a href="#cb16-291" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (x <span class="op">-</span> <span class="fl">2.0</span>) <span class="op">**</span> <span class="dv">2</span> <span class="op">+</span> math.sin(<span class="fl">5.0</span> <span class="op">*</span> x)</span>
+<span id="cb16-292"><a href="#cb16-292" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb16-293"><a href="#cb16-293" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-294"><a href="#cb16-294" aria-hidden="true" tabindex="-1"></a>Then work through the exercise in four passes:</span>
+<span id="cb16-295"><a href="#cb16-295" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-296"><a href="#cb16-296" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>Run the study in a single process and record the best value after 50 trials.</span>
+<span id="cb16-297"><a href="#cb16-297" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>Run it again with <span class="in">`n_jobs=4`</span> and compare wall-clock behavior.</span>
+<span id="cb16-298"><a href="#cb16-298" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>Move the study to shared SQLite storage using <span class="in">`load_if_exists=True`</span> and launch the worker script from multiple terminals.</span>
+<span id="cb16-299"><a href="#cb16-299" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>Replace SQLite with PostgreSQL conceptually and list what operational risks improve when you move to a stronger backend.</span>
+<span id="cb16-300"><a href="#cb16-300" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-301"><a href="#cb16-301" aria-hidden="true" tabindex="-1"></a>Questions to answer after the run:</span>
+<span id="cb16-302"><a href="#cb16-302" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-303"><a href="#cb16-303" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Which part of the speedup came from concurrency and which part was still limited by the objective?</span>
+<span id="cb16-304"><a href="#cb16-304" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Did local parallelism solve the problem, or did you still need shared storage for resumability?</span>
+<span id="cb16-305"><a href="#cb16-305" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>At what point would SQLite stop being a comfortable choice?</span>
+<span id="cb16-306"><a href="#cb16-306" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>If your workers lived on Kubernetes, Ray, or SLURM, what would Optuna handle and what would the platform handle?</span>
+<span id="cb16-307"><a href="#cb16-307" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-308"><a href="#cb16-308" aria-hidden="true" tabindex="-1"></a><span class="fu">## Recap</span></span>
+<span id="cb16-309"><a href="#cb16-309" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-310"><a href="#cb16-310" aria-hidden="true" tabindex="-1"></a>Distributed Optuna is fundamentally about coordination, not just raw worker count.</span>
+<span id="cb16-311"><a href="#cb16-311" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-312"><a href="#cb16-312" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`n_jobs`</span> provides the simplest local concurrency.</span>
+<span id="cb16-313"><a href="#cb16-313" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Shared storage is required once multiple processes or machines collaborate on the same study.</span>
+<span id="cb16-314"><a href="#cb16-314" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>SQLite is useful for small shared experiments, while PostgreSQL or MySQL are better suited to serious distributed workloads.</span>
+<span id="cb16-315"><a href="#cb16-315" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Persistent storage enables fault tolerance, resumability, and monitoring.</span>
+<span id="cb16-316"><a href="#cb16-316" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-317"><a href="#cb16-317" aria-hidden="true" tabindex="-1"></a><span class="fu">## Decision Guide</span></span>
+<span id="cb16-318"><a href="#cb16-318" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-319"><a href="#cb16-319" aria-hidden="true" tabindex="-1"></a>Choose the simplest scaling model that matches the workload.</span>
+<span id="cb16-320"><a href="#cb16-320" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-321"><a href="#cb16-321" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Use a single process for cheap exploratory studies.</span>
+<span id="cb16-322"><a href="#cb16-322" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Use <span class="in">`n_jobs`</span> when one machine is enough and concurrency is the main need.</span>
+<span id="cb16-323"><a href="#cb16-323" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Use shared storage when workers must coordinate across processes or hosts.</span>
+<span id="cb16-324"><a href="#cb16-324" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Prefer PostgreSQL-class backends when the study is important enough that failures, locking, and concurrency behavior matter.</span>
+<span id="cb16-325"><a href="#cb16-325" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Use external platforms such as Ray, Dask, Kubernetes, or SLURM for resource orchestration, while letting Optuna remain the optimization layer.</span>
+<span id="cb16-326"><a href="#cb16-326" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-327"><a href="#cb16-327" aria-hidden="true" tabindex="-1"></a>The next chapter moves from infrastructure back to applications. In <span class="co">[</span><span class="ot">Optuna for Machine Learning</span><span class="co">](12-optuna-machine-learning.qmd)</span>, we will apply the ideas from this book to realistic model-selection and pipeline-tuning workflows.</span>
+</code><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></pre></div>
+</div></div></div></div></div>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

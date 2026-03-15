@@ -1,0 +1,1671 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.7.31">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>9&nbsp; Advanced Optimization Techniques – Optimization with Optuna: A Practical and Theoretical Guide to Modern Black-Box Optimization</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<link href="../modules/10-visualization-diagnostics.html" rel="next">
+<link href="../modules/08-pruning.html" rel="prev">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-e1a5c8363afafaef2c763b6775fbf3ca.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-84201f73209b7bbc7d36810704c07685.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script src="../site_libs/quarto-diagram/mermaid.min.js"></script>
+<script src="../site_libs/quarto-diagram/mermaid-init.js"></script>
+<link href="../site_libs/quarto-diagram/mermaid.css" rel="stylesheet">
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN") {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body class="nav-sidebar floating quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../modules/09-advanced-optimization-techniques.html">Part III: Advanced Techniques</a></li><li class="breadcrumb-item"><a href="../modules/09-advanced-optimization-techniques.html"><span class="chapter-number">9</span>&nbsp; <span class="chapter-title">Advanced Optimization Techniques</span></a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="../">Optimization with Optuna: A Practical and Theoretical Guide to Modern Black-Box Optimization</a> 
+    </div>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Preface</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../intro.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Introduction</span></a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
+ <span class="menu-text">Part I: Foundations</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/01-foundations-modern-optimization.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">1</span>&nbsp; <span class="chapter-title">Foundations of Modern Optimization</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/02-bayesian-optimization-fundamentals.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">2</span>&nbsp; <span class="chapter-title">Bayesian Optimization Fundamentals</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/03-tpe-algorithm.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">3</span>&nbsp; <span class="chapter-title">The TPE Algorithm</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/04-optuna-architecture.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">4</span>&nbsp; <span class="chapter-title">Optuna Architecture</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true">
+ <span class="menu-text">Part II: Core Usage</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/05-basic-optuna-usage.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">5</span>&nbsp; <span class="chapter-title">Basic Optuna Usage</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/06-designing-search-spaces.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">Designing Search Spaces</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/07-samplers.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">7</span>&nbsp; <span class="chapter-title">Samplers</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/08-pruning.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">8</span>&nbsp; <span class="chapter-title">Pruning</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true">
+ <span class="menu-text">Part III: Advanced Techniques</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/09-advanced-optimization-techniques.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text"><span class="chapter-number">9</span>&nbsp; <span class="chapter-title">Advanced Optimization Techniques</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/10-visualization-diagnostics.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">10</span>&nbsp; <span class="chapter-title">Visualization and Diagnostics</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/11-distributed-scalable-optimization.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">11</span>&nbsp; <span class="chapter-title">Distributed and Scalable Optimization</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true">
+ <span class="menu-text">Part IV: Applications</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-4" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/12-optuna-machine-learning.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">12</span>&nbsp; <span class="chapter-title">Optuna for Machine Learning</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/13-optuna-general-optimization.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">13</span>&nbsp; <span class="chapter-title">Optuna for General Optimization</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/14-production-workflows.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">14</span>&nbsp; <span class="chapter-title">Production Workflows</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/15-final-project.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">15</span>&nbsp; <span class="chapter-title">Final Project</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../summary.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Summary</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../references.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">References</span></a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true">
+ <span class="menu-text">Appendices</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-5" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../appendices/01-optuna-expert-cheat-sheet.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">A</span>&nbsp; <span class="chapter-title">Optuna Expert Cheat Sheet</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul>
+  <li><a href="#why-this-matters" id="toc-why-this-matters" class="nav-link active" data-scroll-target="#why-this-matters"><span class="header-section-number">9.1</span> Why This Matters</a></li>
+  <li><a href="#fast-first-win-a-multi-objective-study" id="toc-fast-first-win-a-multi-objective-study" class="nav-link" data-scroll-target="#fast-first-win-a-multi-objective-study"><span class="header-section-number">9.2</span> Fast First Win: A Multi-Objective Study</a></li>
+  <li><a href="#when-does-the-search-space-become-part-of-the-algorithm" id="toc-when-does-the-search-space-become-part-of-the-algorithm" class="nav-link" data-scroll-target="#when-does-the-search-space-become-part-of-the-algorithm"><span class="header-section-number">9.3</span> When Does the Search Space Become Part of the Algorithm?</a></li>
+  <li><a href="#what-changes-in-multi-objective-optimization" id="toc-what-changes-in-multi-objective-optimization" class="nav-link" data-scroll-target="#what-changes-in-multi-objective-optimization"><span class="header-section-number">9.4</span> What Changes in Multi-Objective Optimization?</a></li>
+  <li><a href="#how-should-you-read-a-pareto-front" id="toc-how-should-you-read-a-pareto-front" class="nav-link" data-scroll-target="#how-should-you-read-a-pareto-front"><span class="header-section-number">9.5</span> How Should You Read a Pareto Front?</a></li>
+  <li><a href="#how-do-constraints-enter-the-search" id="toc-how-do-constraints-enter-the-search" class="nav-link" data-scroll-target="#how-do-constraints-enter-the-search"><span class="header-section-number">9.6</span> How Do Constraints Enter the Search?</a>
+  <ul class="collapse">
+  <li><a href="#penalty-based-constraints" id="toc-penalty-based-constraints" class="nav-link" data-scroll-target="#penalty-based-constraints"><span class="header-section-number">9.6.1</span> Penalty-Based Constraints</a></li>
+  <li><a href="#constraint-aware-multi-objective-search" id="toc-constraint-aware-multi-objective-search" class="nav-link" data-scroll-target="#constraint-aware-multi-objective-search"><span class="header-section-number">9.6.2</span> Constraint-Aware Multi-Objective Search</a></li>
+  </ul></li>
+  <li><a href="#when-should-you-write-a-custom-sampler" id="toc-when-should-you-write-a-custom-sampler" class="nav-link" data-scroll-target="#when-should-you-write-a-custom-sampler"><span class="header-section-number">9.7</span> When Should You Write a Custom Sampler?</a></li>
+  <li><a href="#when-should-you-write-a-custom-pruner" id="toc-when-should-you-write-a-custom-pruner" class="nav-link" data-scroll-target="#when-should-you-write-a-custom-pruner"><span class="header-section-number">9.8</span> When Should You Write a Custom Pruner?</a></li>
+  <li><a href="#practical-exercise-constrained-multi-objective-optimization-with-nsga-ii" id="toc-practical-exercise-constrained-multi-objective-optimization-with-nsga-ii" class="nav-link" data-scroll-target="#practical-exercise-constrained-multi-objective-optimization-with-nsga-ii"><span class="header-section-number">9.9</span> Practical Exercise: Constrained Multi-Objective Optimization with NSGA-II</a></li>
+  <li><a href="#recap" id="toc-recap" class="nav-link" data-scroll-target="#recap"><span class="header-section-number">9.10</span> Recap</a></li>
+  <li><a href="#decision-guide" id="toc-decision-guide" class="nav-link" data-scroll-target="#decision-guide"><span class="header-section-number">9.11</span> Decision Guide</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../modules/09-advanced-optimization-techniques.html">Part III: Advanced Techniques</a></li><li class="breadcrumb-item"><a href="../modules/09-advanced-optimization-techniques.html"><span class="chapter-number">9</span>&nbsp; <span class="chapter-title">Advanced Optimization Techniques</span></a></li></ol></nav>
+<div class="quarto-title">
+<div class="quarto-title-block"><div><h1 class="title"><span class="chapter-number">9</span>&nbsp; <span class="chapter-title">Advanced Optimization Techniques</span></h1><button type="button" class="btn code-tools-button" id="quarto-code-tools-source"><i class="bi"></i> Code</button></div></div>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>This chapter shows how Optuna moves beyond single-objective hyperparameter tuning into richer optimization workflows. By the end, you should be able to model dynamic search spaces, reason about Pareto-optimal trade-offs, and decide when to use constrained optimization or custom optimization components.</p>
+<section id="why-this-matters" class="level2" data-number="9.1">
+<h2 data-number="9.1" class="anchored" data-anchor-id="why-this-matters"><span class="header-section-number">9.1</span> Why This Matters</h2>
+<p>In production systems, the best configuration is rarely the one with the highest validation score alone. You may need to balance accuracy against latency, memory footprint, energy usage, fairness constraints, or engineering limits imposed by deployment.</p>
+<p>That is where Optuna’s more advanced features matter. They let you optimize over search spaces whose structure depends on runtime decisions, retain multiple equally valid trade-off solutions, and inject domain-specific search or pruning logic when the built-in algorithms are not enough.</p>
+</section>
+<section id="fast-first-win-a-multi-objective-study" class="level2" data-number="9.2">
+<h2 data-number="9.2" class="anchored" data-anchor-id="fast-first-win-a-multi-objective-study"><span class="header-section-number">9.2</span> Fast First Win: A Multi-Objective Study</h2>
+<p>The quickest way to see the difference between ordinary and advanced optimization is to optimize two conflicting objectives at once.</p>
+<p>Here we minimize:</p>
+<p><span class="math display">\[
+f_1(x) = (x - 2)^2
+\]</span></p>
+<p>and</p>
+<p><span class="math display">\[
+f_2(x) = (x + 2)^2
+\]</span></p>
+<p>No single value of <span class="math inline">\(x\)</span> minimizes both objectives simultaneously, so the result is a Pareto set rather than a single best trial.</p>
+<div id="8c0fc9bf" class="cell" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> optuna</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective(trial):</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    x <span class="op">=</span> trial.suggest_float(<span class="st">"x"</span>, <span class="op">-</span><span class="fl">5.0</span>, <span class="fl">5.0</span>)</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    f1 <span class="op">=</span> (x <span class="op">-</span> <span class="fl">2.0</span>) <span class="op">**</span> <span class="dv">2</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    f2 <span class="op">=</span> (x <span class="op">+</span> <span class="fl">2.0</span>) <span class="op">**</span> <span class="dv">2</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> f1, f2</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>study <span class="op">=</span> optuna.create_study(</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>    directions<span class="op">=</span>[<span class="st">"minimize"</span>, <span class="st">"minimize"</span>],</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>    sampler<span class="op">=</span>optuna.samplers.NSGAIISampler(seed<span class="op">=</span><span class="dv">42</span>),</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>study.optimize(objective, n_trials<span class="op">=</span><span class="dv">80</span>)</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>pareto_trials <span class="op">=</span> <span class="bu">sorted</span>(study.best_trials, key<span class="op">=</span><span class="kw">lambda</span> trial: trial.params[<span class="st">"x"</span>])</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> trial <span class="kw">in</span> pareto_trials[:<span class="dv">8</span>]:</span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(</span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"x=</span><span class="sc">{</span>trial<span class="sc">.</span>params[<span class="st">'x'</span>]<span class="sc">:.3f}</span><span class="ss"> | "</span></span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"f1=</span><span class="sc">{</span>trial<span class="sc">.</span>values[<span class="dv">0</span>]<span class="sc">:.3f}</span><span class="ss"> | "</span></span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"f2=</span><span class="sc">{</span>trial<span class="sc">.</span>values[<span class="dv">1</span>]<span class="sc">:.3f}</span><span class="ss">"</span></span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Pareto-optimal trials: </span><span class="sc">{</span><span class="bu">len</span>(study.best_trials)<span class="sc">}</span><span class="ss">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<div class="ansi-escaped-output">
+<pre><span class="ansi-green-fg">[I 2026-03-15 08:26:48,232]</span> A new study created in memory with name: no-name-33230826-473a-4b45-b864-6cd7f45a6dc6
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,234]</span> Trial 0 finished with values: [10.592413423988893, 0.5556229317778925] and parameters: {'x': -1.254598811526375}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,236]</span> Trial 1 finished with values: [6.285766343860528, 42.342910856653816] and parameters: {'x': 4.507143064099161}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,238]</span> Trial 2 finished with values: [0.10236123126315734, 18.661876576175562] and parameters: {'x': 2.3199394181140507}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,240]</span> Trial 3 finished with values: [1.027010282524228, 8.919689018287157] and parameters: {'x': 0.986584841970366}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,241]</span> Trial 4 finished with values: [29.59157195460952, 2.0730631900044383] and parameters: {'x': -3.439813595575635}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,243]</span> Trial 5 finished with values: [29.594196190423823, 2.073757817320035] and parameters: {'x': -3.4400547966379733}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,244]</span> Trial 6 finished with values: [41.20566489670265, 5.852353870158612] and parameters: {'x': -4.419163878318005}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,245]</span> Trial 7 finished with values: [2.76145114246125, 32.05554280445606] and parameters: {'x': 3.6617614577493516}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,247]</span> Trial 8 finished with values: [0.9778240902545737, 9.067025029711276] and parameters: {'x': 1.0111501174320878}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,248]</span> Trial 9 finished with values: [0.006516651227320591, 16.652322874910958] and parameters: {'x': 2.0807257779604544}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,249]</span> Trial 10 finished with values: [46.16054293912905, 7.807302482793245] and parameters: {'x': -4.7941550570419755}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,251]</span> Trial 11 finished with values: [7.285132829410962, 44.877921002370506] and parameters: {'x': 4.699098521619943}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,253]</span> Trial 12 finished with values: [1.754105310218955, 28.349516574252696] and parameters: {'x': 3.324426408004218}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,255]</span> Trial 13 finished with values: [23.781314297405455, 0.7684431516675517] and parameters: {'x': -2.8766088932172384}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,257]</span> Trial 14 finished with values: [26.85053646099223, 1.3965338375602845] and parameters: {'x': -3.181750327928994}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,258]</span> Trial 15 finished with values: [26.6870900439771, 1.359450832251801] and parameters: {'x': -3.165954901465662}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,259]</span> Trial 16 finished with values: [15.662420225769758, 0.001799662532774738] and parameters: {'x': -1.9575775704046228}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,262]</span> Trial 17 finished with values: [3.0710308254266523, 5.051545356005681] and parameters: {'x': 0.24756431632237863}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,264]</span> Trial 18 finished with values: [7.185347303077568, 1.7409487944468272] and parameters: {'x': -0.6805498135788426}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,266]</span> Trial 19 finished with values: [16.709361582323204, 0.007692798166560385] and parameters: {'x': -2.0877085980195806}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,267]</span> Trial 20 finished with values: [0.7769912168823914, 9.725222794672751] and parameters: {'x': 1.118528947223795}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,270]</span> Trial 21 finished with values: [31.416713224675267, 2.576222076838616] and parameters: {'x': -3.6050613934795814}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,271]</span> Trial 22 finished with values: [16.634598771846075, 0.006170654663525029] and parameters: {'x': -2.0785535146478185}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,273]</span> Trial 23 finished with values: [11.131441961038313, 0.44038942453364943] and parameters: {'x': -1.336381567063083}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,274]</span> Trial 24 finished with values: [5.950185259987708, 2.435783997350586] and parameters: {'x': -0.43930015782964027}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,275]</span> Trial 25 finished with values: [0.725494439922415, 23.539571351363506] and parameters: {'x': 2.8517596139301364}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,277]</span> Trial 26 finished with values: [25.03263242597205, 1.006534998640826] and parameters: {'x': -3.003262178416403}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,279]</span> Trial 27 finished with values: [3.450884387150625, 4.589639460239555] and parameters: {'x': 0.14234438413611628}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,280]</span> Trial 28 finished with values: [1.1574624993140197, 8.55062800827742] and parameters: {'x': 0.9241456886204249}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,281]</span> Trial 29 finished with values: [42.71270630338613, 6.428739320985948] and parameters: {'x': -4.5354958728000225}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,282]</span> Trial 30 finished with values: [0.8547954409926973, 9.458383593107763] and parameters: {'x': 1.0754485190143832}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,284]</span> Trial 31 finished with values: [28.034470359711058, 1.6764002546943788] and parameters: {'x': -3.294758763127085}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,285]</span> Trial 32 finished with values: [40.31594795705311, 5.520075395875476] and parameters: {'x': -4.349484070147205}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,286]</span> Trial 33 finished with values: [6.194401065388036, 42.1052440456547] and parameters: {'x': 4.488855372533333}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,287]</span> Trial 34 finished with values: [7.0560376995323795, 44.30660034549713] and parameters: {'x': 4.656320330745594}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,291]</span> Trial 35 finished with values: [1.1749985078681247, 25.84678635718501] and parameters: {'x': 3.0839734811646107}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,293]</span> Trial 36 finished with values: [15.633027152728861, 0.002128686598514541] and parameters: {'x': -1.9538623082662934}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,294]</span> Trial 37 finished with values: [36.27988822455386, 4.093657345064571] and parameters: {'x': -4.023278859936161}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,295]</span> Trial 38 finished with values: [0.02485974529663481, 14.763501866269184] and parameters: {'x': 1.8423302651215687}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,298]</span> Trial 39 finished with values: [6.7520726509747915, 1.9642721501428995] and parameters: {'x': -0.5984750626039865}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,299]</span> Trial 40 finished with values: [33.4039801981339, 3.1670389857162093] and parameters: {'x': -3.7796176515522117}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,301]</span> Trial 41 finished with values: [4.19524981515667, 3.809402624058284] and parameters: {'x': -0.048230898887298146}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,302]</span> Trial 42 finished with values: [44.303864082318604, 7.054945771536079] and parameters: {'x': -4.656114788847816}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,304]</span> Trial 43 finished with values: [4.381503072642301, 37.127135238944874] and parameters: {'x': 4.093204020787821}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,306]</span> Trial 44 finished with values: [19.46751046368814, 0.1699089916894944] and parameters: {'x': -2.412200183999831}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,307]</span> Trial 45 finished with values: [0.14045791700437812, 13.142240665322939] and parameters: {'x': 1.6252228435398202}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,309]</span> Trial 46 finished with values: [15.07682884316432, 0.01371493031719735] and parameters: {'x': -1.8828892391058902}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,310]</span> Trial 47 finished with values: [3.2375517002868737, 4.842993394511739] and parameters: {'x': 0.20068021177810813}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,311]</span> Trial 48 finished with values: [2.349773845901536, 6.086596193363907] and parameters: {'x': 0.4671027934327965}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,312]</span> Trial 49 finished with values: [26.537493199190116, 1.3258496412322824] and parameters: {'x': -3.1514554447447294}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,318]</span> Trial 50 finished with values: [7.267587152695562, 44.83435737386025] and parameters: {'x': 4.695846277645586}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,320]</span> Trial 51 finished with values: [0.5644941146212441, 22.575119983510408] and parameters: {'x': 2.7513282336111455}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,322]</span> Trial 52 finished with values: [5.735974301036689, 40.89588962617182] and parameters: {'x': 4.394989415641891}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,324]</span> Trial 53 finished with values: [3.795769647465785, 35.38195768167768] and parameters: {'x': 3.9482735042764876}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,325]</span> Trial 54 finished with values: [1.0424414326776867, 8.874439737564497] and parameters: {'x': 0.9789997881108512}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,328]</span> Trial 55 finished with values: [4.922817616709324, 38.67275641855866] and parameters: {'x': 4.218742350231167}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,330]</span> Trial 56 finished with values: [37.39414200467217, 4.473542168825727] and parameters: {'x': -4.115074979480805}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,331]</span> Trial 57 finished with values: [25.40332749751983, 1.0819564910514472] and parameters: {'x': -3.040171375808548}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,333]</span> Trial 58 finished with values: [42.8727303187444, 6.490913431587447] and parameters: {'x': -4.54772711089462}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,334]</span> Trial 59 finished with values: [14.037736104596489, 0.0641625656576377] and parameters: {'x': -1.7466966923673564}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,336]</span> Trial 60 finished with values: [9.69218299550867, 0.7863661706672316] and parameters: {'x': -1.1132271031051797}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,338]</span> Trial 61 finished with values: [18.374165256117653, 0.08208779802932274] and parameters: {'x': -2.286509682261041}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,341]</span> Trial 62 finished with values: [1.6573346262643114, 27.956335358418666] and parameters: {'x': 3.2873750915192943}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,343]</span> Trial 63 finished with values: [11.781827873591784, 0.3220940090789276] and parameters: {'x': -1.432466733064107}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,345]</span> Trial 64 finished with values: [17.5615885170956, 0.0363492920860578] and parameters: {'x': -2.1906549031261924}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,346]</span> Trial 65 finished with values: [2.4744522253756673, 5.890138878035547] and parameters: {'x': 0.4269608315824849}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,348]</span> Trial 66 finished with values: [31.256572222006987, 2.5305102199879927] and parameters: {'x': -3.5907577502523735}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,350]</span> Trial 67 finished with values: [1.0444222875241573, 25.220180747847337] and parameters: {'x': 3.0219698075403976}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,351]</span> Trial 68 finished with values: [39.118689732138904, 5.082741226520567] and parameters: {'x': -4.254493563202292}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,353]</span> Trial 69 finished with values: [8.230411439202923, 47.18136636724431] and parameters: {'x': 4.868869366005173}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,357]</span> Trial 70 finished with values: [0.5219306690727248, 22.301512212805314] and parameters: {'x': 2.7224476929665737}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,359]</span> Trial 71 finished with values: [25.128596793974932, 1.0258513167087184] and parameters: {'x': -3.012843184658276}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,360]</span> Trial 72 finished with values: [48.229952980448346, 8.671722350336534] and parameters: {'x': -4.944778828763976}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,368]</span> Trial 73 finished with values: [1.3331341460830772, 26.570048422469803] and parameters: {'x': 3.154614284548341}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,370]</span> Trial 74 finished with values: [0.00470231646444529, 16.55328982427382] and parameters: {'x': 2.0685734384761716}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,373]</span> Trial 75 finished with values: [0.0841415797758078, 18.404715023054795] and parameters: {'x': 2.2900716804098735}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,375]</span> Trial 76 finished with values: [0.5079462316734894, 22.209573966549147] and parameters: {'x': 2.712703466859457}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,377]</span> Trial 77 finished with values: [39.18200980226962, 5.10558194099685] and parameters: {'x': -4.259553482659096}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,379]</span> Trial 78 finished with values: [11.664565857879447, 0.34182414142125755] and parameters: {'x': -1.4153427145572737}.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:26:48,380]</span> Trial 79 finished with values: [34.12089556200564, 3.3904203240160227] and parameters: {'x': -3.841309404748703}.
+</pre>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>x=-1.958 | f1=15.662 | f2=0.002
+x=-1.954 | f1=15.633 | f2=0.002
+x=-1.883 | f1=15.077 | f2=0.014
+x=-1.747 | f1=14.038 | f2=0.064
+x=-1.432 | f1=11.782 | f2=0.322
+x=-1.415 | f1=11.665 | f2=0.342
+x=-1.336 | f1=11.131 | f2=0.440
+x=-1.255 | f1=10.592 | f2=0.556
+Pareto-optimal trials: 27</code></pre>
+</div>
+</div>
+<p>The important shift is conceptual: Optuna is no longer returning one optimum. It is returning a frontier of non-dominated solutions that reflect different engineering trade-offs.</p>
+</section>
+<section id="when-does-the-search-space-become-part-of-the-algorithm" class="level2" data-number="9.3">
+<h2 data-number="9.3" class="anchored" data-anchor-id="when-does-the-search-space-become-part-of-the-algorithm"><span class="header-section-number">9.3</span> When Does the Search Space Become Part of the Algorithm?</h2>
+<p>Earlier chapters treated the search space as something you define once and then optimize over. In practice, many workflows are conditional.</p>
+<p>If a trial selects a linear model, you want regularization strength. If it selects a neural network, you want layers, hidden units, and dropout. The structure of the search space changes with the sampled path.</p>
+<p>This is where Optuna’s define-by-run design becomes decisive. You can express branching logic directly in the objective function.</p>
+<div id="6710df02" class="cell" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective(trial):</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    model <span class="op">=</span> trial.suggest_categorical(<span class="st">"model"</span>, [<span class="st">"linear"</span>, <span class="st">"mlp"</span>])</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> model <span class="op">==</span> <span class="st">"linear"</span>:</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>        alpha <span class="op">=</span> trial.suggest_float(<span class="st">"alpha"</span>, <span class="fl">1e-4</span>, <span class="fl">1.0</span>, log<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> train_linear_model(alpha)</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    n_layers <span class="op">=</span> trial.suggest_int(<span class="st">"n_layers"</span>, <span class="dv">1</span>, <span class="dv">3</span>)</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>    widths <span class="op">=</span> []</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> layer_index <span class="kw">in</span> <span class="bu">range</span>(n_layers):</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>        widths.append(trial.suggest_int(<span class="ss">f"units_</span><span class="sc">{</span>layer_index<span class="sc">}</span><span class="ss">"</span>, <span class="dv">32</span>, <span class="dv">256</span>))</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>    dropout <span class="op">=</span> trial.suggest_float(<span class="st">"dropout"</span>, <span class="fl">0.0</span>, <span class="fl">0.5</span>)</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> train_mlp(widths, dropout)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>This is the natural continuation of the search-space design choices from <a href="../modules/06-designing-search-spaces.html">Designing Search Spaces</a>. The difference here is emphasis: the search space is not just descriptive; it becomes an adaptive program that encodes model families and structural decisions.</p>
+</section>
+<section id="what-changes-in-multi-objective-optimization" class="level2" data-number="9.4">
+<h2 data-number="9.4" class="anchored" data-anchor-id="what-changes-in-multi-objective-optimization"><span class="header-section-number">9.4</span> What Changes in Multi-Objective Optimization?</h2>
+<p>In single-objective optimization, we solve:</p>
+<p><span class="math display">\[
+x^* = \arg\min_{x \in \mathcal{X}} f(x)
+\]</span></p>
+<p>In multi-objective optimization, the target becomes a vector:</p>
+<p><span class="math display">\[
+\mathbf{f}(x) = \left(f_1(x), f_2(x), \ldots, f_k(x)\right)
+\]</span></p>
+<p>There is usually no total ordering over all candidates, because improving one objective often worsens another. Instead, we use dominance.</p>
+<p>A candidate <span class="math inline">\(x_a\)</span> dominates <span class="math inline">\(x_b\)</span> if it is no worse on every objective and strictly better on at least one.</p>
+<p>The Pareto front is the set of non-dominated solutions. In Optuna, those solutions are exposed through <code>study.best_trials</code> for multi-objective studies.</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Configuration</th>
+<th style="text-align: right;">Accuracy</th>
+<th style="text-align: right;">Latency</th>
+<th>Dominated?</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>A</td>
+<td style="text-align: right;">0.95</td>
+<td style="text-align: right;">45 ms</td>
+<td>No</td>
+</tr>
+<tr class="even">
+<td>B</td>
+<td style="text-align: right;">0.94</td>
+<td style="text-align: right;">18 ms</td>
+<td>No</td>
+</tr>
+<tr class="odd">
+<td>C</td>
+<td style="text-align: right;">0.92</td>
+<td style="text-align: right;">16 ms</td>
+<td>No</td>
+</tr>
+<tr class="even">
+<td>D</td>
+<td style="text-align: right;">0.93</td>
+<td style="text-align: right;">40 ms</td>
+<td>Yes</td>
+</tr>
+</tbody>
+</table>
+<p>Configuration D is dominated because another configuration can be both more accurate and faster.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">flowchart LR
+    A[Sample candidate] --&gt; B[Evaluate all objectives]
+    B --&gt; C{Dominated by current frontier?}
+    C --&gt;|Yes| D[Keep for history only]
+    C --&gt;|No| E[Add to Pareto front]
+    E --&gt; F[Remove newly dominated points]
+    D --&gt; G[Update sampler state]
+    F --&gt; G
+    G --&gt; A
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p>For advanced practitioners, this matters because model selection stops being a single scalar decision. The optimizer produces a set of candidates, and downstream decision-making becomes a policy question: which trade-off is operationally acceptable?</p>
+</section>
+<section id="how-should-you-read-a-pareto-front" class="level2" data-number="9.5">
+<h2 data-number="9.5" class="anchored" data-anchor-id="how-should-you-read-a-pareto-front"><span class="header-section-number">9.5</span> How Should You Read a Pareto Front?</h2>
+<p>A Pareto front is useful only if you treat it as a decision surface rather than as a ranking.</p>
+<p>Three practical interpretations are common:</p>
+<ul>
+<li>Knee-point selection: choose the point where small objective gains start costing a lot elsewhere.</li>
+<li>Budget-based selection: choose the best solution under a latency, memory, or cost cap.</li>
+<li>Portfolio selection: keep several frontier points for A/B tests or environment-specific deployment.</li>
+</ul>
+<p>That distinction matters because the optimizer cannot decide your business trade-off for you. It can only expose the feasible frontier cleanly.</p>
+</section>
+<section id="how-do-constraints-enter-the-search" class="level2" data-number="9.6">
+<h2 data-number="9.6" class="anchored" data-anchor-id="how-do-constraints-enter-the-search"><span class="header-section-number">9.6</span> How Do Constraints Enter the Search?</h2>
+<p>Some requirements are not preferences but hard limits. You may need:</p>
+<ul>
+<li>latency under 20 ms</li>
+<li>model size under 200 MB</li>
+<li>memory usage below device capacity</li>
+<li>parameter combinations that satisfy physical or safety rules</li>
+</ul>
+<p>There are two broad strategies.</p>
+<section id="penalty-based-constraints" class="level3" data-number="9.6.1">
+<h3 data-number="9.6.1" class="anchored" data-anchor-id="penalty-based-constraints"><span class="header-section-number">9.6.1</span> Penalty-Based Constraints</h3>
+<p>The simplest approach is to encode constraint violations directly in the objective value.</p>
+<div id="61c9963c" class="cell" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective(trial):</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    x <span class="op">=</span> trial.suggest_float(<span class="st">"x"</span>, <span class="op">-</span><span class="fl">5.0</span>, <span class="fl">5.0</span>)</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    y <span class="op">=</span> trial.suggest_float(<span class="st">"y"</span>, <span class="op">-</span><span class="fl">5.0</span>, <span class="fl">5.0</span>)</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    value <span class="op">=</span> x<span class="op">**</span><span class="dv">2</span> <span class="op">+</span> y<span class="op">**</span><span class="dv">2</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    violation <span class="op">=</span> <span class="bu">max</span>(<span class="fl">0.0</span>, x <span class="op">+</span> y <span class="op">-</span> <span class="fl">2.0</span>)</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> value <span class="op">+</span> <span class="fl">1000.0</span> <span class="op">*</span> violation</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>This is easy to implement, but it mixes feasibility and quality into one scalar. A large penalty may make the landscape unstable, while a small penalty may let invalid solutions survive too long.</p>
+</section>
+<section id="constraint-aware-multi-objective-search" class="level3" data-number="9.6.2">
+<h3 data-number="9.6.2" class="anchored" data-anchor-id="constraint-aware-multi-objective-search"><span class="header-section-number">9.6.2</span> Constraint-Aware Multi-Objective Search</h3>
+<p>For algorithms that support explicit constraints, it is cleaner to separate objective values from feasibility information.</p>
+<div id="d20c5ca7" class="cell" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective(trial):</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>    x <span class="op">=</span> trial.suggest_float(<span class="st">"x"</span>, <span class="op">-</span><span class="fl">5.0</span>, <span class="fl">5.0</span>)</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    y <span class="op">=</span> trial.suggest_float(<span class="st">"y"</span>, <span class="op">-</span><span class="fl">5.0</span>, <span class="fl">5.0</span>)</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>    trial.set_user_attr(<span class="st">"constraint"</span>, x <span class="op">+</span> y <span class="op">-</span> <span class="fl">2.0</span>)</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> x<span class="op">**</span><span class="dv">2</span>, y<span class="op">**</span><span class="dv">2</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> constraints_func(frozen_trial):</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (frozen_trial.user_attrs[<span class="st">"constraint"</span>],)</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>sampler <span class="op">=</span> optuna.samplers.NSGAIISampler(constraints_func<span class="op">=</span>constraints_func)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>/tmp/ipykernel_117165/2264972085.py:12: ExperimentalWarning: Argument ``constraints_func`` is an experimental feature. The interface can change in the future.
+  sampler = optuna.samplers.NSGAIISampler(constraints_func=constraints_func)</code></pre>
+</div>
+</div>
+<p>The rule is simple: negative or zero values indicate feasible solutions, while positive values indicate violations. This keeps the optimization objective readable and the constraint handling explicit.</p>
+</section>
+</section>
+<section id="when-should-you-write-a-custom-sampler" class="level2" data-number="9.7">
+<h2 data-number="9.7" class="anchored" data-anchor-id="when-should-you-write-a-custom-sampler"><span class="header-section-number">9.7</span> When Should You Write a Custom Sampler?</h2>
+<p>Most Optuna workloads should start with the built-in samplers from <a href="../modules/07-samplers.html">Samplers</a>. A custom sampler is justified only when you need search behavior that Optuna does not already implement.</p>
+<p>Typical reasons include:</p>
+<ul>
+<li>integrating a research algorithm</li>
+<li>reproducing a proprietary search strategy</li>
+<li>injecting domain heuristics</li>
+<li>combining Optuna with an external optimizer that proposes candidates</li>
+</ul>
+<p>At the API level, a custom sampler subclasses <code>BaseSampler</code> and decides how new parameter values are proposed.</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> optuna.samplers <span class="im">import</span> BaseSampler</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> MySampler(BaseSampler):</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> infer_relative_search_space(<span class="va">self</span>, study, trial):</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> sample_relative(<span class="va">self</span>, study, trial, search_space):</span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> sample_independent(<span class="va">self</span>, study, trial, param_name, param_distribution):</span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> param_distribution.to_external_repr(<span class="fl">0.5</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>In practice, writing a strong sampler is significantly harder than wiring up the class. You are taking responsibility for the exploration-exploitation policy, the statistical assumptions, and the failure modes that Optuna’s built-in samplers already handle for you.</p>
+</section>
+<section id="when-should-you-write-a-custom-pruner" class="level2" data-number="9.8">
+<h2 data-number="9.8" class="anchored" data-anchor-id="when-should-you-write-a-custom-pruner"><span class="header-section-number">9.8</span> When Should You Write a Custom Pruner?</h2>
+<p>The same caution applies to pruners. Optuna already ships with median pruning, successive halving, Hyperband, and related policies discussed in <a href="../modules/08-pruning.html">Pruning</a>. A custom pruner is worthwhile only when your stopping logic depends on domain knowledge unavailable to the built-in rules.</p>
+<p>Examples include:</p>
+<ul>
+<li>simulation pipelines with custom convergence criteria</li>
+<li>training systems with resource-aware stop rules</li>
+<li>domain-specific safety checks that should terminate invalid trials early</li>
+</ul>
+<div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> optuna.pruners <span class="im">import</span> BasePruner</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> ThresholdPruner(BasePruner):</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> prune(<span class="va">self</span>, study, trial):</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> trial.last_step <span class="kw">is</span> <span class="va">None</span>:</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> <span class="va">False</span></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>        latest_value <span class="op">=</span> trial.intermediate_values[trial.last_step]</span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> latest_value <span class="op">&gt;</span> <span class="fl">0.5</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>The engineering question is not whether you can subclass <code>BasePruner</code>, but whether the custom rule produces better resource allocation than the standard pruners with less maintenance risk.</p>
+<div class="callout callout-style-simple callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Common Mistake
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Do not treat multi-objective optimization as if it should produce one universally best trial. If you immediately collapse several objectives into a single score without a clear reason, you throw away the main benefit of the Pareto formulation and hide the trade-offs you were supposed to inspect.</p>
+</div>
+</div>
+</section>
+<section id="practical-exercise-constrained-multi-objective-optimization-with-nsga-ii" class="level2" data-number="9.9">
+<h2 data-number="9.9" class="anchored" data-anchor-id="practical-exercise-constrained-multi-objective-optimization-with-nsga-ii"><span class="header-section-number">9.9</span> Practical Exercise: Constrained Multi-Objective Optimization with NSGA-II</h2>
+<p>Extend the fast first win into a more realistic workflow.</p>
+<p>Build a study with two objectives and one explicit feasibility rule:</p>
+<p><span class="math display">\[
+g(x, y) = x + y - 1 \le 0
+\]</span></p>
+<p>Use NSGA-II to minimize:</p>
+<p><span class="math display">\[
+f_1(x, y) = (x - 1)^2 + y^2
+\]</span></p>
+<p>and</p>
+<p><span class="math display">\[
+f_2(x, y) = x^2 + (y - 1)^2
+\]</span></p>
+<p>Work through the exercise in four passes:</p>
+<ol type="1">
+<li>Reproduce the study with <code>directions=["minimize", "minimize"]</code>.</li>
+<li>Attach the constraint value to each trial with <code>trial.set_user_attr(...)</code> and pass <code>constraints_func</code> into <code>NSGAIISampler</code>.</li>
+<li>Print the feasible Pareto-optimal trials and verify that infeasible points are filtered out of the frontier.</li>
+<li>Change the constraint to <span class="math inline">\(x + y - 0.25 \le 0\)</span> and compare how the frontier shrinks.</li>
+</ol>
+<p>Questions to answer after the run:</p>
+<ul>
+<li>Which points survive after the feasible region tightens?</li>
+<li>Does the new frontier move toward one axis or remain balanced?</li>
+<li>If you were deploying under a strict latency or memory budget, which frontier point would you pick and why?</li>
+</ul>
+</section>
+<section id="recap" class="level2" data-number="9.10">
+<h2 data-number="9.10" class="anchored" data-anchor-id="recap"><span class="header-section-number">9.10</span> Recap</h2>
+<p>This chapter introduced the Optuna features that matter once optimization becomes structurally complex.</p>
+<ul>
+<li>Dynamic parameter spaces let the search space depend on earlier trial decisions.</li>
+<li>Multi-objective studies return Pareto-optimal sets rather than one scalar optimum.</li>
+<li>Constraint handling separates feasibility from pure objective quality.</li>
+<li>Custom samplers and pruners are extension points, but they shift algorithmic responsibility onto you.</li>
+</ul>
+</section>
+<section id="decision-guide" class="level2" data-number="9.11">
+<h2 data-number="9.11" class="anchored" data-anchor-id="decision-guide"><span class="header-section-number">9.11</span> Decision Guide</h2>
+<p>Use the simplest mechanism that matches the problem.</p>
+<ul>
+<li>Use dynamic spaces when the model family or pipeline structure depends on trial choices.</li>
+<li>Use multi-objective optimization when competing metrics should remain visible instead of being collapsed prematurely.</li>
+<li>Use penalty methods for quick prototypes, but prefer explicit constraint handling when feasibility is a first-class concern.</li>
+<li>Use custom samplers or pruners only when built-in Optuna components cannot express the domain logic you need.</li>
+</ul>
+<p>The next chapter turns these advanced runs into something inspectable. In <a href="../modules/10-visualization-diagnostics.html">Optuna Visualization and Diagnostics</a>, we will analyze optimization histories, parameter importance, and failure patterns so that search behavior becomes easier to interpret and improve.</p>
+
+
+<!-- -->
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+        const codeEl = trigger.previousElementSibling.cloneNode(true);
+        for (const childEl of codeEl.children) {
+          if (isCodeAnnotation(childEl)) {
+            childEl.remove();
+          }
+        }
+        return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+    const viewSource = window.document.getElementById('quarto-view-source') ||
+                       window.document.getElementById('quarto-code-tools-source');
+    if (viewSource) {
+      const sourceUrl = viewSource.getAttribute("data-quarto-source-url");
+      viewSource.addEventListener("click", function(e) {
+        if (sourceUrl) {
+          // rstudio viewer pane
+          if (/\bcapabilities=\b/.test(window.location)) {
+            window.open(sourceUrl);
+          } else {
+            window.location.href = sourceUrl;
+          }
+        } else {
+          const modal = new bootstrap.Modal(document.getElementById('quarto-embedded-source-code-modal'));
+          modal.show();
+        }
+        return false;
+      });
+    }
+    function toggleCodeHandler(show) {
+      return function(e) {
+        const detailsSrc = window.document.querySelectorAll(".cell > details > .sourceCode");
+        for (let i=0; i<detailsSrc.length; i++) {
+          const details = detailsSrc[i].parentElement;
+          if (show) {
+            details.open = true;
+          } else {
+            details.removeAttribute("open");
+          }
+        }
+        const cellCodeDivs = window.document.querySelectorAll(".cell > .sourceCode");
+        const fromCls = show ? "hidden" : "unhidden";
+        const toCls = show ? "unhidden" : "hidden";
+        for (let i=0; i<cellCodeDivs.length; i++) {
+          const codeDiv = cellCodeDivs[i];
+          if (codeDiv.classList.contains(fromCls)) {
+            codeDiv.classList.remove(fromCls);
+            codeDiv.classList.add(toCls);
+          } 
+        }
+        return false;
+      }
+    }
+    const hideAllCode = window.document.getElementById("quarto-hide-all-code");
+    if (hideAllCode) {
+      hideAllCode.addEventListener("click", toggleCodeHandler(false));
+    }
+    const showAllCode = window.document.getElementById("quarto-show-all-code");
+    if (showAllCode) {
+      showAllCode.addEventListener("click", toggleCodeHandler(true));
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+<nav class="page-navigation">
+  <div class="nav-page nav-page-previous">
+      <a href="../modules/08-pruning.html" class="pagination-link" aria-label="Pruning">
+        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text"><span class="chapter-number">8</span>&nbsp; <span class="chapter-title">Pruning</span></span>
+      </a>          
+  </div>
+  <div class="nav-page nav-page-next">
+      <a href="../modules/10-visualization-diagnostics.html" class="pagination-link" aria-label="Visualization and Diagnostics">
+        <span class="nav-page-text"><span class="chapter-number">10</span>&nbsp; <span class="chapter-title">Visualization and Diagnostics</span></span> <i class="bi bi-arrow-right-short"></i>
+      </a>
+  </div>
+</nav><div class="modal fade" id="quarto-embedded-source-code-modal" tabindex="-1" aria-labelledby="quarto-embedded-source-code-modal-label" aria-hidden="true"><div class="modal-dialog modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="quarto-embedded-source-code-modal-label">Source Code</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="">
+<div class="sourceCode" id="cb9" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="an">title:</span><span class="co"> "Advanced Optimization Techniques"</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>This chapter shows how Optuna moves beyond single-objective hyperparameter tuning into richer optimization workflows. By the end, you should be able to model dynamic search spaces, reason about Pareto-optimal trade-offs, and decide when to use constrained optimization or custom optimization components.</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a><span class="fu">## Why This Matters</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>In production systems, the best configuration is rarely the one with the highest validation score alone. You may need to balance accuracy against latency, memory footprint, energy usage, fairness constraints, or engineering limits imposed by deployment.</span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>That is where Optuna's more advanced features matter. They let you optimize over search spaces whose structure depends on runtime decisions, retain multiple equally valid trade-off solutions, and inject domain-specific search or pruning logic when the built-in algorithms are not enough.</span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a><span class="fu">## Fast First Win: A Multi-Objective Study</span></span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>The quickest way to see the difference between ordinary and advanced optimization is to optimize two conflicting objectives at once.</span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a>Here we minimize:</span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a>f_1(x) = (x - 2)^2</span>
+<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-23"><a href="#cb9-23" aria-hidden="true" tabindex="-1"></a>and</span>
+<span id="cb9-24"><a href="#cb9-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-25"><a href="#cb9-25" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb9-26"><a href="#cb9-26" aria-hidden="true" tabindex="-1"></a>f_2(x) = (x + 2)^2</span>
+<span id="cb9-27"><a href="#cb9-27" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb9-28"><a href="#cb9-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-29"><a href="#cb9-29" aria-hidden="true" tabindex="-1"></a>No single value of $x$ minimizes both objectives simultaneously, so the result is a Pareto set rather than a single best trial.</span>
+<span id="cb9-30"><a href="#cb9-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-33"><a href="#cb9-33" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb9-34"><a href="#cb9-34" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> optuna</span>
+<span id="cb9-35"><a href="#cb9-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-36"><a href="#cb9-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-37"><a href="#cb9-37" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective(trial):</span>
+<span id="cb9-38"><a href="#cb9-38" aria-hidden="true" tabindex="-1"></a>    x <span class="op">=</span> trial.suggest_float(<span class="st">"x"</span>, <span class="op">-</span><span class="fl">5.0</span>, <span class="fl">5.0</span>)</span>
+<span id="cb9-39"><a href="#cb9-39" aria-hidden="true" tabindex="-1"></a>    f1 <span class="op">=</span> (x <span class="op">-</span> <span class="fl">2.0</span>) <span class="op">**</span> <span class="dv">2</span></span>
+<span id="cb9-40"><a href="#cb9-40" aria-hidden="true" tabindex="-1"></a>    f2 <span class="op">=</span> (x <span class="op">+</span> <span class="fl">2.0</span>) <span class="op">**</span> <span class="dv">2</span></span>
+<span id="cb9-41"><a href="#cb9-41" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> f1, f2</span>
+<span id="cb9-42"><a href="#cb9-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-43"><a href="#cb9-43" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-44"><a href="#cb9-44" aria-hidden="true" tabindex="-1"></a>study <span class="op">=</span> optuna.create_study(</span>
+<span id="cb9-45"><a href="#cb9-45" aria-hidden="true" tabindex="-1"></a>    directions<span class="op">=</span>[<span class="st">"minimize"</span>, <span class="st">"minimize"</span>],</span>
+<span id="cb9-46"><a href="#cb9-46" aria-hidden="true" tabindex="-1"></a>    sampler<span class="op">=</span>optuna.samplers.NSGAIISampler(seed<span class="op">=</span><span class="dv">42</span>),</span>
+<span id="cb9-47"><a href="#cb9-47" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb9-48"><a href="#cb9-48" aria-hidden="true" tabindex="-1"></a>study.optimize(objective, n_trials<span class="op">=</span><span class="dv">80</span>)</span>
+<span id="cb9-49"><a href="#cb9-49" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-50"><a href="#cb9-50" aria-hidden="true" tabindex="-1"></a>pareto_trials <span class="op">=</span> <span class="bu">sorted</span>(study.best_trials, key<span class="op">=</span><span class="kw">lambda</span> trial: trial.params[<span class="st">"x"</span>])</span>
+<span id="cb9-51"><a href="#cb9-51" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-52"><a href="#cb9-52" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> trial <span class="kw">in</span> pareto_trials[:<span class="dv">8</span>]:</span>
+<span id="cb9-53"><a href="#cb9-53" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(</span>
+<span id="cb9-54"><a href="#cb9-54" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"x=</span><span class="sc">{</span>trial<span class="sc">.</span>params[<span class="st">'x'</span>]<span class="sc">:.3f}</span><span class="ss"> | "</span></span>
+<span id="cb9-55"><a href="#cb9-55" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"f1=</span><span class="sc">{</span>trial<span class="sc">.</span>values[<span class="dv">0</span>]<span class="sc">:.3f}</span><span class="ss"> | "</span></span>
+<span id="cb9-56"><a href="#cb9-56" aria-hidden="true" tabindex="-1"></a>        <span class="ss">f"f2=</span><span class="sc">{</span>trial<span class="sc">.</span>values[<span class="dv">1</span>]<span class="sc">:.3f}</span><span class="ss">"</span></span>
+<span id="cb9-57"><a href="#cb9-57" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb9-58"><a href="#cb9-58" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-59"><a href="#cb9-59" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Pareto-optimal trials: </span><span class="sc">{</span><span class="bu">len</span>(study.best_trials)<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb9-60"><a href="#cb9-60" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb9-61"><a href="#cb9-61" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-62"><a href="#cb9-62" aria-hidden="true" tabindex="-1"></a>The important shift is conceptual: Optuna is no longer returning one optimum. It is returning a frontier of non-dominated solutions that reflect different engineering trade-offs.</span>
+<span id="cb9-63"><a href="#cb9-63" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-64"><a href="#cb9-64" aria-hidden="true" tabindex="-1"></a><span class="fu">## When Does the Search Space Become Part of the Algorithm?</span></span>
+<span id="cb9-65"><a href="#cb9-65" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-66"><a href="#cb9-66" aria-hidden="true" tabindex="-1"></a>Earlier chapters treated the search space as something you define once and then optimize over. In practice, many workflows are conditional.</span>
+<span id="cb9-67"><a href="#cb9-67" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-68"><a href="#cb9-68" aria-hidden="true" tabindex="-1"></a>If a trial selects a linear model, you want regularization strength. If it selects a neural network, you want layers, hidden units, and dropout. The structure of the search space changes with the sampled path.</span>
+<span id="cb9-69"><a href="#cb9-69" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-70"><a href="#cb9-70" aria-hidden="true" tabindex="-1"></a>This is where Optuna's define-by-run design becomes decisive. You can express branching logic directly in the objective function.</span>
+<span id="cb9-71"><a href="#cb9-71" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-74"><a href="#cb9-74" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb9-75"><a href="#cb9-75" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective(trial):</span>
+<span id="cb9-76"><a href="#cb9-76" aria-hidden="true" tabindex="-1"></a>    model <span class="op">=</span> trial.suggest_categorical(<span class="st">"model"</span>, [<span class="st">"linear"</span>, <span class="st">"mlp"</span>])</span>
+<span id="cb9-77"><a href="#cb9-77" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-78"><a href="#cb9-78" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> model <span class="op">==</span> <span class="st">"linear"</span>:</span>
+<span id="cb9-79"><a href="#cb9-79" aria-hidden="true" tabindex="-1"></a>        alpha <span class="op">=</span> trial.suggest_float(<span class="st">"alpha"</span>, <span class="fl">1e-4</span>, <span class="fl">1.0</span>, log<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb9-80"><a href="#cb9-80" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> train_linear_model(alpha)</span>
+<span id="cb9-81"><a href="#cb9-81" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-82"><a href="#cb9-82" aria-hidden="true" tabindex="-1"></a>    n_layers <span class="op">=</span> trial.suggest_int(<span class="st">"n_layers"</span>, <span class="dv">1</span>, <span class="dv">3</span>)</span>
+<span id="cb9-83"><a href="#cb9-83" aria-hidden="true" tabindex="-1"></a>    widths <span class="op">=</span> []</span>
+<span id="cb9-84"><a href="#cb9-84" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> layer_index <span class="kw">in</span> <span class="bu">range</span>(n_layers):</span>
+<span id="cb9-85"><a href="#cb9-85" aria-hidden="true" tabindex="-1"></a>        widths.append(trial.suggest_int(<span class="ss">f"units_</span><span class="sc">{</span>layer_index<span class="sc">}</span><span class="ss">"</span>, <span class="dv">32</span>, <span class="dv">256</span>))</span>
+<span id="cb9-86"><a href="#cb9-86" aria-hidden="true" tabindex="-1"></a>    dropout <span class="op">=</span> trial.suggest_float(<span class="st">"dropout"</span>, <span class="fl">0.0</span>, <span class="fl">0.5</span>)</span>
+<span id="cb9-87"><a href="#cb9-87" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> train_mlp(widths, dropout)</span>
+<span id="cb9-88"><a href="#cb9-88" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb9-89"><a href="#cb9-89" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-90"><a href="#cb9-90" aria-hidden="true" tabindex="-1"></a>This is the natural continuation of the search-space design choices from <span class="co">[</span><span class="ot">Designing Search Spaces</span><span class="co">](06-designing-search-spaces.qmd)</span>. The difference here is emphasis: the search space is not just descriptive; it becomes an adaptive program that encodes model families and structural decisions.</span>
+<span id="cb9-91"><a href="#cb9-91" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-92"><a href="#cb9-92" aria-hidden="true" tabindex="-1"></a><span class="fu">## What Changes in Multi-Objective Optimization?</span></span>
+<span id="cb9-93"><a href="#cb9-93" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-94"><a href="#cb9-94" aria-hidden="true" tabindex="-1"></a>In single-objective optimization, we solve:</span>
+<span id="cb9-95"><a href="#cb9-95" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-96"><a href="#cb9-96" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb9-97"><a href="#cb9-97" aria-hidden="true" tabindex="-1"></a>x^* = \arg\min_{x \in \mathcal{X}} f(x)</span>
+<span id="cb9-98"><a href="#cb9-98" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb9-99"><a href="#cb9-99" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-100"><a href="#cb9-100" aria-hidden="true" tabindex="-1"></a>In multi-objective optimization, the target becomes a vector:</span>
+<span id="cb9-101"><a href="#cb9-101" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-102"><a href="#cb9-102" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb9-103"><a href="#cb9-103" aria-hidden="true" tabindex="-1"></a>\mathbf{f}(x) = \left(f_1(x), f_2(x), \ldots, f_k(x)\right)</span>
+<span id="cb9-104"><a href="#cb9-104" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb9-105"><a href="#cb9-105" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-106"><a href="#cb9-106" aria-hidden="true" tabindex="-1"></a>There is usually no total ordering over all candidates, because improving one objective often worsens another. Instead, we use dominance.</span>
+<span id="cb9-107"><a href="#cb9-107" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-108"><a href="#cb9-108" aria-hidden="true" tabindex="-1"></a>A candidate $x_a$ dominates $x_b$ if it is no worse on every objective and strictly better on at least one.</span>
+<span id="cb9-109"><a href="#cb9-109" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-110"><a href="#cb9-110" aria-hidden="true" tabindex="-1"></a>The Pareto front is the set of non-dominated solutions. In Optuna, those solutions are exposed through <span class="in">`study.best_trials`</span> for multi-objective studies.</span>
+<span id="cb9-111"><a href="#cb9-111" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-112"><a href="#cb9-112" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Configuration <span class="pp">|</span> Accuracy <span class="pp">|</span> Latency <span class="pp">|</span> Dominated? <span class="pp">|</span></span>
+<span id="cb9-113"><a href="#cb9-113" aria-hidden="true" tabindex="-1"></a><span class="pp">|---|---:|---:|---|</span></span>
+<span id="cb9-114"><a href="#cb9-114" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> A <span class="pp">|</span> 0.95 <span class="pp">|</span> 45 ms <span class="pp">|</span> No <span class="pp">|</span></span>
+<span id="cb9-115"><a href="#cb9-115" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> B <span class="pp">|</span> 0.94 <span class="pp">|</span> 18 ms <span class="pp">|</span> No <span class="pp">|</span></span>
+<span id="cb9-116"><a href="#cb9-116" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> C <span class="pp">|</span> 0.92 <span class="pp">|</span> 16 ms <span class="pp">|</span> No <span class="pp">|</span></span>
+<span id="cb9-117"><a href="#cb9-117" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> D <span class="pp">|</span> 0.93 <span class="pp">|</span> 40 ms <span class="pp">|</span> Yes <span class="pp">|</span></span>
+<span id="cb9-118"><a href="#cb9-118" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-119"><a href="#cb9-119" aria-hidden="true" tabindex="-1"></a>Configuration D is dominated because another configuration can be both more accurate and faster.</span>
+<span id="cb9-120"><a href="#cb9-120" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-123"><a href="#cb9-123" aria-hidden="true" tabindex="-1"></a><span class="in">```{mermaid}</span></span>
+<span id="cb9-124"><a href="#cb9-124" aria-hidden="true" tabindex="-1"></a>flowchart LR</span>
+<span id="cb9-125"><a href="#cb9-125" aria-hidden="true" tabindex="-1"></a>    A[Sample candidate] --&gt; B[Evaluate all objectives]</span>
+<span id="cb9-126"><a href="#cb9-126" aria-hidden="true" tabindex="-1"></a>    B --&gt; C{Dominated by current frontier?}</span>
+<span id="cb9-127"><a href="#cb9-127" aria-hidden="true" tabindex="-1"></a>    C --&gt;|Yes| D[Keep <span class="kw">for</span> history only]</span>
+<span id="cb9-128"><a href="#cb9-128" aria-hidden="true" tabindex="-1"></a>    C --&gt;|No| E[Add to Pareto front]</span>
+<span id="cb9-129"><a href="#cb9-129" aria-hidden="true" tabindex="-1"></a>    E --&gt; F[Remove newly dominated points]</span>
+<span id="cb9-130"><a href="#cb9-130" aria-hidden="true" tabindex="-1"></a>    D --&gt; G[Update sampler <span class="kw">state</span>]</span>
+<span id="cb9-131"><a href="#cb9-131" aria-hidden="true" tabindex="-1"></a>    F --&gt; G</span>
+<span id="cb9-132"><a href="#cb9-132" aria-hidden="true" tabindex="-1"></a>    G --&gt; A</span>
+<span id="cb9-133"><a href="#cb9-133" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb9-134"><a href="#cb9-134" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-135"><a href="#cb9-135" aria-hidden="true" tabindex="-1"></a>For advanced practitioners, this matters because model selection stops being a single scalar decision. The optimizer produces a set of candidates, and downstream decision-making becomes a policy question: which trade-off is operationally acceptable?</span>
+<span id="cb9-136"><a href="#cb9-136" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-137"><a href="#cb9-137" aria-hidden="true" tabindex="-1"></a><span class="fu">## How Should You Read a Pareto Front?</span></span>
+<span id="cb9-138"><a href="#cb9-138" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-139"><a href="#cb9-139" aria-hidden="true" tabindex="-1"></a>A Pareto front is useful only if you treat it as a decision surface rather than as a ranking.</span>
+<span id="cb9-140"><a href="#cb9-140" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-141"><a href="#cb9-141" aria-hidden="true" tabindex="-1"></a>Three practical interpretations are common:</span>
+<span id="cb9-142"><a href="#cb9-142" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-143"><a href="#cb9-143" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Knee-point selection: choose the point where small objective gains start costing a lot elsewhere.</span>
+<span id="cb9-144"><a href="#cb9-144" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Budget-based selection: choose the best solution under a latency, memory, or cost cap.</span>
+<span id="cb9-145"><a href="#cb9-145" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Portfolio selection: keep several frontier points for A/B tests or environment-specific deployment.</span>
+<span id="cb9-146"><a href="#cb9-146" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-147"><a href="#cb9-147" aria-hidden="true" tabindex="-1"></a>That distinction matters because the optimizer cannot decide your business trade-off for you. It can only expose the feasible frontier cleanly.</span>
+<span id="cb9-148"><a href="#cb9-148" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-149"><a href="#cb9-149" aria-hidden="true" tabindex="-1"></a><span class="fu">## How Do Constraints Enter the Search?</span></span>
+<span id="cb9-150"><a href="#cb9-150" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-151"><a href="#cb9-151" aria-hidden="true" tabindex="-1"></a>Some requirements are not preferences but hard limits. You may need:</span>
+<span id="cb9-152"><a href="#cb9-152" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-153"><a href="#cb9-153" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>latency under 20 ms</span>
+<span id="cb9-154"><a href="#cb9-154" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>model size under 200 MB</span>
+<span id="cb9-155"><a href="#cb9-155" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>memory usage below device capacity</span>
+<span id="cb9-156"><a href="#cb9-156" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>parameter combinations that satisfy physical or safety rules</span>
+<span id="cb9-157"><a href="#cb9-157" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-158"><a href="#cb9-158" aria-hidden="true" tabindex="-1"></a>There are two broad strategies.</span>
+<span id="cb9-159"><a href="#cb9-159" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-160"><a href="#cb9-160" aria-hidden="true" tabindex="-1"></a><span class="fu">### Penalty-Based Constraints</span></span>
+<span id="cb9-161"><a href="#cb9-161" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-162"><a href="#cb9-162" aria-hidden="true" tabindex="-1"></a>The simplest approach is to encode constraint violations directly in the objective value.</span>
+<span id="cb9-163"><a href="#cb9-163" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-166"><a href="#cb9-166" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb9-167"><a href="#cb9-167" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective(trial):</span>
+<span id="cb9-168"><a href="#cb9-168" aria-hidden="true" tabindex="-1"></a>    x <span class="op">=</span> trial.suggest_float(<span class="st">"x"</span>, <span class="op">-</span><span class="fl">5.0</span>, <span class="fl">5.0</span>)</span>
+<span id="cb9-169"><a href="#cb9-169" aria-hidden="true" tabindex="-1"></a>    y <span class="op">=</span> trial.suggest_float(<span class="st">"y"</span>, <span class="op">-</span><span class="fl">5.0</span>, <span class="fl">5.0</span>)</span>
+<span id="cb9-170"><a href="#cb9-170" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-171"><a href="#cb9-171" aria-hidden="true" tabindex="-1"></a>    value <span class="op">=</span> x<span class="op">**</span><span class="dv">2</span> <span class="op">+</span> y<span class="op">**</span><span class="dv">2</span></span>
+<span id="cb9-172"><a href="#cb9-172" aria-hidden="true" tabindex="-1"></a>    violation <span class="op">=</span> <span class="bu">max</span>(<span class="fl">0.0</span>, x <span class="op">+</span> y <span class="op">-</span> <span class="fl">2.0</span>)</span>
+<span id="cb9-173"><a href="#cb9-173" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-174"><a href="#cb9-174" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> value <span class="op">+</span> <span class="fl">1000.0</span> <span class="op">*</span> violation</span>
+<span id="cb9-175"><a href="#cb9-175" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb9-176"><a href="#cb9-176" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-177"><a href="#cb9-177" aria-hidden="true" tabindex="-1"></a>This is easy to implement, but it mixes feasibility and quality into one scalar. A large penalty may make the landscape unstable, while a small penalty may let invalid solutions survive too long.</span>
+<span id="cb9-178"><a href="#cb9-178" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-179"><a href="#cb9-179" aria-hidden="true" tabindex="-1"></a><span class="fu">### Constraint-Aware Multi-Objective Search</span></span>
+<span id="cb9-180"><a href="#cb9-180" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-181"><a href="#cb9-181" aria-hidden="true" tabindex="-1"></a>For algorithms that support explicit constraints, it is cleaner to separate objective values from feasibility information.</span>
+<span id="cb9-182"><a href="#cb9-182" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-185"><a href="#cb9-185" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb9-186"><a href="#cb9-186" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective(trial):</span>
+<span id="cb9-187"><a href="#cb9-187" aria-hidden="true" tabindex="-1"></a>    x <span class="op">=</span> trial.suggest_float(<span class="st">"x"</span>, <span class="op">-</span><span class="fl">5.0</span>, <span class="fl">5.0</span>)</span>
+<span id="cb9-188"><a href="#cb9-188" aria-hidden="true" tabindex="-1"></a>    y <span class="op">=</span> trial.suggest_float(<span class="st">"y"</span>, <span class="op">-</span><span class="fl">5.0</span>, <span class="fl">5.0</span>)</span>
+<span id="cb9-189"><a href="#cb9-189" aria-hidden="true" tabindex="-1"></a>    trial.set_user_attr(<span class="st">"constraint"</span>, x <span class="op">+</span> y <span class="op">-</span> <span class="fl">2.0</span>)</span>
+<span id="cb9-190"><a href="#cb9-190" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> x<span class="op">**</span><span class="dv">2</span>, y<span class="op">**</span><span class="dv">2</span></span>
+<span id="cb9-191"><a href="#cb9-191" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-192"><a href="#cb9-192" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-193"><a href="#cb9-193" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> constraints_func(frozen_trial):</span>
+<span id="cb9-194"><a href="#cb9-194" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (frozen_trial.user_attrs[<span class="st">"constraint"</span>],)</span>
+<span id="cb9-195"><a href="#cb9-195" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-196"><a href="#cb9-196" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-197"><a href="#cb9-197" aria-hidden="true" tabindex="-1"></a>sampler <span class="op">=</span> optuna.samplers.NSGAIISampler(constraints_func<span class="op">=</span>constraints_func)</span>
+<span id="cb9-198"><a href="#cb9-198" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb9-199"><a href="#cb9-199" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-200"><a href="#cb9-200" aria-hidden="true" tabindex="-1"></a>The rule is simple: negative or zero values indicate feasible solutions, while positive values indicate violations. This keeps the optimization objective readable and the constraint handling explicit.</span>
+<span id="cb9-201"><a href="#cb9-201" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-202"><a href="#cb9-202" aria-hidden="true" tabindex="-1"></a><span class="fu">## When Should You Write a Custom Sampler?</span></span>
+<span id="cb9-203"><a href="#cb9-203" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-204"><a href="#cb9-204" aria-hidden="true" tabindex="-1"></a>Most Optuna workloads should start with the built-in samplers from <span class="co">[</span><span class="ot">Samplers</span><span class="co">](07-samplers.qmd)</span>. A custom sampler is justified only when you need search behavior that Optuna does not already implement.</span>
+<span id="cb9-205"><a href="#cb9-205" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-206"><a href="#cb9-206" aria-hidden="true" tabindex="-1"></a>Typical reasons include:</span>
+<span id="cb9-207"><a href="#cb9-207" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-208"><a href="#cb9-208" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>integrating a research algorithm</span>
+<span id="cb9-209"><a href="#cb9-209" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>reproducing a proprietary search strategy</span>
+<span id="cb9-210"><a href="#cb9-210" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>injecting domain heuristics</span>
+<span id="cb9-211"><a href="#cb9-211" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>combining Optuna with an external optimizer that proposes candidates</span>
+<span id="cb9-212"><a href="#cb9-212" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-213"><a href="#cb9-213" aria-hidden="true" tabindex="-1"></a>At the API level, a custom sampler subclasses <span class="in">`BaseSampler`</span> and decides how new parameter values are proposed.</span>
+<span id="cb9-214"><a href="#cb9-214" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-215"><a href="#cb9-215" aria-hidden="true" tabindex="-1"></a><span class="in">```python</span></span>
+<span id="cb9-216"><a href="#cb9-216" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> optuna.samplers <span class="im">import</span> BaseSampler</span>
+<span id="cb9-217"><a href="#cb9-217" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-218"><a href="#cb9-218" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-219"><a href="#cb9-219" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> MySampler(BaseSampler):</span>
+<span id="cb9-220"><a href="#cb9-220" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> infer_relative_search_space(<span class="va">self</span>, study, trial):</span>
+<span id="cb9-221"><a href="#cb9-221" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}</span>
+<span id="cb9-222"><a href="#cb9-222" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-223"><a href="#cb9-223" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> sample_relative(<span class="va">self</span>, study, trial, search_space):</span>
+<span id="cb9-224"><a href="#cb9-224" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {}</span>
+<span id="cb9-225"><a href="#cb9-225" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-226"><a href="#cb9-226" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> sample_independent(<span class="va">self</span>, study, trial, param_name, param_distribution):</span>
+<span id="cb9-227"><a href="#cb9-227" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> param_distribution.to_external_repr(<span class="fl">0.5</span>)</span>
+<span id="cb9-228"><a href="#cb9-228" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb9-229"><a href="#cb9-229" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-230"><a href="#cb9-230" aria-hidden="true" tabindex="-1"></a>In practice, writing a strong sampler is significantly harder than wiring up the class. You are taking responsibility for the exploration-exploitation policy, the statistical assumptions, and the failure modes that Optuna's built-in samplers already handle for you.</span>
+<span id="cb9-231"><a href="#cb9-231" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-232"><a href="#cb9-232" aria-hidden="true" tabindex="-1"></a><span class="fu">## When Should You Write a Custom Pruner?</span></span>
+<span id="cb9-233"><a href="#cb9-233" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-234"><a href="#cb9-234" aria-hidden="true" tabindex="-1"></a>The same caution applies to pruners. Optuna already ships with median pruning, successive halving, Hyperband, and related policies discussed in <span class="co">[</span><span class="ot">Pruning</span><span class="co">](08-pruning.qmd)</span>. A custom pruner is worthwhile only when your stopping logic depends on domain knowledge unavailable to the built-in rules.</span>
+<span id="cb9-235"><a href="#cb9-235" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-236"><a href="#cb9-236" aria-hidden="true" tabindex="-1"></a>Examples include:</span>
+<span id="cb9-237"><a href="#cb9-237" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-238"><a href="#cb9-238" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>simulation pipelines with custom convergence criteria</span>
+<span id="cb9-239"><a href="#cb9-239" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>training systems with resource-aware stop rules</span>
+<span id="cb9-240"><a href="#cb9-240" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>domain-specific safety checks that should terminate invalid trials early</span>
+<span id="cb9-241"><a href="#cb9-241" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-242"><a href="#cb9-242" aria-hidden="true" tabindex="-1"></a><span class="in">```python</span></span>
+<span id="cb9-243"><a href="#cb9-243" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> optuna.pruners <span class="im">import</span> BasePruner</span>
+<span id="cb9-244"><a href="#cb9-244" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-245"><a href="#cb9-245" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-246"><a href="#cb9-246" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> ThresholdPruner(BasePruner):</span>
+<span id="cb9-247"><a href="#cb9-247" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> prune(<span class="va">self</span>, study, trial):</span>
+<span id="cb9-248"><a href="#cb9-248" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> trial.last_step <span class="kw">is</span> <span class="va">None</span>:</span>
+<span id="cb9-249"><a href="#cb9-249" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> <span class="va">False</span></span>
+<span id="cb9-250"><a href="#cb9-250" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-251"><a href="#cb9-251" aria-hidden="true" tabindex="-1"></a>        latest_value <span class="op">=</span> trial.intermediate_values[trial.last_step]</span>
+<span id="cb9-252"><a href="#cb9-252" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> latest_value <span class="op">&gt;</span> <span class="fl">0.5</span></span>
+<span id="cb9-253"><a href="#cb9-253" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb9-254"><a href="#cb9-254" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-255"><a href="#cb9-255" aria-hidden="true" tabindex="-1"></a>The engineering question is not whether you can subclass <span class="in">`BasePruner`</span>, but whether the custom rule produces better resource allocation than the standard pruners with less maintenance risk.</span>
+<span id="cb9-256"><a href="#cb9-256" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-257"><a href="#cb9-257" aria-hidden="true" tabindex="-1"></a>::: callout-warning</span>
+<span id="cb9-258"><a href="#cb9-258" aria-hidden="true" tabindex="-1"></a><span class="fu">## Common Mistake</span></span>
+<span id="cb9-259"><a href="#cb9-259" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-260"><a href="#cb9-260" aria-hidden="true" tabindex="-1"></a>Do not treat multi-objective optimization as if it should produce one universally best trial. If you immediately collapse several objectives into a single score without a clear reason, you throw away the main benefit of the Pareto formulation and hide the trade-offs you were supposed to inspect.</span>
+<span id="cb9-261"><a href="#cb9-261" aria-hidden="true" tabindex="-1"></a>:::</span>
+<span id="cb9-262"><a href="#cb9-262" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-263"><a href="#cb9-263" aria-hidden="true" tabindex="-1"></a><span class="fu">## Practical Exercise: Constrained Multi-Objective Optimization with NSGA-II</span></span>
+<span id="cb9-264"><a href="#cb9-264" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-265"><a href="#cb9-265" aria-hidden="true" tabindex="-1"></a>Extend the fast first win into a more realistic workflow.</span>
+<span id="cb9-266"><a href="#cb9-266" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-267"><a href="#cb9-267" aria-hidden="true" tabindex="-1"></a>Build a study with two objectives and one explicit feasibility rule:</span>
+<span id="cb9-268"><a href="#cb9-268" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-269"><a href="#cb9-269" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb9-270"><a href="#cb9-270" aria-hidden="true" tabindex="-1"></a>g(x, y) = x + y - 1 \le 0</span>
+<span id="cb9-271"><a href="#cb9-271" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb9-272"><a href="#cb9-272" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-273"><a href="#cb9-273" aria-hidden="true" tabindex="-1"></a>Use NSGA-II to minimize:</span>
+<span id="cb9-274"><a href="#cb9-274" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-275"><a href="#cb9-275" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb9-276"><a href="#cb9-276" aria-hidden="true" tabindex="-1"></a>f_1(x, y) = (x - 1)^2 + y^2</span>
+<span id="cb9-277"><a href="#cb9-277" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb9-278"><a href="#cb9-278" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-279"><a href="#cb9-279" aria-hidden="true" tabindex="-1"></a>and</span>
+<span id="cb9-280"><a href="#cb9-280" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-281"><a href="#cb9-281" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb9-282"><a href="#cb9-282" aria-hidden="true" tabindex="-1"></a>f_2(x, y) = x^2 + (y - 1)^2</span>
+<span id="cb9-283"><a href="#cb9-283" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb9-284"><a href="#cb9-284" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-285"><a href="#cb9-285" aria-hidden="true" tabindex="-1"></a>Work through the exercise in four passes:</span>
+<span id="cb9-286"><a href="#cb9-286" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-287"><a href="#cb9-287" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>Reproduce the study with <span class="in">`directions=["minimize", "minimize"]`</span>.</span>
+<span id="cb9-288"><a href="#cb9-288" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>Attach the constraint value to each trial with <span class="in">`trial.set_user_attr(...)`</span> and pass <span class="in">`constraints_func`</span> into <span class="in">`NSGAIISampler`</span>.</span>
+<span id="cb9-289"><a href="#cb9-289" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>Print the feasible Pareto-optimal trials and verify that infeasible points are filtered out of the frontier.</span>
+<span id="cb9-290"><a href="#cb9-290" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>Change the constraint to $x + y - 0.25 \le 0$ and compare how the frontier shrinks.</span>
+<span id="cb9-291"><a href="#cb9-291" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-292"><a href="#cb9-292" aria-hidden="true" tabindex="-1"></a>Questions to answer after the run:</span>
+<span id="cb9-293"><a href="#cb9-293" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-294"><a href="#cb9-294" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Which points survive after the feasible region tightens?</span>
+<span id="cb9-295"><a href="#cb9-295" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Does the new frontier move toward one axis or remain balanced?</span>
+<span id="cb9-296"><a href="#cb9-296" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>If you were deploying under a strict latency or memory budget, which frontier point would you pick and why?</span>
+<span id="cb9-297"><a href="#cb9-297" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-298"><a href="#cb9-298" aria-hidden="true" tabindex="-1"></a><span class="fu">## Recap</span></span>
+<span id="cb9-299"><a href="#cb9-299" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-300"><a href="#cb9-300" aria-hidden="true" tabindex="-1"></a>This chapter introduced the Optuna features that matter once optimization becomes structurally complex.</span>
+<span id="cb9-301"><a href="#cb9-301" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-302"><a href="#cb9-302" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Dynamic parameter spaces let the search space depend on earlier trial decisions.</span>
+<span id="cb9-303"><a href="#cb9-303" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Multi-objective studies return Pareto-optimal sets rather than one scalar optimum.</span>
+<span id="cb9-304"><a href="#cb9-304" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Constraint handling separates feasibility from pure objective quality.</span>
+<span id="cb9-305"><a href="#cb9-305" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Custom samplers and pruners are extension points, but they shift algorithmic responsibility onto you.</span>
+<span id="cb9-306"><a href="#cb9-306" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-307"><a href="#cb9-307" aria-hidden="true" tabindex="-1"></a><span class="fu">## Decision Guide</span></span>
+<span id="cb9-308"><a href="#cb9-308" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-309"><a href="#cb9-309" aria-hidden="true" tabindex="-1"></a>Use the simplest mechanism that matches the problem.</span>
+<span id="cb9-310"><a href="#cb9-310" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-311"><a href="#cb9-311" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Use dynamic spaces when the model family or pipeline structure depends on trial choices.</span>
+<span id="cb9-312"><a href="#cb9-312" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Use multi-objective optimization when competing metrics should remain visible instead of being collapsed prematurely.</span>
+<span id="cb9-313"><a href="#cb9-313" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Use penalty methods for quick prototypes, but prefer explicit constraint handling when feasibility is a first-class concern.</span>
+<span id="cb9-314"><a href="#cb9-314" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Use custom samplers or pruners only when built-in Optuna components cannot express the domain logic you need.</span>
+<span id="cb9-315"><a href="#cb9-315" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-316"><a href="#cb9-316" aria-hidden="true" tabindex="-1"></a>The next chapter turns these advanced runs into something inspectable. In <span class="co">[</span><span class="ot">Optuna Visualization and Diagnostics</span><span class="co">](10-visualization-diagnostics.qmd)</span>, we will analyze optimization histories, parameter importance, and failure patterns so that search behavior becomes easier to interpret and improve.</span>
+</code><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></pre></div>
+</div></div></div></div></div>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

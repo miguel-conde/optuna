@@ -1,0 +1,1594 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.7.31">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>6&nbsp; Designing Search Spaces – Optimization with Optuna: A Practical and Theoretical Guide to Modern Black-Box Optimization</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<link href="../modules/07-samplers.html" rel="next">
+<link href="../modules/05-basic-optuna-usage.html" rel="prev">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-e1a5c8363afafaef2c763b6775fbf3ca.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-84201f73209b7bbc7d36810704c07685.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script src="../site_libs/quarto-diagram/mermaid.min.js"></script>
+<script src="../site_libs/quarto-diagram/mermaid-init.js"></script>
+<link href="../site_libs/quarto-diagram/mermaid.css" rel="stylesheet">
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN") {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body class="nav-sidebar floating quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../modules/05-basic-optuna-usage.html">Part II: Core Usage</a></li><li class="breadcrumb-item"><a href="../modules/06-designing-search-spaces.html"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">Designing Search Spaces</span></a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="../">Optimization with Optuna: A Practical and Theoretical Guide to Modern Black-Box Optimization</a> 
+    </div>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Preface</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../intro.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Introduction</span></a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
+ <span class="menu-text">Part I: Foundations</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/01-foundations-modern-optimization.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">1</span>&nbsp; <span class="chapter-title">Foundations of Modern Optimization</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/02-bayesian-optimization-fundamentals.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">2</span>&nbsp; <span class="chapter-title">Bayesian Optimization Fundamentals</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/03-tpe-algorithm.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">3</span>&nbsp; <span class="chapter-title">The TPE Algorithm</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/04-optuna-architecture.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">4</span>&nbsp; <span class="chapter-title">Optuna Architecture</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true">
+ <span class="menu-text">Part II: Core Usage</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/05-basic-optuna-usage.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">5</span>&nbsp; <span class="chapter-title">Basic Optuna Usage</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/06-designing-search-spaces.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">Designing Search Spaces</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/07-samplers.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">7</span>&nbsp; <span class="chapter-title">Samplers</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/08-pruning.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">8</span>&nbsp; <span class="chapter-title">Pruning</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true">
+ <span class="menu-text">Part III: Advanced Techniques</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/09-advanced-optimization-techniques.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">9</span>&nbsp; <span class="chapter-title">Advanced Optimization Techniques</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/10-visualization-diagnostics.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">10</span>&nbsp; <span class="chapter-title">Visualization and Diagnostics</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/11-distributed-scalable-optimization.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">11</span>&nbsp; <span class="chapter-title">Distributed and Scalable Optimization</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true">
+ <span class="menu-text">Part IV: Applications</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-4" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/12-optuna-machine-learning.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">12</span>&nbsp; <span class="chapter-title">Optuna for Machine Learning</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/13-optuna-general-optimization.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">13</span>&nbsp; <span class="chapter-title">Optuna for General Optimization</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/14-production-workflows.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">14</span>&nbsp; <span class="chapter-title">Production Workflows</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/15-final-project.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">15</span>&nbsp; <span class="chapter-title">Final Project</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../summary.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Summary</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../references.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">References</span></a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true">
+ <span class="menu-text">Appendices</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-5" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../appendices/01-optuna-expert-cheat-sheet.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">A</span>&nbsp; <span class="chapter-title">Optuna Expert Cheat Sheet</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul>
+  <li><a href="#why-this-matters" id="toc-why-this-matters" class="nav-link active" data-scroll-target="#why-this-matters"><span class="header-section-number">6.1</span> Why This Matters</a></li>
+  <li><a href="#a-fast-first-win" id="toc-a-fast-first-win" class="nav-link" data-scroll-target="#a-fast-first-win"><span class="header-section-number">6.2</span> A Fast First Win</a></li>
+  <li><a href="#continuous-discrete-and-categorical-parameters" id="toc-continuous-discrete-and-categorical-parameters" class="nav-link" data-scroll-target="#continuous-discrete-and-categorical-parameters"><span class="header-section-number">6.3</span> Continuous, Discrete, and Categorical Parameters</a>
+  <ul class="collapse">
+  <li><a href="#continuous-parameters" id="toc-continuous-parameters" class="nav-link" data-scroll-target="#continuous-parameters"><span class="header-section-number">6.3.1</span> Continuous parameters</a></li>
+  <li><a href="#discrete-parameters" id="toc-discrete-parameters" class="nav-link" data-scroll-target="#discrete-parameters"><span class="header-section-number">6.3.2</span> Discrete parameters</a></li>
+  <li><a href="#categorical-parameters" id="toc-categorical-parameters" class="nav-link" data-scroll-target="#categorical-parameters"><span class="header-section-number">6.3.3</span> Categorical parameters</a></li>
+  </ul></li>
+  <li><a href="#why-log-scaled-parameters-matter" id="toc-why-log-scaled-parameters-matter" class="nav-link" data-scroll-target="#why-log-scaled-parameters-matter"><span class="header-section-number">6.4</span> Why Log-Scaled Parameters Matter</a></li>
+  <li><a href="#conditional-parameters" id="toc-conditional-parameters" class="nav-link" data-scroll-target="#conditional-parameters"><span class="header-section-number">6.5</span> Conditional Parameters</a></li>
+  <li><a href="#dynamic-search-spaces" id="toc-dynamic-search-spaces" class="nav-link" data-scroll-target="#dynamic-search-spaces"><span class="header-section-number">6.6</span> Dynamic Search Spaces</a></li>
+  <li><a href="#hierarchical-search-spaces" id="toc-hierarchical-search-spaces" class="nav-link" data-scroll-target="#hierarchical-search-spaces"><span class="header-section-number">6.7</span> Hierarchical Search Spaces</a></li>
+  <li><a href="#example-neural-architecture-search" id="toc-example-neural-architecture-search" class="nav-link" data-scroll-target="#example-neural-architecture-search"><span class="header-section-number">6.8</span> Example: Neural Architecture Search</a></li>
+  <li><a href="#example-algorithm-configuration" id="toc-example-algorithm-configuration" class="nav-link" data-scroll-target="#example-algorithm-configuration"><span class="header-section-number">6.9</span> Example: Algorithm Configuration</a></li>
+  <li><a href="#best-practices-for-search-space-design" id="toc-best-practices-for-search-space-design" class="nav-link" data-scroll-target="#best-practices-for-search-space-design"><span class="header-section-number">6.10</span> Best Practices for Search Space Design</a>
+  <ul class="collapse">
+  <li><a href="#use-log-scales-for-multiplicative-parameters" id="toc-use-log-scales-for-multiplicative-parameters" class="nav-link" data-scroll-target="#use-log-scales-for-multiplicative-parameters"><span class="header-section-number">6.10.1</span> Use log scales for multiplicative parameters</a></li>
+  <li><a href="#avoid-absurdly-large-ranges" id="toc-avoid-absurdly-large-ranges" class="nav-link" data-scroll-target="#avoid-absurdly-large-ranges"><span class="header-section-number">6.10.2</span> Avoid absurdly large ranges</a></li>
+  <li><a href="#use-domain-knowledge-aggressively" id="toc-use-domain-knowledge-aggressively" class="nav-link" data-scroll-target="#use-domain-knowledge-aggressively"><span class="header-section-number">6.10.3</span> Use domain knowledge aggressively</a></li>
+  </ul></li>
+  <li><a href="#practical-exercise-conditional-hyperparameter-optimization" id="toc-practical-exercise-conditional-hyperparameter-optimization" class="nav-link" data-scroll-target="#practical-exercise-conditional-hyperparameter-optimization"><span class="header-section-number">6.11</span> Practical Exercise: Conditional Hyperparameter Optimization</a></li>
+  <li><a href="#recap" id="toc-recap" class="nav-link" data-scroll-target="#recap"><span class="header-section-number">6.12</span> Recap</a></li>
+  <li><a href="#decision-guide" id="toc-decision-guide" class="nav-link" data-scroll-target="#decision-guide"><span class="header-section-number">6.13</span> Decision Guide</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../modules/05-basic-optuna-usage.html">Part II: Core Usage</a></li><li class="breadcrumb-item"><a href="../modules/06-designing-search-spaces.html"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">Designing Search Spaces</span></a></li></ol></nav>
+<div class="quarto-title">
+<div class="quarto-title-block"><div><h1 class="title"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">Designing Search Spaces</span></h1><button type="button" class="btn code-tools-button" id="quarto-code-tools-source"><i class="bi"></i> Code</button></div></div>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>This chapter focuses on one of the most important practical skills in optimization: designing a search space that the optimizer can explore effectively. In real Optuna workflows, a well-designed space often matters more than the choice between two strong samplers.</p>
+<p>By the end of the chapter, you should be able to distinguish continuous, discrete, categorical, conditional, dynamic, and hierarchical search spaces, and choose parameter ranges that reflect both domain knowledge and optimization efficiency.</p>
+<p>This chapter builds directly on <a href="../modules/05-basic-optuna-usage.html">Basic Optuna Usage</a> and connects back to why <a href="../modules/03-tpe-algorithm.html">The TPE Algorithm</a> works well with tree-structured spaces.</p>
+<section id="why-this-matters" class="level2" data-number="6.1">
+<h2 data-number="6.1" class="anchored" data-anchor-id="why-this-matters"><span class="header-section-number">6.1</span> Why This Matters</h2>
+<p>Suppose you are tuning a model and choose a learning-rate range from <code>1e-8</code> to <code>10</code>, a tree depth from <code>1</code> to <code>1000</code>, and several conditional parameters that are never active together. Even a strong optimizer will waste trials in irrelevant or pathological regions.</p>
+<p>Search-space design matters because the optimizer can only search the space you give it. If the space is poorly structured, the optimization loop becomes inefficient no matter how sophisticated the sampler is.</p>
+</section>
+<section id="a-fast-first-win" class="level2" data-number="6.2">
+<h2 data-number="6.2" class="anchored" data-anchor-id="a-fast-first-win"><span class="header-section-number">6.2</span> A Fast First Win</h2>
+<p>The easiest way to see search-space design in action is to compare a few parameter types inside one small Optuna objective.</p>
+<div id="43ecfd2e" class="cell" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> optuna</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>optuna.logging.set_verbosity(optuna.logging.WARNING)</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective(trial):</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    x <span class="op">=</span> trial.suggest_float(<span class="st">"x"</span>, <span class="op">-</span><span class="dv">10</span>, <span class="dv">10</span>)</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    depth <span class="op">=</span> trial.suggest_int(<span class="st">"depth"</span>, <span class="dv">2</span>, <span class="dv">8</span>)</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>    optimizer <span class="op">=</span> trial.suggest_categorical(<span class="st">"optimizer"</span>, [<span class="st">"adam"</span>, <span class="st">"sgd"</span>])</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    lr <span class="op">=</span> trial.suggest_float(<span class="st">"lr"</span>, <span class="fl">1e-5</span>, <span class="fl">1e-1</span>, log<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>    penalty <span class="op">=</span> <span class="fl">0.0</span> <span class="cf">if</span> optimizer <span class="op">==</span> <span class="st">"adam"</span> <span class="cf">else</span> <span class="fl">0.2</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (x <span class="op">-</span> <span class="dv">2</span>) <span class="op">**</span> <span class="dv">2</span> <span class="op">+</span> <span class="fl">0.01</span> <span class="op">*</span> depth <span class="op">+</span> penalty <span class="op">+</span> <span class="bu">abs</span>(lr <span class="op">-</span> <span class="fl">1e-2</span>)</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>study <span class="op">=</span> optuna.create_study(direction<span class="op">=</span><span class="st">"minimize"</span>)</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>study.optimize(objective, n_trials<span class="op">=</span><span class="dv">20</span>)</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Best params:"</span>, study.best_params)</span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Best value:"</span>, <span class="bu">round</span>(study.best_value, <span class="dv">4</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Best params: {'x': 2.0646547029516213, 'depth': 7, 'optimizer': 'adam', 'lr': 0.0005932423243772284}
+Best value: 0.0836</code></pre>
+</div>
+</div>
+<p>This example already shows the main idea of the chapter: the search space is not just a range of numbers. It is a structured description of what the optimizer is allowed to try.</p>
+</section>
+<section id="continuous-discrete-and-categorical-parameters" class="level2" data-number="6.3">
+<h2 data-number="6.3" class="anchored" data-anchor-id="continuous-discrete-and-categorical-parameters"><span class="header-section-number">6.3</span> Continuous, Discrete, and Categorical Parameters</h2>
+<p>Search spaces usually combine different parameter types.</p>
+<section id="continuous-parameters" class="level3" data-number="6.3.1">
+<h3 data-number="6.3.1" class="anchored" data-anchor-id="continuous-parameters"><span class="header-section-number">6.3.1</span> Continuous parameters</h3>
+<p>Continuous parameters represent real-valued ranges.</p>
+<p><span class="math display">\[
+x \in [-10, 10]
+\]</span></p>
+<p>In Optuna:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>x <span class="op">=</span> trial.suggest_float(<span class="st">"x"</span>, <span class="op">-</span><span class="dv">10</span>, <span class="dv">10</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>Typical continuous parameters include:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Parameter</th>
+<th>Example range</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Learning rate</td>
+<td><code>0.0001</code> to <code>0.1</code></td>
+</tr>
+<tr class="even">
+<td>Regularization</td>
+<td><code>1e-6</code> to <code>1</code></td>
+</tr>
+<tr class="odd">
+<td>Dropout</td>
+<td><code>0</code> to <code>0.5</code></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="discrete-parameters" class="level3" data-number="6.3.2">
+<h3 data-number="6.3.2" class="anchored" data-anchor-id="discrete-parameters"><span class="header-section-number">6.3.2</span> Discrete parameters</h3>
+<p>Discrete parameters often take integer values.</p>
+<p><span class="math display">\[
+depth \in \{1, 2, 3, \ldots, 10\}
+\]</span></p>
+<p>In Optuna:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>depth <span class="op">=</span> trial.suggest_int(<span class="st">"depth"</span>, <span class="dv">1</span>, <span class="dv">10</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>Examples include tree depth, numbers of layers, and neighborhood sizes.</p>
+</section>
+<section id="categorical-parameters" class="level3" data-number="6.3.3">
+<h3 data-number="6.3.3" class="anchored" data-anchor-id="categorical-parameters"><span class="header-section-number">6.3.3</span> Categorical parameters</h3>
+<p>Categorical parameters represent choices among named options.</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>model <span class="op">=</span> trial.suggest_categorical(</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>    <span class="st">"model"</span>,</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    [<span class="st">"xgboost"</span>, <span class="st">"random_forest"</span>, <span class="st">"svm"</span>],</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>These are common for model families, optimizers, activations, kernels, and preprocessing decisions.</p>
+</section>
+</section>
+<section id="why-log-scaled-parameters-matter" class="level2" data-number="6.4">
+<h2 data-number="6.4" class="anchored" data-anchor-id="why-log-scaled-parameters-matter"><span class="header-section-number">6.4</span> Why Log-Scaled Parameters Matter</h2>
+<p>Some parameters span multiple orders of magnitude. Learning rates are the canonical example.</p>
+<p>Instead of sampling uniformly over</p>
+<p><span class="math display">\[
+[10^{-5}, 10^{-1}]
+\]</span></p>
+<p>you usually want to sample in log-space:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>lr <span class="op">=</span> trial.suggest_float(<span class="st">"lr"</span>, <span class="fl">1e-5</span>, <span class="fl">1e-1</span>, log<span class="op">=</span><span class="va">True</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>This avoids oversampling the large end of the range and better reflects how such parameters behave in practice.</p>
+<p>Typical log-scaled parameters include:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Parameter</th>
+<th>Example range</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Learning rate</td>
+<td><code>1e-5</code> to <code>1e-1</code></td>
+</tr>
+<tr class="even">
+<td>Regularization</td>
+<td><code>1e-6</code> to <code>10</code></td>
+</tr>
+<tr class="odd">
+<td>Kernel width</td>
+<td><code>1e-3</code> to <code>10</code></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="conditional-parameters" class="level2" data-number="6.5">
+<h2 data-number="6.5" class="anchored" data-anchor-id="conditional-parameters"><span class="header-section-number">6.5</span> Conditional Parameters</h2>
+<p>Some parameters only make sense when another choice is active.</p>
+<p>For example, if the selected model is a random forest, you may want to optimize <code>n_trees</code> and <code>depth</code>. If the selected model is an SVM, those parameters are irrelevant, and instead you care about <code>C</code> and <code>kernel</code>.</p>
+<p>Optuna handles this naturally with define-by-run logic:</p>
+<div id="86e91e6a" class="cell" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective(trial):</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    model <span class="op">=</span> trial.suggest_categorical(<span class="st">"model"</span>, [<span class="st">"rf"</span>, <span class="st">"svm"</span>])</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> model <span class="op">==</span> <span class="st">"rf"</span>:</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>        n_trees <span class="op">=</span> trial.suggest_int(<span class="st">"n_trees"</span>, <span class="dv">50</span>, <span class="dv">200</span>)</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>        depth <span class="op">=</span> trial.suggest_int(<span class="st">"depth"</span>, <span class="dv">3</span>, <span class="dv">10</span>)</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="fl">0.001</span> <span class="op">*</span> n_trees <span class="op">+</span> <span class="fl">0.1</span> <span class="op">*</span> depth</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>    c_value <span class="op">=</span> trial.suggest_float(<span class="st">"C"</span>, <span class="fl">1e-3</span>, <span class="dv">10</span>, log<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>    kernel <span class="op">=</span> trial.suggest_categorical(<span class="st">"kernel"</span>, [<span class="st">"linear"</span>, <span class="st">"rbf"</span>])</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>    kernel_penalty <span class="op">=</span> <span class="fl">0.0</span> <span class="cf">if</span> kernel <span class="op">==</span> <span class="st">"rbf"</span> <span class="cf">else</span> <span class="fl">0.2</span></span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="bu">abs</span>(c_value <span class="op">-</span> <span class="fl">1.0</span>) <span class="op">+</span> kernel_penalty</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>This creates a conditional branch inside the search space. Structurally, that is exactly the kind of tree-shaped configuration TPE is designed to handle well.</p>
+</section>
+<section id="dynamic-search-spaces" class="level2" data-number="6.6">
+<h2 data-number="6.6" class="anchored" data-anchor-id="dynamic-search-spaces"><span class="header-section-number">6.6</span> Dynamic Search Spaces</h2>
+<p>Optuna also allows the number of active parameters to depend on earlier choices.</p>
+<p>For example:</p>
+<div id="90c0e4d3" class="cell" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective(trial):</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>    n_layers <span class="op">=</span> trial.suggest_int(<span class="st">"n_layers"</span>, <span class="dv">1</span>, <span class="dv">4</span>)</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>    total_units <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(n_layers):</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>        units <span class="op">=</span> trial.suggest_int(<span class="ss">f"units_layer_</span><span class="sc">{</span>i<span class="sc">}</span><span class="ss">"</span>, <span class="dv">32</span>, <span class="dv">256</span>)</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>        total_units <span class="op">+=</span> units</span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="bu">abs</span>(total_units <span class="op">-</span> <span class="dv">320</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Here, the dimensionality of the space changes from trial to trial because the number of active layer parameters depends on <code>n_layers</code>.</p>
+<p>This flexibility is useful for neural architecture search, pipeline configuration, and other structured optimization problems.</p>
+</section>
+<section id="hierarchical-search-spaces" class="level2" data-number="6.7">
+<h2 data-number="6.7" class="anchored" data-anchor-id="hierarchical-search-spaces"><span class="header-section-number">6.7</span> Hierarchical Search Spaces</h2>
+<p>Hierarchical spaces are multi-level search spaces where one decision activates a whole family of sub-decisions.</p>
+<div id="6b0189d2" class="cell" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective(trial):</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>    model <span class="op">=</span> trial.suggest_categorical(<span class="st">"model"</span>, [<span class="st">"xgb"</span>, <span class="st">"rf"</span>, <span class="st">"svm"</span>])</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> model <span class="op">==</span> <span class="st">"xgb"</span>:</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>        max_depth <span class="op">=</span> trial.suggest_int(<span class="st">"max_depth"</span>, <span class="dv">3</span>, <span class="dv">10</span>)</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>        eta <span class="op">=</span> trial.suggest_float(<span class="st">"eta"</span>, <span class="fl">1e-3</span>, <span class="fl">0.3</span>, log<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="fl">0.1</span> <span class="op">*</span> max_depth <span class="op">+</span> <span class="bu">abs</span>(eta <span class="op">-</span> <span class="fl">0.05</span>)</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> model <span class="op">==</span> <span class="st">"rf"</span>:</span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>        n_estimators <span class="op">=</span> trial.suggest_int(<span class="st">"n_estimators"</span>, <span class="dv">50</span>, <span class="dv">300</span>)</span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="bu">abs</span>(n_estimators <span class="op">-</span> <span class="dv">180</span>)</span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>    c_value <span class="op">=</span> trial.suggest_float(<span class="st">"C"</span>, <span class="fl">1e-3</span>, <span class="dv">10</span>, log<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="bu">abs</span>(c_value <span class="op">-</span> <span class="fl">1.5</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>This kind of hierarchy is common in AutoML workflows and whole-pipeline optimization.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">flowchart TD
+    A[Choose model] --&gt; B[XGBoost branch]
+    A --&gt; C[Random Forest branch]
+    A --&gt; D[SVM branch]
+    B --&gt; E[max_depth, eta]
+    C --&gt; F[n_estimators, depth]
+    D --&gt; G[C, kernel]
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</section>
+<section id="example-neural-architecture-search" class="level2" data-number="6.8">
+<h2 data-number="6.8" class="anchored" data-anchor-id="example-neural-architecture-search"><span class="header-section-number">6.8</span> Example: Neural Architecture Search</h2>
+<p>Optuna is often used for neural architecture search precisely because define-by-run spaces can express variable structure compactly.</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective(trial):</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>    n_layers <span class="op">=</span> trial.suggest_int(<span class="st">"n_layers"</span>, <span class="dv">1</span>, <span class="dv">4</span>)</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>    layers <span class="op">=</span> []</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(n_layers):</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>        units <span class="op">=</span> trial.suggest_int(<span class="ss">f"units_</span><span class="sc">{</span>i<span class="sc">}</span><span class="ss">"</span>, <span class="dv">32</span>, <span class="dv">256</span>)</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>        dropout <span class="op">=</span> trial.suggest_float(<span class="ss">f"dropout_</span><span class="sc">{</span>i<span class="sc">}</span><span class="ss">"</span>, <span class="fl">0.0</span>, <span class="fl">0.5</span>)</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>        layers.append((units, dropout))</span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="bu">len</span>(layers)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>Each trial can represent a different architecture, which would be cumbersome to describe in a rigid static search-space definition.</p>
+</section>
+<section id="example-algorithm-configuration" class="level2" data-number="6.9">
+<h2 data-number="6.9" class="anchored" data-anchor-id="example-algorithm-configuration"><span class="header-section-number">6.9</span> Example: Algorithm Configuration</h2>
+<p>Search spaces do not have to be about model hyperparameters only. They can also represent algorithmic design choices.</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>solver <span class="op">=</span> trial.suggest_categorical(<span class="st">"solver"</span>, [<span class="st">"gradient"</span>, <span class="st">"newton"</span>])</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> solver <span class="op">==</span> <span class="st">"gradient"</span>:</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>    lr <span class="op">=</span> trial.suggest_float(<span class="st">"lr"</span>, <span class="fl">1e-4</span>, <span class="fl">1e-1</span>, log<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a><span class="cf">else</span>:</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>    damping <span class="op">=</span> trial.suggest_float(<span class="st">"damping"</span>, <span class="fl">1e-3</span>, <span class="dv">1</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>This lets Optuna search not only over numeric hyperparameters, but over whole families of algorithm behavior.</p>
+</section>
+<section id="best-practices-for-search-space-design" class="level2" data-number="6.10">
+<h2 data-number="6.10" class="anchored" data-anchor-id="best-practices-for-search-space-design"><span class="header-section-number">6.10</span> Best Practices for Search Space Design</h2>
+<section id="use-log-scales-for-multiplicative-parameters" class="level3" data-number="6.10.1">
+<h3 data-number="6.10.1" class="anchored" data-anchor-id="use-log-scales-for-multiplicative-parameters"><span class="header-section-number">6.10.1</span> Use log scales for multiplicative parameters</h3>
+<p>Bad:</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>lr <span class="op">=</span> trial.suggest_float(<span class="st">"lr"</span>, <span class="fl">0.00001</span>, <span class="fl">0.1</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>Better:</p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>lr <span class="op">=</span> trial.suggest_float(<span class="st">"lr"</span>, <span class="fl">1e-5</span>, <span class="fl">1e-1</span>, log<span class="op">=</span><span class="va">True</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="avoid-absurdly-large-ranges" class="level3" data-number="6.10.2">
+<h3 data-number="6.10.2" class="anchored" data-anchor-id="avoid-absurdly-large-ranges"><span class="header-section-number">6.10.2</span> Avoid absurdly large ranges</h3>
+<p>Bad:</p>
+<div class="sourceCode" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>depth <span class="op">=</span> trial.suggest_int(<span class="st">"depth"</span>, <span class="dv">1</span>, <span class="dv">1000</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>Better:</p>
+<div class="sourceCode" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>depth <span class="op">=</span> trial.suggest_int(<span class="st">"depth"</span>, <span class="dv">3</span>, <span class="dv">15</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>Large unrealistic ranges waste trials and slow convergence.</p>
+</section>
+<section id="use-domain-knowledge-aggressively" class="level3" data-number="6.10.3">
+<h3 data-number="6.10.3" class="anchored" data-anchor-id="use-domain-knowledge-aggressively"><span class="header-section-number">6.10.3</span> Use domain knowledge aggressively</h3>
+<p>Good search spaces reflect:</p>
+<ul>
+<li>Theoretical constraints.</li>
+<li>Empirical experience.</li>
+<li>Practical operating limits.</li>
+</ul>
+<div class="callout callout-style-simple callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Common Mistake
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Do not treat the search space as a neutral container. It encodes assumptions about what values are plausible. A badly chosen space can make a strong sampler look weak, hide the true optimum behind useless volume, or spend most trials on configurations you would never deploy.</p>
+</div>
+</div>
+</section>
+</section>
+<section id="practical-exercise-conditional-hyperparameter-optimization" class="level2" data-number="6.11">
+<h2 data-number="6.11" class="anchored" data-anchor-id="practical-exercise-conditional-hyperparameter-optimization"><span class="header-section-number">6.11</span> Practical Exercise: Conditional Hyperparameter Optimization</h2>
+<p>As a hands-on exercise, optimize a tiny conditional problem where the study chooses between two model families.</p>
+<div id="3fbb8899" class="cell" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> math</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> optuna</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>optuna.logging.set_verbosity(optuna.logging.WARNING)</span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective(trial):</span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a>    model <span class="op">=</span> trial.suggest_categorical(<span class="st">"model"</span>, [<span class="st">"quadratic"</span>, <span class="st">"sin"</span>])</span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>    x <span class="op">=</span> trial.suggest_float(<span class="st">"x"</span>, <span class="op">-</span><span class="dv">5</span>, <span class="dv">5</span>)</span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> model <span class="op">==</span> <span class="st">"quadratic"</span>:</span>
+<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> (x <span class="op">-</span> <span class="dv">2</span>) <span class="op">**</span> <span class="dv">2</span></span>
+<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> math.sin(x) <span class="op">+</span> <span class="dv">1</span></span>
+<span id="cb16-15"><a href="#cb16-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-16"><a href="#cb16-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-17"><a href="#cb16-17" aria-hidden="true" tabindex="-1"></a>study <span class="op">=</span> optuna.create_study(direction<span class="op">=</span><span class="st">"minimize"</span>)</span>
+<span id="cb16-18"><a href="#cb16-18" aria-hidden="true" tabindex="-1"></a>study.optimize(objective, n_trials<span class="op">=</span><span class="dv">60</span>)</span>
+<span id="cb16-19"><a href="#cb16-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-20"><a href="#cb16-20" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Best parameters:"</span>, study.best_params)</span>
+<span id="cb16-21"><a href="#cb16-21" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Best value:"</span>, <span class="bu">round</span>(study.best_value, <span class="dv">4</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Best parameters: {'model': 'sin', 'x': -1.5687253960769634}
+Best value: 0.0</code></pre>
+</div>
+</div>
+<p>This example demonstrates:</p>
+<ul>
+<li>Categorical model selection.</li>
+<li>Conditional objective logic.</li>
+<li>Flexible search-space definition inside the objective.</li>
+</ul>
+<p>Try extending it by adding model-specific parameters that only apply to one branch.</p>
+</section>
+<section id="recap" class="level2" data-number="6.12">
+<h2 data-number="6.12" class="anchored" data-anchor-id="recap"><span class="header-section-number">6.12</span> Recap</h2>
+<p>Effective search spaces often include a mix of:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Feature</th>
+<th>Why it matters</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Continuous parameters</td>
+<td>Capture real-valued behavior</td>
+</tr>
+<tr class="even">
+<td>Discrete parameters</td>
+<td>Respect integer constraints</td>
+</tr>
+<tr class="odd">
+<td>Log distributions</td>
+<td>Handle multi-scale parameters</td>
+</tr>
+<tr class="even">
+<td>Conditional parameters</td>
+<td>Support structured model choices</td>
+</tr>
+<tr class="odd">
+<td>Dynamic spaces</td>
+<td>Allow variable architecture or pipeline depth</td>
+</tr>
+<tr class="even">
+<td>Hierarchical spaces</td>
+<td>Enable multi-level AutoML workflows</td>
+</tr>
+</tbody>
+</table>
+<p>The practical lesson is simple: a good search space can improve optimization more than switching between two strong optimizers.</p>
+</section>
+<section id="decision-guide" class="level2" data-number="6.13">
+<h2 data-number="6.13" class="anchored" data-anchor-id="decision-guide"><span class="header-section-number">6.13</span> Decision Guide</h2>
+<p>Use the following mental model:</p>
+<ul>
+<li>Use continuous ranges for genuinely real-valued quantities.</li>
+<li>Use integer or categorical parameters when the problem structure demands them.</li>
+<li>Use <code>log=True</code> whenever scale matters more than absolute distance.</li>
+<li>Use conditional and hierarchical branches when different model families require different parameter sets.</li>
+<li>Shrink overly broad ranges whenever domain knowledge allows it.</li>
+</ul>
+<p>Next, <a href="../modules/07-samplers.html">Samplers</a> focuses on the optimization engines that search these spaces and how their behavior differs in practice.</p>
+
+
+<!-- -->
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+        const codeEl = trigger.previousElementSibling.cloneNode(true);
+        for (const childEl of codeEl.children) {
+          if (isCodeAnnotation(childEl)) {
+            childEl.remove();
+          }
+        }
+        return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+    const viewSource = window.document.getElementById('quarto-view-source') ||
+                       window.document.getElementById('quarto-code-tools-source');
+    if (viewSource) {
+      const sourceUrl = viewSource.getAttribute("data-quarto-source-url");
+      viewSource.addEventListener("click", function(e) {
+        if (sourceUrl) {
+          // rstudio viewer pane
+          if (/\bcapabilities=\b/.test(window.location)) {
+            window.open(sourceUrl);
+          } else {
+            window.location.href = sourceUrl;
+          }
+        } else {
+          const modal = new bootstrap.Modal(document.getElementById('quarto-embedded-source-code-modal'));
+          modal.show();
+        }
+        return false;
+      });
+    }
+    function toggleCodeHandler(show) {
+      return function(e) {
+        const detailsSrc = window.document.querySelectorAll(".cell > details > .sourceCode");
+        for (let i=0; i<detailsSrc.length; i++) {
+          const details = detailsSrc[i].parentElement;
+          if (show) {
+            details.open = true;
+          } else {
+            details.removeAttribute("open");
+          }
+        }
+        const cellCodeDivs = window.document.querySelectorAll(".cell > .sourceCode");
+        const fromCls = show ? "hidden" : "unhidden";
+        const toCls = show ? "unhidden" : "hidden";
+        for (let i=0; i<cellCodeDivs.length; i++) {
+          const codeDiv = cellCodeDivs[i];
+          if (codeDiv.classList.contains(fromCls)) {
+            codeDiv.classList.remove(fromCls);
+            codeDiv.classList.add(toCls);
+          } 
+        }
+        return false;
+      }
+    }
+    const hideAllCode = window.document.getElementById("quarto-hide-all-code");
+    if (hideAllCode) {
+      hideAllCode.addEventListener("click", toggleCodeHandler(false));
+    }
+    const showAllCode = window.document.getElementById("quarto-show-all-code");
+    if (showAllCode) {
+      showAllCode.addEventListener("click", toggleCodeHandler(true));
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+<nav class="page-navigation">
+  <div class="nav-page nav-page-previous">
+      <a href="../modules/05-basic-optuna-usage.html" class="pagination-link" aria-label="Basic Optuna Usage">
+        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text"><span class="chapter-number">5</span>&nbsp; <span class="chapter-title">Basic Optuna Usage</span></span>
+      </a>          
+  </div>
+  <div class="nav-page nav-page-next">
+      <a href="../modules/07-samplers.html" class="pagination-link" aria-label="Samplers">
+        <span class="nav-page-text"><span class="chapter-number">7</span>&nbsp; <span class="chapter-title">Samplers</span></span> <i class="bi bi-arrow-right-short"></i>
+      </a>
+  </div>
+</nav><div class="modal fade" id="quarto-embedded-source-code-modal" tabindex="-1" aria-labelledby="quarto-embedded-source-code-modal-label" aria-hidden="true"><div class="modal-dialog modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="quarto-embedded-source-code-modal-label">Source Code</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="">
+<div class="sourceCode" id="cb18" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a><span class="an">title:</span><span class="co"> "Designing Search Spaces"</span></span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>This chapter focuses on one of the most important practical skills in optimization: designing a search space that the optimizer can explore effectively. In real Optuna workflows, a well-designed space often matters more than the choice between two strong samplers.</span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a>By the end of the chapter, you should be able to distinguish continuous, discrete, categorical, conditional, dynamic, and hierarchical search spaces, and choose parameter ranges that reflect both domain knowledge and optimization efficiency.</span>
+<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a>This chapter builds directly on <span class="co">[</span><span class="ot">Basic Optuna Usage</span><span class="co">](05-basic-optuna-usage.qmd)</span> and connects back to why <span class="co">[</span><span class="ot">The TPE Algorithm</span><span class="co">](03-tpe-algorithm.qmd)</span> works well with tree-structured spaces.</span>
+<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-11"><a href="#cb18-11" aria-hidden="true" tabindex="-1"></a><span class="fu">## Why This Matters</span></span>
+<span id="cb18-12"><a href="#cb18-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-13"><a href="#cb18-13" aria-hidden="true" tabindex="-1"></a>Suppose you are tuning a model and choose a learning-rate range from <span class="in">`1e-8`</span> to <span class="in">`10`</span>, a tree depth from <span class="in">`1`</span> to <span class="in">`1000`</span>, and several conditional parameters that are never active together. Even a strong optimizer will waste trials in irrelevant or pathological regions.</span>
+<span id="cb18-14"><a href="#cb18-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-15"><a href="#cb18-15" aria-hidden="true" tabindex="-1"></a>Search-space design matters because the optimizer can only search the space you give it. If the space is poorly structured, the optimization loop becomes inefficient no matter how sophisticated the sampler is.</span>
+<span id="cb18-16"><a href="#cb18-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-17"><a href="#cb18-17" aria-hidden="true" tabindex="-1"></a><span class="fu">## A Fast First Win</span></span>
+<span id="cb18-18"><a href="#cb18-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-19"><a href="#cb18-19" aria-hidden="true" tabindex="-1"></a>The easiest way to see search-space design in action is to compare a few parameter types inside one small Optuna objective.</span>
+<span id="cb18-20"><a href="#cb18-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-23"><a href="#cb18-23" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb18-24"><a href="#cb18-24" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> optuna</span>
+<span id="cb18-25"><a href="#cb18-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-26"><a href="#cb18-26" aria-hidden="true" tabindex="-1"></a>optuna.logging.set_verbosity(optuna.logging.WARNING)</span>
+<span id="cb18-27"><a href="#cb18-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-28"><a href="#cb18-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-29"><a href="#cb18-29" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective(trial):</span>
+<span id="cb18-30"><a href="#cb18-30" aria-hidden="true" tabindex="-1"></a>    x <span class="op">=</span> trial.suggest_float(<span class="st">"x"</span>, <span class="op">-</span><span class="dv">10</span>, <span class="dv">10</span>)</span>
+<span id="cb18-31"><a href="#cb18-31" aria-hidden="true" tabindex="-1"></a>    depth <span class="op">=</span> trial.suggest_int(<span class="st">"depth"</span>, <span class="dv">2</span>, <span class="dv">8</span>)</span>
+<span id="cb18-32"><a href="#cb18-32" aria-hidden="true" tabindex="-1"></a>    optimizer <span class="op">=</span> trial.suggest_categorical(<span class="st">"optimizer"</span>, [<span class="st">"adam"</span>, <span class="st">"sgd"</span>])</span>
+<span id="cb18-33"><a href="#cb18-33" aria-hidden="true" tabindex="-1"></a>    lr <span class="op">=</span> trial.suggest_float(<span class="st">"lr"</span>, <span class="fl">1e-5</span>, <span class="fl">1e-1</span>, log<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb18-34"><a href="#cb18-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-35"><a href="#cb18-35" aria-hidden="true" tabindex="-1"></a>    penalty <span class="op">=</span> <span class="fl">0.0</span> <span class="cf">if</span> optimizer <span class="op">==</span> <span class="st">"adam"</span> <span class="cf">else</span> <span class="fl">0.2</span></span>
+<span id="cb18-36"><a href="#cb18-36" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (x <span class="op">-</span> <span class="dv">2</span>) <span class="op">**</span> <span class="dv">2</span> <span class="op">+</span> <span class="fl">0.01</span> <span class="op">*</span> depth <span class="op">+</span> penalty <span class="op">+</span> <span class="bu">abs</span>(lr <span class="op">-</span> <span class="fl">1e-2</span>)</span>
+<span id="cb18-37"><a href="#cb18-37" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-38"><a href="#cb18-38" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-39"><a href="#cb18-39" aria-hidden="true" tabindex="-1"></a>study <span class="op">=</span> optuna.create_study(direction<span class="op">=</span><span class="st">"minimize"</span>)</span>
+<span id="cb18-40"><a href="#cb18-40" aria-hidden="true" tabindex="-1"></a>study.optimize(objective, n_trials<span class="op">=</span><span class="dv">20</span>)</span>
+<span id="cb18-41"><a href="#cb18-41" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-42"><a href="#cb18-42" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Best params:"</span>, study.best_params)</span>
+<span id="cb18-43"><a href="#cb18-43" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Best value:"</span>, <span class="bu">round</span>(study.best_value, <span class="dv">4</span>))</span>
+<span id="cb18-44"><a href="#cb18-44" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb18-45"><a href="#cb18-45" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-46"><a href="#cb18-46" aria-hidden="true" tabindex="-1"></a>This example already shows the main idea of the chapter: the search space is not just a range of numbers. It is a structured description of what the optimizer is allowed to try.</span>
+<span id="cb18-47"><a href="#cb18-47" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-48"><a href="#cb18-48" aria-hidden="true" tabindex="-1"></a><span class="fu">## Continuous, Discrete, and Categorical Parameters</span></span>
+<span id="cb18-49"><a href="#cb18-49" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-50"><a href="#cb18-50" aria-hidden="true" tabindex="-1"></a>Search spaces usually combine different parameter types.</span>
+<span id="cb18-51"><a href="#cb18-51" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-52"><a href="#cb18-52" aria-hidden="true" tabindex="-1"></a><span class="fu">### Continuous parameters</span></span>
+<span id="cb18-53"><a href="#cb18-53" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-54"><a href="#cb18-54" aria-hidden="true" tabindex="-1"></a>Continuous parameters represent real-valued ranges.</span>
+<span id="cb18-55"><a href="#cb18-55" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-56"><a href="#cb18-56" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb18-57"><a href="#cb18-57" aria-hidden="true" tabindex="-1"></a>x \in <span class="co">[</span><span class="ot">-10, 10</span><span class="co">]</span></span>
+<span id="cb18-58"><a href="#cb18-58" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb18-59"><a href="#cb18-59" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-60"><a href="#cb18-60" aria-hidden="true" tabindex="-1"></a>In Optuna:</span>
+<span id="cb18-61"><a href="#cb18-61" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-62"><a href="#cb18-62" aria-hidden="true" tabindex="-1"></a><span class="in">```python</span></span>
+<span id="cb18-63"><a href="#cb18-63" aria-hidden="true" tabindex="-1"></a>x <span class="op">=</span> trial.suggest_float(<span class="st">"x"</span>, <span class="op">-</span><span class="dv">10</span>, <span class="dv">10</span>)</span>
+<span id="cb18-64"><a href="#cb18-64" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb18-65"><a href="#cb18-65" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-66"><a href="#cb18-66" aria-hidden="true" tabindex="-1"></a>Typical continuous parameters include:</span>
+<span id="cb18-67"><a href="#cb18-67" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-68"><a href="#cb18-68" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Parameter <span class="pp">|</span> Example range <span class="pp">|</span></span>
+<span id="cb18-69"><a href="#cb18-69" aria-hidden="true" tabindex="-1"></a><span class="pp">| ---</span> <span class="pp">| ---</span> <span class="pp">|</span></span>
+<span id="cb18-70"><a href="#cb18-70" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Learning rate <span class="pp">|</span> <span class="in">`0.0001`</span> to <span class="in">`0.1`</span> <span class="pp">|</span></span>
+<span id="cb18-71"><a href="#cb18-71" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Regularization <span class="pp">|</span> <span class="in">`1e-6`</span> to <span class="in">`1`</span> <span class="pp">|</span></span>
+<span id="cb18-72"><a href="#cb18-72" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Dropout <span class="pp">|</span> <span class="in">`0`</span> to <span class="in">`0.5`</span> <span class="pp">|</span></span>
+<span id="cb18-73"><a href="#cb18-73" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-74"><a href="#cb18-74" aria-hidden="true" tabindex="-1"></a><span class="fu">### Discrete parameters</span></span>
+<span id="cb18-75"><a href="#cb18-75" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-76"><a href="#cb18-76" aria-hidden="true" tabindex="-1"></a>Discrete parameters often take integer values.</span>
+<span id="cb18-77"><a href="#cb18-77" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-78"><a href="#cb18-78" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb18-79"><a href="#cb18-79" aria-hidden="true" tabindex="-1"></a>depth \in <span class="sc">\{</span>1, 2, 3, \ldots, 10<span class="sc">\}</span></span>
+<span id="cb18-80"><a href="#cb18-80" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb18-81"><a href="#cb18-81" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-82"><a href="#cb18-82" aria-hidden="true" tabindex="-1"></a>In Optuna:</span>
+<span id="cb18-83"><a href="#cb18-83" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-84"><a href="#cb18-84" aria-hidden="true" tabindex="-1"></a><span class="in">```python</span></span>
+<span id="cb18-85"><a href="#cb18-85" aria-hidden="true" tabindex="-1"></a>depth <span class="op">=</span> trial.suggest_int(<span class="st">"depth"</span>, <span class="dv">1</span>, <span class="dv">10</span>)</span>
+<span id="cb18-86"><a href="#cb18-86" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb18-87"><a href="#cb18-87" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-88"><a href="#cb18-88" aria-hidden="true" tabindex="-1"></a>Examples include tree depth, numbers of layers, and neighborhood sizes.</span>
+<span id="cb18-89"><a href="#cb18-89" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-90"><a href="#cb18-90" aria-hidden="true" tabindex="-1"></a><span class="fu">### Categorical parameters</span></span>
+<span id="cb18-91"><a href="#cb18-91" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-92"><a href="#cb18-92" aria-hidden="true" tabindex="-1"></a>Categorical parameters represent choices among named options.</span>
+<span id="cb18-93"><a href="#cb18-93" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-94"><a href="#cb18-94" aria-hidden="true" tabindex="-1"></a><span class="in">```python</span></span>
+<span id="cb18-95"><a href="#cb18-95" aria-hidden="true" tabindex="-1"></a>model <span class="op">=</span> trial.suggest_categorical(</span>
+<span id="cb18-96"><a href="#cb18-96" aria-hidden="true" tabindex="-1"></a>    <span class="st">"model"</span>,</span>
+<span id="cb18-97"><a href="#cb18-97" aria-hidden="true" tabindex="-1"></a>    [<span class="st">"xgboost"</span>, <span class="st">"random_forest"</span>, <span class="st">"svm"</span>],</span>
+<span id="cb18-98"><a href="#cb18-98" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb18-99"><a href="#cb18-99" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb18-100"><a href="#cb18-100" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-101"><a href="#cb18-101" aria-hidden="true" tabindex="-1"></a>These are common for model families, optimizers, activations, kernels, and preprocessing decisions.</span>
+<span id="cb18-102"><a href="#cb18-102" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-103"><a href="#cb18-103" aria-hidden="true" tabindex="-1"></a><span class="fu">## Why Log-Scaled Parameters Matter</span></span>
+<span id="cb18-104"><a href="#cb18-104" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-105"><a href="#cb18-105" aria-hidden="true" tabindex="-1"></a>Some parameters span multiple orders of magnitude. Learning rates are the canonical example.</span>
+<span id="cb18-106"><a href="#cb18-106" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-107"><a href="#cb18-107" aria-hidden="true" tabindex="-1"></a>Instead of sampling uniformly over</span>
+<span id="cb18-108"><a href="#cb18-108" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-109"><a href="#cb18-109" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb18-110"><a href="#cb18-110" aria-hidden="true" tabindex="-1"></a><span class="co">[</span><span class="ot">10^{-5}, 10^{-1}</span><span class="co">]</span></span>
+<span id="cb18-111"><a href="#cb18-111" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb18-112"><a href="#cb18-112" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-113"><a href="#cb18-113" aria-hidden="true" tabindex="-1"></a>you usually want to sample in log-space:</span>
+<span id="cb18-114"><a href="#cb18-114" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-115"><a href="#cb18-115" aria-hidden="true" tabindex="-1"></a><span class="in">```python</span></span>
+<span id="cb18-116"><a href="#cb18-116" aria-hidden="true" tabindex="-1"></a>lr <span class="op">=</span> trial.suggest_float(<span class="st">"lr"</span>, <span class="fl">1e-5</span>, <span class="fl">1e-1</span>, log<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb18-117"><a href="#cb18-117" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb18-118"><a href="#cb18-118" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-119"><a href="#cb18-119" aria-hidden="true" tabindex="-1"></a>This avoids oversampling the large end of the range and better reflects how such parameters behave in practice.</span>
+<span id="cb18-120"><a href="#cb18-120" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-121"><a href="#cb18-121" aria-hidden="true" tabindex="-1"></a>Typical log-scaled parameters include:</span>
+<span id="cb18-122"><a href="#cb18-122" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-123"><a href="#cb18-123" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Parameter <span class="pp">|</span> Example range <span class="pp">|</span></span>
+<span id="cb18-124"><a href="#cb18-124" aria-hidden="true" tabindex="-1"></a><span class="pp">| ---</span> <span class="pp">| ---</span> <span class="pp">|</span></span>
+<span id="cb18-125"><a href="#cb18-125" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Learning rate <span class="pp">|</span> <span class="in">`1e-5`</span> to <span class="in">`1e-1`</span> <span class="pp">|</span></span>
+<span id="cb18-126"><a href="#cb18-126" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Regularization <span class="pp">|</span> <span class="in">`1e-6`</span> to <span class="in">`10`</span> <span class="pp">|</span></span>
+<span id="cb18-127"><a href="#cb18-127" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Kernel width <span class="pp">|</span> <span class="in">`1e-3`</span> to <span class="in">`10`</span> <span class="pp">|</span></span>
+<span id="cb18-128"><a href="#cb18-128" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-129"><a href="#cb18-129" aria-hidden="true" tabindex="-1"></a><span class="fu">## Conditional Parameters</span></span>
+<span id="cb18-130"><a href="#cb18-130" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-131"><a href="#cb18-131" aria-hidden="true" tabindex="-1"></a>Some parameters only make sense when another choice is active.</span>
+<span id="cb18-132"><a href="#cb18-132" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-133"><a href="#cb18-133" aria-hidden="true" tabindex="-1"></a>For example, if the selected model is a random forest, you may want to optimize <span class="in">`n_trees`</span> and <span class="in">`depth`</span>. If the selected model is an SVM, those parameters are irrelevant, and instead you care about <span class="in">`C`</span> and <span class="in">`kernel`</span>.</span>
+<span id="cb18-134"><a href="#cb18-134" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-135"><a href="#cb18-135" aria-hidden="true" tabindex="-1"></a>Optuna handles this naturally with define-by-run logic:</span>
+<span id="cb18-136"><a href="#cb18-136" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-139"><a href="#cb18-139" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb18-140"><a href="#cb18-140" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective(trial):</span>
+<span id="cb18-141"><a href="#cb18-141" aria-hidden="true" tabindex="-1"></a>    model <span class="op">=</span> trial.suggest_categorical(<span class="st">"model"</span>, [<span class="st">"rf"</span>, <span class="st">"svm"</span>])</span>
+<span id="cb18-142"><a href="#cb18-142" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-143"><a href="#cb18-143" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> model <span class="op">==</span> <span class="st">"rf"</span>:</span>
+<span id="cb18-144"><a href="#cb18-144" aria-hidden="true" tabindex="-1"></a>        n_trees <span class="op">=</span> trial.suggest_int(<span class="st">"n_trees"</span>, <span class="dv">50</span>, <span class="dv">200</span>)</span>
+<span id="cb18-145"><a href="#cb18-145" aria-hidden="true" tabindex="-1"></a>        depth <span class="op">=</span> trial.suggest_int(<span class="st">"depth"</span>, <span class="dv">3</span>, <span class="dv">10</span>)</span>
+<span id="cb18-146"><a href="#cb18-146" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="fl">0.001</span> <span class="op">*</span> n_trees <span class="op">+</span> <span class="fl">0.1</span> <span class="op">*</span> depth</span>
+<span id="cb18-147"><a href="#cb18-147" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-148"><a href="#cb18-148" aria-hidden="true" tabindex="-1"></a>    c_value <span class="op">=</span> trial.suggest_float(<span class="st">"C"</span>, <span class="fl">1e-3</span>, <span class="dv">10</span>, log<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb18-149"><a href="#cb18-149" aria-hidden="true" tabindex="-1"></a>    kernel <span class="op">=</span> trial.suggest_categorical(<span class="st">"kernel"</span>, [<span class="st">"linear"</span>, <span class="st">"rbf"</span>])</span>
+<span id="cb18-150"><a href="#cb18-150" aria-hidden="true" tabindex="-1"></a>    kernel_penalty <span class="op">=</span> <span class="fl">0.0</span> <span class="cf">if</span> kernel <span class="op">==</span> <span class="st">"rbf"</span> <span class="cf">else</span> <span class="fl">0.2</span></span>
+<span id="cb18-151"><a href="#cb18-151" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="bu">abs</span>(c_value <span class="op">-</span> <span class="fl">1.0</span>) <span class="op">+</span> kernel_penalty</span>
+<span id="cb18-152"><a href="#cb18-152" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb18-153"><a href="#cb18-153" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-154"><a href="#cb18-154" aria-hidden="true" tabindex="-1"></a>This creates a conditional branch inside the search space. Structurally, that is exactly the kind of tree-shaped configuration TPE is designed to handle well.</span>
+<span id="cb18-155"><a href="#cb18-155" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-156"><a href="#cb18-156" aria-hidden="true" tabindex="-1"></a><span class="fu">## Dynamic Search Spaces</span></span>
+<span id="cb18-157"><a href="#cb18-157" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-158"><a href="#cb18-158" aria-hidden="true" tabindex="-1"></a>Optuna also allows the number of active parameters to depend on earlier choices.</span>
+<span id="cb18-159"><a href="#cb18-159" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-160"><a href="#cb18-160" aria-hidden="true" tabindex="-1"></a>For example:</span>
+<span id="cb18-161"><a href="#cb18-161" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-164"><a href="#cb18-164" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb18-165"><a href="#cb18-165" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective(trial):</span>
+<span id="cb18-166"><a href="#cb18-166" aria-hidden="true" tabindex="-1"></a>    n_layers <span class="op">=</span> trial.suggest_int(<span class="st">"n_layers"</span>, <span class="dv">1</span>, <span class="dv">4</span>)</span>
+<span id="cb18-167"><a href="#cb18-167" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-168"><a href="#cb18-168" aria-hidden="true" tabindex="-1"></a>    total_units <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb18-169"><a href="#cb18-169" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(n_layers):</span>
+<span id="cb18-170"><a href="#cb18-170" aria-hidden="true" tabindex="-1"></a>        units <span class="op">=</span> trial.suggest_int(<span class="ss">f"units_layer_</span><span class="sc">{</span>i<span class="sc">}</span><span class="ss">"</span>, <span class="dv">32</span>, <span class="dv">256</span>)</span>
+<span id="cb18-171"><a href="#cb18-171" aria-hidden="true" tabindex="-1"></a>        total_units <span class="op">+=</span> units</span>
+<span id="cb18-172"><a href="#cb18-172" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-173"><a href="#cb18-173" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="bu">abs</span>(total_units <span class="op">-</span> <span class="dv">320</span>)</span>
+<span id="cb18-174"><a href="#cb18-174" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb18-175"><a href="#cb18-175" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-176"><a href="#cb18-176" aria-hidden="true" tabindex="-1"></a>Here, the dimensionality of the space changes from trial to trial because the number of active layer parameters depends on <span class="in">`n_layers`</span>.</span>
+<span id="cb18-177"><a href="#cb18-177" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-178"><a href="#cb18-178" aria-hidden="true" tabindex="-1"></a>This flexibility is useful for neural architecture search, pipeline configuration, and other structured optimization problems.</span>
+<span id="cb18-179"><a href="#cb18-179" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-180"><a href="#cb18-180" aria-hidden="true" tabindex="-1"></a><span class="fu">## Hierarchical Search Spaces</span></span>
+<span id="cb18-181"><a href="#cb18-181" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-182"><a href="#cb18-182" aria-hidden="true" tabindex="-1"></a>Hierarchical spaces are multi-level search spaces where one decision activates a whole family of sub-decisions.</span>
+<span id="cb18-183"><a href="#cb18-183" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-186"><a href="#cb18-186" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb18-187"><a href="#cb18-187" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective(trial):</span>
+<span id="cb18-188"><a href="#cb18-188" aria-hidden="true" tabindex="-1"></a>    model <span class="op">=</span> trial.suggest_categorical(<span class="st">"model"</span>, [<span class="st">"xgb"</span>, <span class="st">"rf"</span>, <span class="st">"svm"</span>])</span>
+<span id="cb18-189"><a href="#cb18-189" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-190"><a href="#cb18-190" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> model <span class="op">==</span> <span class="st">"xgb"</span>:</span>
+<span id="cb18-191"><a href="#cb18-191" aria-hidden="true" tabindex="-1"></a>        max_depth <span class="op">=</span> trial.suggest_int(<span class="st">"max_depth"</span>, <span class="dv">3</span>, <span class="dv">10</span>)</span>
+<span id="cb18-192"><a href="#cb18-192" aria-hidden="true" tabindex="-1"></a>        eta <span class="op">=</span> trial.suggest_float(<span class="st">"eta"</span>, <span class="fl">1e-3</span>, <span class="fl">0.3</span>, log<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb18-193"><a href="#cb18-193" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="fl">0.1</span> <span class="op">*</span> max_depth <span class="op">+</span> <span class="bu">abs</span>(eta <span class="op">-</span> <span class="fl">0.05</span>)</span>
+<span id="cb18-194"><a href="#cb18-194" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-195"><a href="#cb18-195" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> model <span class="op">==</span> <span class="st">"rf"</span>:</span>
+<span id="cb18-196"><a href="#cb18-196" aria-hidden="true" tabindex="-1"></a>        n_estimators <span class="op">=</span> trial.suggest_int(<span class="st">"n_estimators"</span>, <span class="dv">50</span>, <span class="dv">300</span>)</span>
+<span id="cb18-197"><a href="#cb18-197" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="bu">abs</span>(n_estimators <span class="op">-</span> <span class="dv">180</span>)</span>
+<span id="cb18-198"><a href="#cb18-198" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-199"><a href="#cb18-199" aria-hidden="true" tabindex="-1"></a>    c_value <span class="op">=</span> trial.suggest_float(<span class="st">"C"</span>, <span class="fl">1e-3</span>, <span class="dv">10</span>, log<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb18-200"><a href="#cb18-200" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="bu">abs</span>(c_value <span class="op">-</span> <span class="fl">1.5</span>)</span>
+<span id="cb18-201"><a href="#cb18-201" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb18-202"><a href="#cb18-202" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-203"><a href="#cb18-203" aria-hidden="true" tabindex="-1"></a>This kind of hierarchy is common in AutoML workflows and whole-pipeline optimization.</span>
+<span id="cb18-204"><a href="#cb18-204" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-207"><a href="#cb18-207" aria-hidden="true" tabindex="-1"></a><span class="in">```{mermaid}</span></span>
+<span id="cb18-208"><a href="#cb18-208" aria-hidden="true" tabindex="-1"></a>flowchart TD</span>
+<span id="cb18-209"><a href="#cb18-209" aria-hidden="true" tabindex="-1"></a>    A[Choose model] --&gt; B[XGBoost branch]</span>
+<span id="cb18-210"><a href="#cb18-210" aria-hidden="true" tabindex="-1"></a>    A --&gt; C[Random Forest branch]</span>
+<span id="cb18-211"><a href="#cb18-211" aria-hidden="true" tabindex="-1"></a>    A --&gt; D[SVM branch]</span>
+<span id="cb18-212"><a href="#cb18-212" aria-hidden="true" tabindex="-1"></a>    B --&gt; E[max_depth, eta]</span>
+<span id="cb18-213"><a href="#cb18-213" aria-hidden="true" tabindex="-1"></a>    C --&gt; F[n_estimators, depth]</span>
+<span id="cb18-214"><a href="#cb18-214" aria-hidden="true" tabindex="-1"></a>    D --&gt; G[C, kernel]</span>
+<span id="cb18-215"><a href="#cb18-215" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb18-216"><a href="#cb18-216" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-217"><a href="#cb18-217" aria-hidden="true" tabindex="-1"></a><span class="fu">## Example: Neural Architecture Search</span></span>
+<span id="cb18-218"><a href="#cb18-218" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-219"><a href="#cb18-219" aria-hidden="true" tabindex="-1"></a>Optuna is often used for neural architecture search precisely because define-by-run spaces can express variable structure compactly.</span>
+<span id="cb18-220"><a href="#cb18-220" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-221"><a href="#cb18-221" aria-hidden="true" tabindex="-1"></a><span class="in">```python</span></span>
+<span id="cb18-222"><a href="#cb18-222" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective(trial):</span>
+<span id="cb18-223"><a href="#cb18-223" aria-hidden="true" tabindex="-1"></a>    n_layers <span class="op">=</span> trial.suggest_int(<span class="st">"n_layers"</span>, <span class="dv">1</span>, <span class="dv">4</span>)</span>
+<span id="cb18-224"><a href="#cb18-224" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-225"><a href="#cb18-225" aria-hidden="true" tabindex="-1"></a>    layers <span class="op">=</span> []</span>
+<span id="cb18-226"><a href="#cb18-226" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(n_layers):</span>
+<span id="cb18-227"><a href="#cb18-227" aria-hidden="true" tabindex="-1"></a>        units <span class="op">=</span> trial.suggest_int(<span class="ss">f"units_</span><span class="sc">{</span>i<span class="sc">}</span><span class="ss">"</span>, <span class="dv">32</span>, <span class="dv">256</span>)</span>
+<span id="cb18-228"><a href="#cb18-228" aria-hidden="true" tabindex="-1"></a>        dropout <span class="op">=</span> trial.suggest_float(<span class="ss">f"dropout_</span><span class="sc">{</span>i<span class="sc">}</span><span class="ss">"</span>, <span class="fl">0.0</span>, <span class="fl">0.5</span>)</span>
+<span id="cb18-229"><a href="#cb18-229" aria-hidden="true" tabindex="-1"></a>        layers.append((units, dropout))</span>
+<span id="cb18-230"><a href="#cb18-230" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-231"><a href="#cb18-231" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="bu">len</span>(layers)</span>
+<span id="cb18-232"><a href="#cb18-232" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb18-233"><a href="#cb18-233" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-234"><a href="#cb18-234" aria-hidden="true" tabindex="-1"></a>Each trial can represent a different architecture, which would be cumbersome to describe in a rigid static search-space definition.</span>
+<span id="cb18-235"><a href="#cb18-235" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-236"><a href="#cb18-236" aria-hidden="true" tabindex="-1"></a><span class="fu">## Example: Algorithm Configuration</span></span>
+<span id="cb18-237"><a href="#cb18-237" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-238"><a href="#cb18-238" aria-hidden="true" tabindex="-1"></a>Search spaces do not have to be about model hyperparameters only. They can also represent algorithmic design choices.</span>
+<span id="cb18-239"><a href="#cb18-239" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-240"><a href="#cb18-240" aria-hidden="true" tabindex="-1"></a><span class="in">```python</span></span>
+<span id="cb18-241"><a href="#cb18-241" aria-hidden="true" tabindex="-1"></a>solver <span class="op">=</span> trial.suggest_categorical(<span class="st">"solver"</span>, [<span class="st">"gradient"</span>, <span class="st">"newton"</span>])</span>
+<span id="cb18-242"><a href="#cb18-242" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-243"><a href="#cb18-243" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> solver <span class="op">==</span> <span class="st">"gradient"</span>:</span>
+<span id="cb18-244"><a href="#cb18-244" aria-hidden="true" tabindex="-1"></a>    lr <span class="op">=</span> trial.suggest_float(<span class="st">"lr"</span>, <span class="fl">1e-4</span>, <span class="fl">1e-1</span>, log<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb18-245"><a href="#cb18-245" aria-hidden="true" tabindex="-1"></a><span class="cf">else</span>:</span>
+<span id="cb18-246"><a href="#cb18-246" aria-hidden="true" tabindex="-1"></a>    damping <span class="op">=</span> trial.suggest_float(<span class="st">"damping"</span>, <span class="fl">1e-3</span>, <span class="dv">1</span>)</span>
+<span id="cb18-247"><a href="#cb18-247" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb18-248"><a href="#cb18-248" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-249"><a href="#cb18-249" aria-hidden="true" tabindex="-1"></a>This lets Optuna search not only over numeric hyperparameters, but over whole families of algorithm behavior.</span>
+<span id="cb18-250"><a href="#cb18-250" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-251"><a href="#cb18-251" aria-hidden="true" tabindex="-1"></a><span class="fu">## Best Practices for Search Space Design</span></span>
+<span id="cb18-252"><a href="#cb18-252" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-253"><a href="#cb18-253" aria-hidden="true" tabindex="-1"></a><span class="fu">### Use log scales for multiplicative parameters</span></span>
+<span id="cb18-254"><a href="#cb18-254" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-255"><a href="#cb18-255" aria-hidden="true" tabindex="-1"></a>Bad:</span>
+<span id="cb18-256"><a href="#cb18-256" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-257"><a href="#cb18-257" aria-hidden="true" tabindex="-1"></a><span class="in">```python</span></span>
+<span id="cb18-258"><a href="#cb18-258" aria-hidden="true" tabindex="-1"></a>lr <span class="op">=</span> trial.suggest_float(<span class="st">"lr"</span>, <span class="fl">0.00001</span>, <span class="fl">0.1</span>)</span>
+<span id="cb18-259"><a href="#cb18-259" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb18-260"><a href="#cb18-260" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-261"><a href="#cb18-261" aria-hidden="true" tabindex="-1"></a>Better:</span>
+<span id="cb18-262"><a href="#cb18-262" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-263"><a href="#cb18-263" aria-hidden="true" tabindex="-1"></a><span class="in">```python</span></span>
+<span id="cb18-264"><a href="#cb18-264" aria-hidden="true" tabindex="-1"></a>lr <span class="op">=</span> trial.suggest_float(<span class="st">"lr"</span>, <span class="fl">1e-5</span>, <span class="fl">1e-1</span>, log<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb18-265"><a href="#cb18-265" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb18-266"><a href="#cb18-266" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-267"><a href="#cb18-267" aria-hidden="true" tabindex="-1"></a><span class="fu">### Avoid absurdly large ranges</span></span>
+<span id="cb18-268"><a href="#cb18-268" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-269"><a href="#cb18-269" aria-hidden="true" tabindex="-1"></a>Bad:</span>
+<span id="cb18-270"><a href="#cb18-270" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-271"><a href="#cb18-271" aria-hidden="true" tabindex="-1"></a><span class="in">```python</span></span>
+<span id="cb18-272"><a href="#cb18-272" aria-hidden="true" tabindex="-1"></a>depth <span class="op">=</span> trial.suggest_int(<span class="st">"depth"</span>, <span class="dv">1</span>, <span class="dv">1000</span>)</span>
+<span id="cb18-273"><a href="#cb18-273" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb18-274"><a href="#cb18-274" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-275"><a href="#cb18-275" aria-hidden="true" tabindex="-1"></a>Better:</span>
+<span id="cb18-276"><a href="#cb18-276" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-277"><a href="#cb18-277" aria-hidden="true" tabindex="-1"></a><span class="in">```python</span></span>
+<span id="cb18-278"><a href="#cb18-278" aria-hidden="true" tabindex="-1"></a>depth <span class="op">=</span> trial.suggest_int(<span class="st">"depth"</span>, <span class="dv">3</span>, <span class="dv">15</span>)</span>
+<span id="cb18-279"><a href="#cb18-279" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb18-280"><a href="#cb18-280" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-281"><a href="#cb18-281" aria-hidden="true" tabindex="-1"></a>Large unrealistic ranges waste trials and slow convergence.</span>
+<span id="cb18-282"><a href="#cb18-282" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-283"><a href="#cb18-283" aria-hidden="true" tabindex="-1"></a><span class="fu">### Use domain knowledge aggressively</span></span>
+<span id="cb18-284"><a href="#cb18-284" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-285"><a href="#cb18-285" aria-hidden="true" tabindex="-1"></a>Good search spaces reflect:</span>
+<span id="cb18-286"><a href="#cb18-286" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-287"><a href="#cb18-287" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Theoretical constraints.</span>
+<span id="cb18-288"><a href="#cb18-288" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Empirical experience.</span>
+<span id="cb18-289"><a href="#cb18-289" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Practical operating limits.</span>
+<span id="cb18-290"><a href="#cb18-290" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-291"><a href="#cb18-291" aria-hidden="true" tabindex="-1"></a>::: {.callout-warning}</span>
+<span id="cb18-292"><a href="#cb18-292" aria-hidden="true" tabindex="-1"></a><span class="fu">## Common Mistake</span></span>
+<span id="cb18-293"><a href="#cb18-293" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-294"><a href="#cb18-294" aria-hidden="true" tabindex="-1"></a>Do not treat the search space as a neutral container. It encodes assumptions about what values are plausible. A badly chosen space can make a strong sampler look weak, hide the true optimum behind useless volume, or spend most trials on configurations you would never deploy.</span>
+<span id="cb18-295"><a href="#cb18-295" aria-hidden="true" tabindex="-1"></a>:::</span>
+<span id="cb18-296"><a href="#cb18-296" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-297"><a href="#cb18-297" aria-hidden="true" tabindex="-1"></a><span class="fu">## Practical Exercise: Conditional Hyperparameter Optimization</span></span>
+<span id="cb18-298"><a href="#cb18-298" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-299"><a href="#cb18-299" aria-hidden="true" tabindex="-1"></a>As a hands-on exercise, optimize a tiny conditional problem where the study chooses between two model families.</span>
+<span id="cb18-300"><a href="#cb18-300" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-303"><a href="#cb18-303" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb18-304"><a href="#cb18-304" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> math</span>
+<span id="cb18-305"><a href="#cb18-305" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> optuna</span>
+<span id="cb18-306"><a href="#cb18-306" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-307"><a href="#cb18-307" aria-hidden="true" tabindex="-1"></a>optuna.logging.set_verbosity(optuna.logging.WARNING)</span>
+<span id="cb18-308"><a href="#cb18-308" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-309"><a href="#cb18-309" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-310"><a href="#cb18-310" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective(trial):</span>
+<span id="cb18-311"><a href="#cb18-311" aria-hidden="true" tabindex="-1"></a>    model <span class="op">=</span> trial.suggest_categorical(<span class="st">"model"</span>, [<span class="st">"quadratic"</span>, <span class="st">"sin"</span>])</span>
+<span id="cb18-312"><a href="#cb18-312" aria-hidden="true" tabindex="-1"></a>    x <span class="op">=</span> trial.suggest_float(<span class="st">"x"</span>, <span class="op">-</span><span class="dv">5</span>, <span class="dv">5</span>)</span>
+<span id="cb18-313"><a href="#cb18-313" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-314"><a href="#cb18-314" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> model <span class="op">==</span> <span class="st">"quadratic"</span>:</span>
+<span id="cb18-315"><a href="#cb18-315" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> (x <span class="op">-</span> <span class="dv">2</span>) <span class="op">**</span> <span class="dv">2</span></span>
+<span id="cb18-316"><a href="#cb18-316" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-317"><a href="#cb18-317" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> math.sin(x) <span class="op">+</span> <span class="dv">1</span></span>
+<span id="cb18-318"><a href="#cb18-318" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-319"><a href="#cb18-319" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-320"><a href="#cb18-320" aria-hidden="true" tabindex="-1"></a>study <span class="op">=</span> optuna.create_study(direction<span class="op">=</span><span class="st">"minimize"</span>)</span>
+<span id="cb18-321"><a href="#cb18-321" aria-hidden="true" tabindex="-1"></a>study.optimize(objective, n_trials<span class="op">=</span><span class="dv">60</span>)</span>
+<span id="cb18-322"><a href="#cb18-322" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-323"><a href="#cb18-323" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Best parameters:"</span>, study.best_params)</span>
+<span id="cb18-324"><a href="#cb18-324" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Best value:"</span>, <span class="bu">round</span>(study.best_value, <span class="dv">4</span>))</span>
+<span id="cb18-325"><a href="#cb18-325" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb18-326"><a href="#cb18-326" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-327"><a href="#cb18-327" aria-hidden="true" tabindex="-1"></a>This example demonstrates:</span>
+<span id="cb18-328"><a href="#cb18-328" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-329"><a href="#cb18-329" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Categorical model selection.</span>
+<span id="cb18-330"><a href="#cb18-330" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Conditional objective logic.</span>
+<span id="cb18-331"><a href="#cb18-331" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Flexible search-space definition inside the objective.</span>
+<span id="cb18-332"><a href="#cb18-332" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-333"><a href="#cb18-333" aria-hidden="true" tabindex="-1"></a>Try extending it by adding model-specific parameters that only apply to one branch.</span>
+<span id="cb18-334"><a href="#cb18-334" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-335"><a href="#cb18-335" aria-hidden="true" tabindex="-1"></a><span class="fu">## Recap</span></span>
+<span id="cb18-336"><a href="#cb18-336" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-337"><a href="#cb18-337" aria-hidden="true" tabindex="-1"></a>Effective search spaces often include a mix of:</span>
+<span id="cb18-338"><a href="#cb18-338" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-339"><a href="#cb18-339" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Feature <span class="pp">|</span> Why it matters <span class="pp">|</span></span>
+<span id="cb18-340"><a href="#cb18-340" aria-hidden="true" tabindex="-1"></a><span class="pp">| ---</span> <span class="pp">| ---</span> <span class="pp">|</span></span>
+<span id="cb18-341"><a href="#cb18-341" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Continuous parameters <span class="pp">|</span> Capture real-valued behavior <span class="pp">|</span></span>
+<span id="cb18-342"><a href="#cb18-342" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Discrete parameters <span class="pp">|</span> Respect integer constraints <span class="pp">|</span></span>
+<span id="cb18-343"><a href="#cb18-343" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Log distributions <span class="pp">|</span> Handle multi-scale parameters <span class="pp">|</span></span>
+<span id="cb18-344"><a href="#cb18-344" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Conditional parameters <span class="pp">|</span> Support structured model choices <span class="pp">|</span></span>
+<span id="cb18-345"><a href="#cb18-345" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Dynamic spaces <span class="pp">|</span> Allow variable architecture or pipeline depth <span class="pp">|</span></span>
+<span id="cb18-346"><a href="#cb18-346" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Hierarchical spaces <span class="pp">|</span> Enable multi-level AutoML workflows <span class="pp">|</span></span>
+<span id="cb18-347"><a href="#cb18-347" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-348"><a href="#cb18-348" aria-hidden="true" tabindex="-1"></a>The practical lesson is simple: a good search space can improve optimization more than switching between two strong optimizers.</span>
+<span id="cb18-349"><a href="#cb18-349" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-350"><a href="#cb18-350" aria-hidden="true" tabindex="-1"></a><span class="fu">## Decision Guide</span></span>
+<span id="cb18-351"><a href="#cb18-351" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-352"><a href="#cb18-352" aria-hidden="true" tabindex="-1"></a>Use the following mental model:</span>
+<span id="cb18-353"><a href="#cb18-353" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-354"><a href="#cb18-354" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Use continuous ranges for genuinely real-valued quantities.</span>
+<span id="cb18-355"><a href="#cb18-355" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Use integer or categorical parameters when the problem structure demands them.</span>
+<span id="cb18-356"><a href="#cb18-356" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Use <span class="in">`log=True`</span> whenever scale matters more than absolute distance.</span>
+<span id="cb18-357"><a href="#cb18-357" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Use conditional and hierarchical branches when different model families require different parameter sets.</span>
+<span id="cb18-358"><a href="#cb18-358" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Shrink overly broad ranges whenever domain knowledge allows it.</span>
+<span id="cb18-359"><a href="#cb18-359" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-360"><a href="#cb18-360" aria-hidden="true" tabindex="-1"></a>Next, <span class="co">[</span><span class="ot">Samplers</span><span class="co">](07-samplers.qmd)</span> focuses on the optimization engines that search these spaces and how their behavior differs in practice.</span>
+</code><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></pre></div>
+</div></div></div></div></div>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

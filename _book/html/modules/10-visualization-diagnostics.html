@@ -1,0 +1,1674 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.7.31">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>10&nbsp; Visualization and Diagnostics – Optimization with Optuna: A Practical and Theoretical Guide to Modern Black-Box Optimization</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<link href="../modules/11-distributed-scalable-optimization.html" rel="next">
+<link href="../modules/09-advanced-optimization-techniques.html" rel="prev">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-e1a5c8363afafaef2c763b6775fbf3ca.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-84201f73209b7bbc7d36810704c07685.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script src="../site_libs/quarto-diagram/mermaid.min.js"></script>
+<script src="../site_libs/quarto-diagram/mermaid-init.js"></script>
+<link href="../site_libs/quarto-diagram/mermaid.css" rel="stylesheet">
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN") {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body class="nav-sidebar floating quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../modules/09-advanced-optimization-techniques.html">Part III: Advanced Techniques</a></li><li class="breadcrumb-item"><a href="../modules/10-visualization-diagnostics.html"><span class="chapter-number">10</span>&nbsp; <span class="chapter-title">Visualization and Diagnostics</span></a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="../">Optimization with Optuna: A Practical and Theoretical Guide to Modern Black-Box Optimization</a> 
+    </div>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Preface</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../intro.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Introduction</span></a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
+ <span class="menu-text">Part I: Foundations</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/01-foundations-modern-optimization.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">1</span>&nbsp; <span class="chapter-title">Foundations of Modern Optimization</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/02-bayesian-optimization-fundamentals.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">2</span>&nbsp; <span class="chapter-title">Bayesian Optimization Fundamentals</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/03-tpe-algorithm.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">3</span>&nbsp; <span class="chapter-title">The TPE Algorithm</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/04-optuna-architecture.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">4</span>&nbsp; <span class="chapter-title">Optuna Architecture</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true">
+ <span class="menu-text">Part II: Core Usage</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/05-basic-optuna-usage.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">5</span>&nbsp; <span class="chapter-title">Basic Optuna Usage</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/06-designing-search-spaces.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">Designing Search Spaces</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/07-samplers.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">7</span>&nbsp; <span class="chapter-title">Samplers</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/08-pruning.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">8</span>&nbsp; <span class="chapter-title">Pruning</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true">
+ <span class="menu-text">Part III: Advanced Techniques</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/09-advanced-optimization-techniques.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">9</span>&nbsp; <span class="chapter-title">Advanced Optimization Techniques</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/10-visualization-diagnostics.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text"><span class="chapter-number">10</span>&nbsp; <span class="chapter-title">Visualization and Diagnostics</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/11-distributed-scalable-optimization.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">11</span>&nbsp; <span class="chapter-title">Distributed and Scalable Optimization</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true">
+ <span class="menu-text">Part IV: Applications</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-4" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/12-optuna-machine-learning.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">12</span>&nbsp; <span class="chapter-title">Optuna for Machine Learning</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/13-optuna-general-optimization.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">13</span>&nbsp; <span class="chapter-title">Optuna for General Optimization</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/14-production-workflows.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">14</span>&nbsp; <span class="chapter-title">Production Workflows</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/15-final-project.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">15</span>&nbsp; <span class="chapter-title">Final Project</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../summary.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Summary</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../references.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">References</span></a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true">
+ <span class="menu-text">Appendices</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-5" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../appendices/01-optuna-expert-cheat-sheet.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">A</span>&nbsp; <span class="chapter-title">Optuna Expert Cheat Sheet</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul>
+  <li><a href="#why-this-matters" id="toc-why-this-matters" class="nav-link active" data-scroll-target="#why-this-matters"><span class="header-section-number">10.1</span> Why This Matters</a></li>
+  <li><a href="#fast-first-win-build-a-study-worth-diagnosing" id="toc-fast-first-win-build-a-study-worth-diagnosing" class="nav-link" data-scroll-target="#fast-first-win-build-a-study-worth-diagnosing"><span class="header-section-number">10.2</span> Fast First Win: Build a Study Worth Diagnosing</a></li>
+  <li><a href="#which-tools-does-optuna-provide" id="toc-which-tools-does-optuna-provide" class="nav-link" data-scroll-target="#which-tools-does-optuna-provide"><span class="header-section-number">10.3</span> Which Tools Does Optuna Provide?</a></li>
+  <li><a href="#how-should-you-read-optimization-history" id="toc-how-should-you-read-optimization-history" class="nav-link" data-scroll-target="#how-should-you-read-optimization-history"><span class="header-section-number">10.4</span> How Should You Read Optimization History?</a></li>
+  <li><a href="#what-does-parameter-importance-actually-mean" id="toc-what-does-parameter-importance-actually-mean" class="nav-link" data-scroll-target="#what-does-parameter-importance-actually-mean"><span class="header-section-number">10.5</span> What Does Parameter Importance Actually Mean?</a></li>
+  <li><a href="#how-do-slice-plots-expose-useful-structure" id="toc-how-do-slice-plots-expose-useful-structure" class="nav-link" data-scroll-target="#how-do-slice-plots-expose-useful-structure"><span class="header-section-number">10.6</span> How Do Slice Plots Expose Useful Structure?</a></li>
+  <li><a href="#when-do-parallel-coordinates-help-more-than-slices" id="toc-when-do-parallel-coordinates-help-more-than-slices" class="nav-link" data-scroll-target="#when-do-parallel-coordinates-help-more-than-slices"><span class="header-section-number">10.7</span> When Do Parallel Coordinates Help More Than Slices?</a></li>
+  <li><a href="#what-do-contour-plots-add" id="toc-what-do-contour-plots-add" class="nav-link" data-scroll-target="#what-do-contour-plots-add"><span class="header-section-number">10.8</span> What Do Contour Plots Add?</a></li>
+  <li><a href="#how-do-visuals-reveal-a-bad-search-space" id="toc-how-do-visuals-reveal-a-bad-search-space" class="nav-link" data-scroll-target="#how-do-visuals-reveal-a-bad-search-space"><span class="header-section-number">10.9</span> How Do Visuals Reveal a Bad Search Space?</a></li>
+  <li><a href="#how-do-you-diagnose-parameter-interactions" id="toc-how-do-you-diagnose-parameter-interactions" class="nav-link" data-scroll-target="#how-do-you-diagnose-parameter-interactions"><span class="header-section-number">10.10</span> How Do You Diagnose Parameter Interactions?</a></li>
+  <li><a href="#when-is-the-dashboard-worth-using" id="toc-when-is-the-dashboard-worth-using" class="nav-link" data-scroll-target="#when-is-the-dashboard-worth-using"><span class="header-section-number">10.11</span> When Is the Dashboard Worth Using?</a></li>
+  <li><a href="#practical-exercise-diagnose-a-weak-study-and-repair-it" id="toc-practical-exercise-diagnose-a-weak-study-and-repair-it" class="nav-link" data-scroll-target="#practical-exercise-diagnose-a-weak-study-and-repair-it"><span class="header-section-number">10.12</span> Practical Exercise: Diagnose a Weak Study and Repair It</a></li>
+  <li><a href="#recap" id="toc-recap" class="nav-link" data-scroll-target="#recap"><span class="header-section-number">10.13</span> Recap</a></li>
+  <li><a href="#decision-guide" id="toc-decision-guide" class="nav-link" data-scroll-target="#decision-guide"><span class="header-section-number">10.14</span> Decision Guide</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../modules/09-advanced-optimization-techniques.html">Part III: Advanced Techniques</a></li><li class="breadcrumb-item"><a href="../modules/10-visualization-diagnostics.html"><span class="chapter-number">10</span>&nbsp; <span class="chapter-title">Visualization and Diagnostics</span></a></li></ol></nav>
+<div class="quarto-title">
+<div class="quarto-title-block"><div><h1 class="title"><span class="chapter-number">10</span>&nbsp; <span class="chapter-title">Visualization and Diagnostics</span></h1><button type="button" class="btn code-tools-button" id="quarto-code-tools-source"><i class="bi"></i> Code</button></div></div>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>This chapter is about reading an optimization process rather than merely running one. By the end, you should be able to use Optuna’s visualization tools to diagnose convergence, identify influential parameters, detect bad search-space design, and decide when a study needs redesign rather than more trials.</p>
+<section id="why-this-matters" class="level2" data-number="10.1">
+<h2 data-number="10.1" class="anchored" data-anchor-id="why-this-matters"><span class="header-section-number">10.1</span> Why This Matters</h2>
+<p>An optimizer can fail quietly. A study may appear to run correctly while wasting budget on irrelevant parameters, spending trials in the wrong scale, or bouncing around a noisy objective with little real progress.</p>
+<p>That is why diagnostics matter. Once you can inspect optimization history, parameter importance, and interactions, you stop treating hyperparameter tuning as a black box and start treating it as an iterative engineering process.</p>
+</section>
+<section id="fast-first-win-build-a-study-worth-diagnosing" class="level2" data-number="10.2">
+<h2 data-number="10.2" class="anchored" data-anchor-id="fast-first-win-build-a-study-worth-diagnosing"><span class="header-section-number">10.2</span> Fast First Win: Build a Study Worth Diagnosing</h2>
+<p>To make the diagnostic tools meaningful, start with a study that is deliberately imperfect: a noisy objective with a search range that is wider than necessary.</p>
+<div id="6d98e6d7" class="cell" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> random</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> optuna</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective(trial):</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    x <span class="op">=</span> trial.suggest_float(<span class="st">"x"</span>, <span class="op">-</span><span class="fl">100.0</span>, <span class="fl">100.0</span>)</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    y <span class="op">=</span> trial.suggest_float(<span class="st">"y"</span>, <span class="op">-</span><span class="fl">100.0</span>, <span class="fl">100.0</span>)</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    signal <span class="op">=</span> (x <span class="op">-</span> <span class="fl">3.0</span>) <span class="op">**</span> <span class="dv">2</span> <span class="op">+</span> (y <span class="op">+</span> <span class="fl">2.0</span>) <span class="op">**</span> <span class="dv">2</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>    noise <span class="op">=</span> random.gauss(<span class="fl">0.0</span>, <span class="fl">1.0</span>)</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> signal <span class="op">+</span> noise</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>sampler <span class="op">=</span> optuna.samplers.TPESampler(seed<span class="op">=</span><span class="dv">42</span>)</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>study <span class="op">=</span> optuna.create_study(direction<span class="op">=</span><span class="st">"minimize"</span>, sampler<span class="op">=</span>sampler)</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>study.optimize(objective, n_trials<span class="op">=</span><span class="dv">120</span>)</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>best_so_far <span class="op">=</span> []</span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>incumbent <span class="op">=</span> <span class="bu">float</span>(<span class="st">"inf"</span>)</span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> trial <span class="kw">in</span> study.trials:</span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> trial.value <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>        incumbent <span class="op">=</span> <span class="bu">min</span>(incumbent, trial.value)</span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a>        best_so_far.append(<span class="bu">round</span>(incumbent, <span class="dv">3</span>))</span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Best value:"</span>, <span class="bu">round</span>(study.best_value, <span class="dv">3</span>))</span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Best params:"</span>, study.best_params)</span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"First 10 incumbent values:"</span>, best_so_far[:<span class="dv">10</span>])</span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Last 10 incumbent values:"</span>, best_so_far[<span class="op">-</span><span class="dv">10</span>:])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<div class="ansi-escaped-output">
+<pre><span class="ansi-green-fg">[I 2026-03-15 08:33:45,478]</span> A new study created in memory with name: no-name-2f9bde0c-cb34-4f2c-af4a-a2c6d88f8b66
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,486]</span> Trial 0 finished with value: 9279.65999678322 and parameters: {'x': -25.091976230527507, 'y': 90.14286128198324}. Best is trial 0 with value: 9279.65999678322.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,490]</span> Trial 1 finished with value: 2356.6309351506134 and parameters: {'x': 46.39878836228101, 'y': 19.73169683940732}. Best is trial 1 with value: 2356.6309351506134.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,493]</span> Trial 2 finished with value: 9616.941948319933 and parameters: {'x': -68.79627191151269, 'y': -68.80109593275947}. Best is trial 1 with value: 2356.6309351506134.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,497]</span> Trial 3 finished with value: 14011.81280992941 and parameters: {'x': -88.3832775663601, 'y': 73.23522915498702}. Best is trial 1 with value: 2356.6309351506134.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,501]</span> Trial 4 finished with value: 2197.1356506165853 and parameters: {'x': 20.223002348641756, 'y': 41.61451555920911}. Best is trial 4 with value: 2197.1356506165853.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,504]</span> Trial 5 finished with value: 18990.509436686225 and parameters: {'x': -95.88310114083951, 'y': 93.98197043239887}. Best is trial 4 with value: 2197.1356506165853.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,508]</span> Trial 6 finished with value: 7114.653427144853 and parameters: {'x': 66.48852816008434, 'y': -57.53217786434477}. Best is trial 4 with value: 2197.1356506165853.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,511]</span> Trial 7 finished with value: 8201.773980542468 and parameters: {'x': -63.635006558579875, 'y': -63.31909802931324}. Best is trial 4 with value: 2197.1356506165853.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,514]</span> Trial 8 finished with value: 1824.732003001564 and parameters: {'x': -39.15155140809246, 'y': 4.951286326447573}. Best is trial 8 with value: 1824.732003001564.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,517]</span> Trial 9 finished with value: 1855.7309077931714 and parameters: {'x': -13.610996271576852, 'y': -41.754171960391616}. Best is trial 8 with value: 1824.732003001564.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,535]</span> Trial 10 finished with value: 2050.9134980831996 and parameters: {'x': -37.730933037090374, 'y': -21.812229765233297}. Best is trial 8 with value: 1824.732003001564.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,549]</span> Trial 11 finished with value: 196.55220586715708 and parameters: {'x': -0.5282051788649612, 'y': -15.539445764820265}. Best is trial 11 with value: 196.55220586715708.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,561]</span> Trial 12 finished with value: 223.30492626625198 and parameters: {'x': 17.848967498245987, 'y': -3.9718681190738465}. Best is trial 11 with value: 196.55220586715708.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,582]</span> Trial 13 finished with value: 731.1375577034809 and parameters: {'x': 21.69249596522358, 'y': -21.50942157947351}. Best is trial 11 with value: 196.55220586715708.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,595]</span> Trial 14 finished with value: 16557.51545821417 and parameters: {'x': 89.39237527802987, 'y': -97.36465350733195}. Best is trial 11 with value: 196.55220586715708.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,606]</span> Trial 15 finished with value: 1790.424207241122 and parameters: {'x': 11.57401450551163, 'y': 39.43117966801888}. Best is trial 11 with value: 196.55220586715708.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,616]</span> Trial 16 finished with value: 1969.2808519802768 and parameters: {'x': 45.961020241447414, 'y': -13.128745648717757}. Best is trial 11 with value: 196.55220586715708.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,625]</span> Trial 17 finished with value: 715.2930077895862 and parameters: {'x': -3.6207340673340713, 'y': 23.906788626719827}. Best is trial 11 with value: 196.55220586715708.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,638]</span> Trial 18 finished with value: 1226.7259962610776 and parameters: {'x': 37.97808466993836, 'y': -0.514190551196386}. Best is trial 11 with value: 196.55220586715708.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,651]</span> Trial 19 finished with value: 6044.817837373616 and parameters: {'x': 70.16733998359211, 'y': -41.14389016099272}. Best is trial 11 with value: 196.55220586715708.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,661]</span> Trial 20 finished with value: 3622.154744886794 and parameters: {'x': 4.5645726281781265, 'y': 58.167159644255726}. Best is trial 11 with value: 196.55220586715708.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,672]</span> Trial 21 finished with value: 803.6540634252171 and parameters: {'x': -12.062541536291377, 'y': 22.01968448840592}. Best is trial 11 with value: 196.55220586715708.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,680]</span> Trial 22 finished with value: 858.3888938194617 and parameters: {'x': 28.928736945920292, 'y': 11.600149515002263}. Best is trial 11 with value: 196.55220586715708.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,690]</span> Trial 23 finished with value: 1397.8578526775707 and parameters: {'x': -3.7423014067954883, 'y': 34.77282978810045}. Best is trial 11 with value: 196.55220586715708.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,698]</span> Trial 24 finished with value: 1067.7600655444605 and parameters: {'x': -29.007476642770555, 'y': -8.53691200768159}. Best is trial 11 with value: 196.55220586715708.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,708]</span> Trial 25 finished with value: 3954.6686760183516 and parameters: {'x': -49.31354040723863, 'y': -36.89154992328092}. Best is trial 11 with value: 196.55220586715708.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,714]</span> Trial 26 finished with value: 911.1810514669005 and parameters: {'x': 4.1294474991662815, 'y': 28.154183554389803}. Best is trial 11 with value: 196.55220586715708.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,723]</span> Trial 27 finished with value: 3155.2786667435757 and parameters: {'x': -12.502018607673076, 'y': 51.98849593864922}. Best is trial 11 with value: 196.55220586715708.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,729]</span> Trial 28 finished with value: 4361.268814317292 and parameters: {'x': 64.32281368179663, 'y': -26.51088323979853}. Best is trial 11 with value: 196.55220586715708.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,737]</span> Trial 29 finished with value: 6737.618105378472 and parameters: {'x': -22.8040949903026, 'y': 75.92278534530243}. Best is trial 11 with value: 196.55220586715708.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,744]</span> Trial 30 finished with value: 257.95129761521525 and parameters: {'x': 10.968233078691274, 'y': 11.976022960167395}. Best is trial 11 with value: 196.55220586715708.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,750]</span> Trial 31 finished with value: 316.51290681125425 and parameters: {'x': 14.181883115840044, 'y': 11.832066054521292}. Best is trial 11 with value: 196.55220586715708.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,757]</span> Trial 32 finished with value: 1080.7596978740066 and parameters: {'x': 35.0776123822412, 'y': 5.191958048267699}. Best is trial 11 with value: 196.55220586715708.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,764]</span> Trial 33 finished with value: 198.10794166176095 and parameters: {'x': 15.913209893212935, 'y': -7.61357698788553}. Best is trial 11 with value: 196.55220586715708.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,769]</span> Trial 34 finished with value: 1793.0663854572517 and parameters: {'x': 44.62775189572495, 'y': -9.743412187774268}. Best is trial 11 with value: 196.55220586715708.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,777]</span> Trial 35 finished with value: 2770.366499877924 and parameters: {'x': 55.62751687456022, 'y': -2.987373563340432}. Best is trial 11 with value: 196.55220586715708.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,783]</span> Trial 36 finished with value: 1218.5844964722392 and parameters: {'x': 25.23496592152636, 'y': -28.890970717122922}. Best is trial 11 with value: 196.55220586715708.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,791]</span> Trial 37 finished with value: 2180.3558435818068 and parameters: {'x': 12.051011186988045, 'y': -47.811471607597554}. Best is trial 11 with value: 196.55220586715708.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,797]</span> Trial 38 finished with value: 990.973606729477 and parameters: {'x': -25.261916644682017, 'y': 11.818282136758675}. Best is trial 11 with value: 196.55220586715708.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,805]</span> Trial 39 finished with value: 1031.7839009606328 and parameters: {'x': 32.119849165691654, 'y': -15.519133860360931}. Best is trial 11 with value: 196.55220586715708.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,811]</span> Trial 40 finished with value: 5083.210829316708 and parameters: {'x': 19.43903445691698, 'y': -71.36848967842965}. Best is trial 11 with value: 196.55220586715708.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,817]</span> Trial 41 finished with value: 258.21802375090607 and parameters: {'x': 12.948141534100031, 'y': 10.583581419032132}. Best is trial 11 with value: 196.55220586715708.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,824]</span> Trial 42 finished with value: 19.38060995581715 and parameters: {'x': -1.6124051057993292, 'y': -1.7093744213121753}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,830]</span> Trial 43 finished with value: 23.171913147774916 and parameters: {'x': -1.8791989783682421, 'y': -1.6336030790580165}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,836]</span> Trial 44 finished with value: 38.71752630070389 and parameters: {'x': -3.090448871338072, 'y': -3.573751617915364}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,842]</span> Trial 45 finished with value: 1170.8637096862117 and parameters: {'x': -16.01741243356986, 'y': -30.446568622249792}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,848]</span> Trial 46 finished with value: 1902.3289649012554 and parameters: {'x': -37.11958368271667, 'y': -19.163249099500916}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,854]</span> Trial 47 finished with value: 2679.3702575211814 and parameters: {'x': -2.6344640160890487, 'y': -53.45872424196038}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,860]</span> Trial 48 finished with value: 3269.5061071662853 and parameters: {'x': -54.123424541689985, 'y': 0.2914030844733347}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,866]</span> Trial 49 finished with value: 72.19463599350263 and parameters: {'x': 1.7066443975397836, 'y': -10.354852338280132}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,874]</span> Trial 50 finished with value: 1220.7361540418906 and parameters: {'x': -8.140236668895032, 'y': -35.116517735807314}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,880]</span> Trial 51 finished with value: 41.93492113584753 and parameters: {'x': 3.6433280600691296, 'y': -8.491138597397793}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,885]</span> Trial 52 finished with value: 258.08491120215507 and parameters: {'x': 4.925454908122308, 'y': -17.955915482138035}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,892]</span> Trial 53 finished with value: 463.04505404840063 and parameters: {'x': -18.16016787185383, 'y': 1.996012069721715}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,899]</span> Trial 54 finished with value: 1611.9007577643029 and parameters: {'x': -30.51484489221835, 'y': 20.14720214997097}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,905]</span> Trial 55 finished with value: 430.7693623431954 and parameters: {'x': 0.9689790226283281, 'y': -22.67417352220248}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,911]</span> Trial 56 finished with value: 1189.0245072343155 and parameters: {'x': -7.988288518892467, 'y': 30.6907584426843}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,917]</span> Trial 57 finished with value: 647.0313829519829 and parameters: {'x': -19.166249152767488, 'y': -14.476161637117766}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,924]</span> Trial 58 finished with value: 5677.0794481246785 and parameters: {'x': -72.24601211388024, 'y': -5.708633914245042}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,930]</span> Trial 59 finished with value: 5687.942897301171 and parameters: {'x': 5.845376093508661, 'y': -77.36969711069762}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,936]</span> Trial 60 finished with value: 219.70663070093028 and parameters: {'x': -8.337841321776901, 'y': 7.514860741578383}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,942]</span> Trial 61 finished with value: 305.7777272590922 and parameters: {'x': 19.77107357807445, 'y': -7.094409446038965}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,948]</span> Trial 62 finished with value: 424.6217776007446 and parameters: {'x': -0.34117742733804124, 'y': 18.295637778392017}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,954]</span> Trial 63 finished with value: 781.4076477307976 and parameters: {'x': 28.302922214800034, 'y': -13.937612443389819}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,960]</span> Trial 64 finished with value: 559.1652833886106 and parameters: {'x': 7.810088704994811, 'y': -25.145140974942457}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,965]</span> Trial 65 finished with value: 106.88926939341262 and parameters: {'x': -7.2236816250628095, 'y': -0.3200088408998675}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,973]</span> Trial 66 finished with value: 72.51616957365815 and parameters: {'x': -4.715776053998313, 'y': 1.5574549680661889}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,978]</span> Trial 67 finished with value: 1084.7512926968893 and parameters: {'x': -29.587965751968824, 'y': 2.6552276529361203}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,984]</span> Trial 68 finished with value: 511.80192174502037 and parameters: {'x': -7.502869520083383, 'y': 18.03390388518186}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,990]</span> Trial 69 finished with value: 2393.947492637388 and parameters: {'x': -13.763933072575993, 'y': 43.9838002846247}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:45,995]</span> Trial 70 finished with value: 2265.6510292499324 and parameters: {'x': -44.59083344098067, 'y': -3.2368797575194916}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,001]</span> Trial 71 finished with value: 75.60206768838539 and parameters: {'x': -0.22014555503819544, 'y': -10.040193021759372}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,008]</span> Trial 72 finished with value: 47.178971325276045 and parameters: {'x': -0.2718843661766737, 'y': 4.013185229149663}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,013]</span> Trial 73 finished with value: 65.45666443751647 and parameters: {'x': 0.9937367412630671, 'y': 5.861903174971301}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,019]</span> Trial 74 finished with value: 1488.2318478273628 and parameters: {'x': -23.29056867933756, 'y': 26.242943853711687}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,026]</span> Trial 75 finished with value: 98.31829192396978 and parameters: {'x': 8.23878634402396, 'y': 6.311764717181981}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,032]</span> Trial 76 finished with value: 902.8054833364562 and parameters: {'x': 25.64901769245474, 'y': 17.727128800577027}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,037]</span> Trial 77 finished with value: 277.65524479754544 and parameters: {'x': 2.565767149639202, 'y': 14.67169895740373}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,042]</span> Trial 78 finished with value: 371.5450522198492 and parameters: {'x': -14.375266224651625, 'y': 6.428305256718526}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,047]</span> Trial 79 finished with value: 1592.5959293251665 and parameters: {'x': 16.910629502839804, 'y': 35.36590149160513}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,052]</span> Trial 80 finished with value: 142.8381258832691 and parameters: {'x': 10.301403553657554, 'y': -11.389653125771996}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,058]</span> Trial 81 finished with value: 65.60384396793496 and parameters: {'x': 1.2197130539384187, 'y': -9.899725083647139}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,064]</span> Trial 82 finished with value: 42.64117937596304 and parameters: {'x': -3.1839413371532603, 'y': -4.149237102667715}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,071]</span> Trial 83 finished with value: 35.88683741878298 and parameters: {'x': -2.6178589566864776, 'y': -4.23773692579403}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,077]</span> Trial 84 finished with value: 212.1173772593159 and parameters: {'x': -11.365599336555128, 'y': -4.061021130000915}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,083]</span> Trial 85 finished with value: 7627.151950767979 and parameters: {'x': 88.71847016998208, 'y': -18.666359953703708}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,089]</span> Trial 86 finished with value: 819.356518713315 and parameters: {'x': -3.562012196575637, 'y': -29.868455660904914}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,097]</span> Trial 87 finished with value: 674.924463251474 and parameters: {'x': -19.710428730434735, 'y': 10.648778717484992}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,104]</span> Trial 88 finished with value: 606.10635306106 and parameters: {'x': 15.496308609067873, 'y': -23.23070665092908}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,110]</span> Trial 89 finished with value: 411.24379147947076 and parameters: {'x': 23.264051527190706, 'y': -2.6252436681218656}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,116]</span> Trial 90 finished with value: 1499.6041551303667 and parameters: {'x': 40.931392594957686, 'y': 5.846804638977528}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,122]</span> Trial 91 finished with value: 73.13359821499935 and parameters: {'x': 1.1917365226492271, 'y': -10.308324950374578}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,128]</span> Trial 92 finished with value: 20.096964724150865 and parameters: {'x': 4.638224449862578, 'y': -6.205434883874687}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,133]</span> Trial 93 finished with value: 253.42396560083392 and parameters: {'x': 8.158512838236287, 'y': -17.076342841776484}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,141]</span> Trial 94 finished with value: 201.97194464780978 and parameters: {'x': -11.108877162900596, 'y': -0.20221457619507466}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,147]</span> Trial 95 finished with value: 34.060503725681116 and parameters: {'x': 5.447727379286784, 'y': -7.244534842677003}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,153]</span> Trial 96 finished with value: 385.5674611984354 and parameters: {'x': 13.991354341483433, 'y': 14.271303879603996}. Best is trial 42 with value: 19.38060995581715.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,160]</span> Trial 97 finished with value: 16.870455127775255 and parameters: {'x': 5.394393298560891, 'y': -5.333659815612}. Best is trial 97 with value: 16.870455127775255.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,165]</span> Trial 98 finished with value: 81.09035175930363 and parameters: {'x': -4.243346331699378, 'y': -7.4157000751598305}. Best is trial 97 with value: 16.870455127775255.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,171]</span> Trial 99 finished with value: 1228.7197159688637 and parameters: {'x': 9.609756470549508, 'y': -36.44735785321637}. Best is trial 97 with value: 16.870455127775255.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,177]</span> Trial 100 finished with value: 137.45757717757536 and parameters: {'x': 4.540028890141262, 'y': -13.660773827106695}. Best is trial 97 with value: 16.870455127775255.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,182]</span> Trial 101 finished with value: 410.69870111365503 and parameters: {'x': 20.11846519063796, 'y': 8.852070597082848}. Best is trial 97 with value: 16.870455127775255.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,188]</span> Trial 102 finished with value: 64.67448517046442 and parameters: {'x': -2.96249049626622, 'y': 3.3292629019460707}. Best is trial 97 with value: 16.870455127775255.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,194]</span> Trial 103 finished with value: 179.6915839916464 and parameters: {'x': -10.170561550501608, 'y': -4.650922672260448}. Best is trial 97 with value: 16.870455127775255.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,199]</span> Trial 104 finished with value: 415.018211899805 and parameters: {'x': -6.055963194526617, 'y': -20.23385505011499}. Best is trial 97 with value: 16.870455127775255.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,205]</span> Trial 105 finished with value: 409.93743495008385 and parameters: {'x': -17.164469134140518, 'y': 0.2513163261792739}. Best is trial 97 with value: 16.870455127775255.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,211]</span> Trial 106 finished with value: 20.96485436518659 and parameters: {'x': 5.0448994837196075, 'y': -5.9704316408253515}. Best is trial 97 with value: 16.870455127775255.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,216]</span> Trial 107 finished with value: 185.3567381717971 and parameters: {'x': 4.397385319376495, 'y': -15.489745693739323}. Best is trial 97 with value: 16.870455127775255.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,221]</span> Trial 108 finished with value: 34.66088259474799 and parameters: {'x': 7.13758396298703, 'y': -6.15100375546316}. Best is trial 97 with value: 16.870455127775255.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,229]</span> Trial 109 finished with value: 135.94950218781722 and parameters: {'x': 13.72083605033299, 'y': -6.515521400372853}. Best is trial 97 with value: 16.870455127775255.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,234]</span> Trial 110 finished with value: 1357.567465153091 and parameters: {'x': 30.59691522485314, 'y': -26.422340319393015}. Best is trial 97 with value: 16.870455127775255.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,242]</span> Trial 111 finished with value: 11.070770090505183 and parameters: {'x': 6.37741875092558, 'y': -2.892085850758323}. Best is trial 111 with value: 11.070770090505183.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,247]</span> Trial 112 finished with value: 14.747240240018662 and parameters: {'x': 6.707682883600064, 'y': -3.546150613258546}. Best is trial 111 with value: 11.070770090505183.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,253]</span> Trial 113 finished with value: 139.48001047177542 and parameters: {'x': 7.500095953304193, 'y': -12.97308220943413}. Best is trial 111 with value: 11.070770090505183.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,259]</span> Trial 114 finished with value: 68.63814652601661 and parameters: {'x': 11.103075565236324, 'y': -1.1980767519454085}. Best is trial 111 with value: 11.070770090505183.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,264]</span> Trial 115 finished with value: 248.5689898899301 and parameters: {'x': 18.182972469295787, 'y': -6.253670381631185}. Best is trial 111 with value: 11.070770090505183.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,269]</span> Trial 116 finished with value: 661.0471751594172 and parameters: {'x': 22.799837936381167, 'y': 14.410064474144544}. Best is trial 111 with value: 11.070770090505183.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,275]</span> Trial 117 finished with value: 402.96495913871433 and parameters: {'x': 5.88755501264272, 'y': -21.851756755624297}. Best is trial 111 with value: 11.070770090505183.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,281]</span> Trial 118 finished with value: 80.2605081771867 and parameters: {'x': 10.864052602728997, 'y': 2.327326731437096}. Best is trial 111 with value: 11.070770090505183.
+
+<span class="ansi-green-fg">[I 2026-03-15 08:33:46,286]</span> Trial 119 finished with value: 53.16543433289864 and parameters: {'x': 4.1047210585296785, 'y': -9.240526420862643}. Best is trial 111 with value: 11.070770090505183.
+</pre>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Best value: 11.071
+Best params: {'x': 6.37741875092558, 'y': -2.892085850758323}
+First 10 incumbent values: [9279.66, 2356.631, 2356.631, 2356.631, 2197.136, 2197.136, 2197.136, 2197.136, 1824.732, 1824.732]
+Last 10 incumbent values: [16.87, 11.071, 11.071, 11.071, 11.071, 11.071, 11.071, 11.071, 11.071, 11.071]</code></pre>
+</div>
+</div>
+<p>This example gives you something realistic to inspect: convergence under noise, a search space that is broader than needed, and two parameters that should both matter.</p>
+</section>
+<section id="which-tools-does-optuna-provide" class="level2" data-number="10.3">
+<h2 data-number="10.3" class="anchored" data-anchor-id="which-tools-does-optuna-provide"><span class="header-section-number">10.3</span> Which Tools Does Optuna Provide?</h2>
+<p>Optuna exposes its plotting tools through <code>optuna.visualization</code>, which generates interactive Plotly figures.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> optuna.visualization <span class="im">as</span> vis</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>vis.plot_optimization_history(study)</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>vis.plot_param_importances(study)</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>vis.plot_slice(study)</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>vis.plot_parallel_coordinate(study)</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>vis.plot_contour(study)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>If Plotly is not already installed in your environment, add it explicitly:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ex">pip</span> install plotly</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>For advanced studies, these plots are not presentation artifacts. They are debugging tools for your search strategy.</p>
+</section>
+<section id="how-should-you-read-optimization-history" class="level2" data-number="10.4">
+<h2 data-number="10.4" class="anchored" data-anchor-id="how-should-you-read-optimization-history"><span class="header-section-number">10.4</span> How Should You Read Optimization History?</h2>
+<p>The optimization history plot shows objective value as a function of trial number.</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>optuna.visualization.plot_optimization_history(study)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>Two different curves matter conceptually:</p>
+<ul>
+<li>Trial values: the raw objective values observed at each evaluation.</li>
+<li>Best-so-far values: the incumbent trajectory, which shows whether the optimizer is still making meaningful progress.</li>
+</ul>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">flowchart LR
+    A[Run study] --&gt; B[Plot optimization history]
+    B --&gt; C{Improvement still happening?}
+    C --&gt;|Yes| D[Keep budget or refine sampler]
+    C --&gt;|No| E[Inspect space and diagnostics]
+    E --&gt; F[Reduce range or redesign parameters]
+    D --&gt; G[Continue optimization]
+    F --&gt; G
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p>Typical interpretations:</p>
+<ul>
+<li>Healthy convergence: the best-so-far curve keeps improving, even if raw trial values remain noisy.</li>
+<li>Stagnation: many trials pass without a better incumbent, suggesting a poor search space, insufficient exploration, or an almost-exhausted budget.</li>
+<li>High noise: raw values swing widely, but the incumbent barely changes, indicating evaluation instability or stochastic objectives.</li>
+</ul>
+<p>Convergence plots are especially useful when read alongside <a href="../modules/08-pruning.html">Pruning</a>, because apparent stagnation may mean the search space is bad, not merely that pruning is aggressive.</p>
+</section>
+<section id="what-does-parameter-importance-actually-mean" class="level2" data-number="10.5">
+<h2 data-number="10.5" class="anchored" data-anchor-id="what-does-parameter-importance-actually-mean"><span class="header-section-number">10.5</span> What Does Parameter Importance Actually Mean?</h2>
+<p>Parameter importance estimates how much each parameter contributes to variation in the objective.</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>optuna.visualization.plot_param_importances(study)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>Optuna commonly uses fANOVA-style reasoning. At a high level, if total objective variation is <span class="math inline">\(\mathrm{Var}(f(x))\)</span>, the importance of parameter <span class="math inline">\(x_i\)</span> is approximated by the fraction of variance explained by changes in that parameter:</p>
+<p><span class="math display">\[
+\mathrm{Importance}(x_i) = \frac{\mathrm{Var}_{x_i}\left(\mathbb{E}[f(x) \mid x_i]\right)}{\mathrm{Var}(f(x))}
+\]</span></p>
+<p>Interpretation is practical rather than philosophical:</p>
+<ul>
+<li>High importance suggests the parameter meaningfully changes outcomes in the explored region.</li>
+<li>Low importance suggests the parameter is either genuinely weak or not yet explored in the right regime.</li>
+</ul>
+<p>This distinction matters. Low importance does not automatically mean the parameter is useless. It may only mean that the current search space or trial budget has not revealed its effect yet.</p>
+</section>
+<section id="how-do-slice-plots-expose-useful-structure" class="level2" data-number="10.6">
+<h2 data-number="10.6" class="anchored" data-anchor-id="how-do-slice-plots-expose-useful-structure"><span class="header-section-number">10.6</span> How Do Slice Plots Expose Useful Structure?</h2>
+<p>Slice plots visualize one parameter against the objective.</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>optuna.visualization.plot_slice(study)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>Use them to answer questions such as:</p>
+<ul>
+<li>Is there a narrow region where the objective improves sharply?</li>
+<li>Is the relationship monotonic, U-shaped, or mostly flat?</li>
+<li>Are strong results concentrated near one boundary of the search range?</li>
+</ul>
+<p>This is one of the quickest ways to catch poorly designed spaces from <a href="../modules/06-designing-search-spaces.html">Designing Search Spaces</a>. If all strong trials cluster near one edge, your range is probably too wide or mis-scaled.</p>
+</section>
+<section id="when-do-parallel-coordinates-help-more-than-slices" class="level2" data-number="10.7">
+<h2 data-number="10.7" class="anchored" data-anchor-id="when-do-parallel-coordinates-help-more-than-slices"><span class="header-section-number">10.7</span> When Do Parallel Coordinates Help More Than Slices?</h2>
+<p>Slice plots show one parameter at a time. Parallel coordinate plots help when performance depends on combinations of parameters.</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>optuna.visualization.plot_parallel_coordinate(study)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>Each line represents a single trial crossing multiple parameter axes and the objective value. This is useful for discovering patterns such as:</p>
+<ul>
+<li>strong trials combining high learning rates with low regularization</li>
+<li>a parameter becoming useful only when another parameter is within a narrow interval</li>
+<li>certain regions consistently producing weak results regardless of other choices</li>
+</ul>
+<p>For advanced practitioners, this is the bridge between raw visualization and search-space redesign: you use the observed structure to introduce conditional or hierarchical spaces rather than continuing with a flat parameter definition.</p>
+</section>
+<section id="what-do-contour-plots-add" class="level2" data-number="10.8">
+<h2 data-number="10.8" class="anchored" data-anchor-id="what-do-contour-plots-add"><span class="header-section-number">10.8</span> What Do Contour Plots Add?</h2>
+<p>Contour plots focus on pairwise interactions between parameters.</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>optuna.visualization.plot_contour(study)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>They are especially informative when good performance is not attached to one parameter alone, but to a combination. A contour plot can reveal a valley, ridge, or island of strong performance that slice plots would hide.</p>
+<p>Common diagnostic outcomes:</p>
+<ul>
+<li>one parameter matters only when another is small</li>
+<li>two parameters compensate for one another</li>
+<li>a supposedly important parameter is important only because it interacts with another one</li>
+</ul>
+<p>That is often the point where a search problem stops being “pick the right values” and becomes “represent the structure correctly.”</p>
+</section>
+<section id="how-do-visuals-reveal-a-bad-search-space" class="level2" data-number="10.9">
+<h2 data-number="10.9" class="anchored" data-anchor-id="how-do-visuals-reveal-a-bad-search-space"><span class="header-section-number">10.9</span> How Do Visuals Reveal a Bad Search Space?</h2>
+<p>Most failed studies are not failures of the sampler alone. They are failures of problem formulation.</p>
+<p>Typical warning signs include:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Symptom</th>
+<th>Likely issue</th>
+<th>Typical fix</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Best trials sit on parameter boundaries</td>
+<td>Range too wide or too narrow</td>
+<td>Re-center or rescale the space</td>
+</tr>
+<tr class="even">
+<td>Slice plots are flat</td>
+<td>Parameter is weak or irrelevant</td>
+<td>Remove it or reduce its emphasis</td>
+</tr>
+<tr class="odd">
+<td>Good trials cluster logarithmically</td>
+<td>Linear scale is inappropriate</td>
+<td>Use log sampling</td>
+</tr>
+<tr class="even">
+<td>Convergence stalls early</td>
+<td>Space is too broad or too noisy</td>
+<td>Narrow the space or stabilize the objective</td>
+</tr>
+</tbody>
+</table>
+<p>This is why visualization is not an afterthought. It is how you decide whether the next 200 trials will be useful or wasteful.</p>
+</section>
+<section id="how-do-you-diagnose-parameter-interactions" class="level2" data-number="10.10">
+<h2 data-number="10.10" class="anchored" data-anchor-id="how-do-you-diagnose-parameter-interactions"><span class="header-section-number">10.10</span> How Do You Diagnose Parameter Interactions?</h2>
+<p>Interactions occur when the effect of one parameter depends on the value of another.</p>
+<p>For example, a high learning rate may work only with a large batch size, while the same learning rate fails at smaller batches. If you ignore that interaction, you may incorrectly conclude that the learning rate itself is unstable.</p>
+<p>The best tools for this are:</p>
+<ul>
+<li>contour plots for pairwise structure</li>
+<li>parallel coordinate plots for higher-dimensional patterns</li>
+<li>parameter importance plots to see whether interaction-heavy parameters are globally influential</li>
+</ul>
+<p>These signals often justify a redesign into conditional search spaces or alternative samplers, which connects directly back to <a href="../modules/09-advanced-optimization-techniques.html">Advanced Optimization Techniques</a> and <a href="../modules/07-samplers.html">Samplers</a>.</p>
+</section>
+<section id="when-is-the-dashboard-worth-using" class="level2" data-number="10.11">
+<h2 data-number="10.11" class="anchored" data-anchor-id="when-is-the-dashboard-worth-using"><span class="header-section-number">10.11</span> When Is the Dashboard Worth Using?</h2>
+<p>Static analysis is useful, but long-running or collaborative studies benefit from a live interface.</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="ex">optuna-dashboard</span> sqlite:///example.db</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>The dashboard is especially useful when you want:</p>
+<ul>
+<li>live trial monitoring</li>
+<li>filtering and comparing subsets of runs</li>
+<li>interactive Pareto-front inspection for multi-objective studies</li>
+<li>lightweight review of a shared experiment store</li>
+</ul>
+<p>If you are moving from one-off studies to an experiment workflow, the dashboard is often the fastest route to operational visibility.</p>
+<div class="callout callout-style-simple callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Common Mistake
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Do not interpret diagnostic plots as ground truth when you have too few trials or a highly noisy objective. A parameter-importance ranking built from weak coverage can look precise while still being misleading.</p>
+</div>
+</div>
+</section>
+<section id="practical-exercise-diagnose-a-weak-study-and-repair-it" class="level2" data-number="10.12">
+<h2 data-number="10.12" class="anchored" data-anchor-id="practical-exercise-diagnose-a-weak-study-and-repair-it"><span class="header-section-number">10.12</span> Practical Exercise: Diagnose a Weak Study and Repair It</h2>
+<p>Use the study from the opening example as your baseline. Then generate the core diagnostics.</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> optuna.visualization <span class="im">as</span> vis</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>vis.plot_optimization_history(study)</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>vis.plot_param_importances(study)</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>vis.plot_slice(study)</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>vis.plot_parallel_coordinate(study)</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>vis.plot_contour(study)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>Work through the exercise in four passes:</p>
+<ol type="1">
+<li>Inspect the optimization history and decide whether the study is still improving or mostly plateaued.</li>
+<li>Use slice and importance plots to determine whether both <code>x</code> and <code>y</code> deserve the current range of <code>[-100, 100]</code>.</li>
+<li>Redefine the objective with a narrower range such as <code>[-10, 10]</code> and rerun the study with the same trial budget.</li>
+<li>Compare the two studies and explain whether the redesign improved convergence, interpretability, or both.</li>
+</ol>
+<p>Questions to answer after the run:</p>
+<ul>
+<li>Did the incumbent improve earlier after narrowing the range?</li>
+<li>Did parameter importance become easier to interpret?</li>
+<li>Did the plots suggest a log scale, a narrower linear scale, or a conditional redesign?</li>
+<li>If the objective remained noisy, would you spend more trials or reduce evaluation noise first?</li>
+</ul>
+</section>
+<section id="recap" class="level2" data-number="10.13">
+<h2 data-number="10.13" class="anchored" data-anchor-id="recap"><span class="header-section-number">10.13</span> Recap</h2>
+<p>Diagnostics turn Optuna from a trial generator into an optimization workflow you can reason about.</p>
+<ul>
+<li>Optimization history tells you whether progress is real, stalled, or hidden by noise.</li>
+<li>Parameter-importance analysis helps prioritize which parameters deserve budget and attention.</li>
+<li>Slice, contour, and parallel coordinate plots reveal boundaries, scaling mistakes, and interactions.</li>
+<li>The dashboard is useful once studies become large, persistent, or collaborative.</li>
+</ul>
+</section>
+<section id="decision-guide" class="level2" data-number="10.14">
+<h2 data-number="10.14" class="anchored" data-anchor-id="decision-guide"><span class="header-section-number">10.14</span> Decision Guide</h2>
+<p>Use diagnostic tools as a redesign loop, not just as a report at the end.</p>
+<ul>
+<li>Start with optimization history when you want to know whether the budget is still producing value.</li>
+<li>Use slice plots when you suspect a parameter range or scale is poorly chosen.</li>
+<li>Use contour and parallel coordinate plots when performance depends on interactions.</li>
+<li>Use parameter importance to simplify the space, but only after checking that the study has enough coverage.</li>
+<li>Use the dashboard when repeated or long-running studies need live visibility.</li>
+</ul>
+<p>The next chapter extends this diagnostic mindset into infrastructure. In <a href="../modules/11-distributed-scalable-optimization.html">Distributed and Scalable Optimization</a>, we will look at storage backends, parallel execution, and the operational concerns that appear once optimization leaves the single-process notebook setting.</p>
+
+
+<!-- -->
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+        const codeEl = trigger.previousElementSibling.cloneNode(true);
+        for (const childEl of codeEl.children) {
+          if (isCodeAnnotation(childEl)) {
+            childEl.remove();
+          }
+        }
+        return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+    const viewSource = window.document.getElementById('quarto-view-source') ||
+                       window.document.getElementById('quarto-code-tools-source');
+    if (viewSource) {
+      const sourceUrl = viewSource.getAttribute("data-quarto-source-url");
+      viewSource.addEventListener("click", function(e) {
+        if (sourceUrl) {
+          // rstudio viewer pane
+          if (/\bcapabilities=\b/.test(window.location)) {
+            window.open(sourceUrl);
+          } else {
+            window.location.href = sourceUrl;
+          }
+        } else {
+          const modal = new bootstrap.Modal(document.getElementById('quarto-embedded-source-code-modal'));
+          modal.show();
+        }
+        return false;
+      });
+    }
+    function toggleCodeHandler(show) {
+      return function(e) {
+        const detailsSrc = window.document.querySelectorAll(".cell > details > .sourceCode");
+        for (let i=0; i<detailsSrc.length; i++) {
+          const details = detailsSrc[i].parentElement;
+          if (show) {
+            details.open = true;
+          } else {
+            details.removeAttribute("open");
+          }
+        }
+        const cellCodeDivs = window.document.querySelectorAll(".cell > .sourceCode");
+        const fromCls = show ? "hidden" : "unhidden";
+        const toCls = show ? "unhidden" : "hidden";
+        for (let i=0; i<cellCodeDivs.length; i++) {
+          const codeDiv = cellCodeDivs[i];
+          if (codeDiv.classList.contains(fromCls)) {
+            codeDiv.classList.remove(fromCls);
+            codeDiv.classList.add(toCls);
+          } 
+        }
+        return false;
+      }
+    }
+    const hideAllCode = window.document.getElementById("quarto-hide-all-code");
+    if (hideAllCode) {
+      hideAllCode.addEventListener("click", toggleCodeHandler(false));
+    }
+    const showAllCode = window.document.getElementById("quarto-show-all-code");
+    if (showAllCode) {
+      showAllCode.addEventListener("click", toggleCodeHandler(true));
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+<nav class="page-navigation">
+  <div class="nav-page nav-page-previous">
+      <a href="../modules/09-advanced-optimization-techniques.html" class="pagination-link" aria-label="Advanced Optimization Techniques">
+        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text"><span class="chapter-number">9</span>&nbsp; <span class="chapter-title">Advanced Optimization Techniques</span></span>
+      </a>          
+  </div>
+  <div class="nav-page nav-page-next">
+      <a href="../modules/11-distributed-scalable-optimization.html" class="pagination-link" aria-label="Distributed and Scalable Optimization">
+        <span class="nav-page-text"><span class="chapter-number">11</span>&nbsp; <span class="chapter-title">Distributed and Scalable Optimization</span></span> <i class="bi bi-arrow-right-short"></i>
+      </a>
+  </div>
+</nav><div class="modal fade" id="quarto-embedded-source-code-modal" tabindex="-1" aria-labelledby="quarto-embedded-source-code-modal-label" aria-hidden="true"><div class="modal-dialog modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="quarto-embedded-source-code-modal-label">Source Code</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="">
+<div class="sourceCode" id="cb12" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="an">title:</span><span class="co"> "Visualization and Diagnostics"</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>This chapter is about reading an optimization process rather than merely running one. By the end, you should be able to use Optuna's visualization tools to diagnose convergence, identify influential parameters, detect bad search-space design, and decide when a study needs redesign rather than more trials.</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a><span class="fu">## Why This Matters</span></span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>An optimizer can fail quietly. A study may appear to run correctly while wasting budget on irrelevant parameters, spending trials in the wrong scale, or bouncing around a noisy objective with little real progress.</span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>That is why diagnostics matter. Once you can inspect optimization history, parameter importance, and interactions, you stop treating hyperparameter tuning as a black box and start treating it as an iterative engineering process.</span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a><span class="fu">## Fast First Win: Build a Study Worth Diagnosing</span></span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a>To make the diagnostic tools meaningful, start with a study that is deliberately imperfect: a noisy objective with a search range that is wider than necessary.</span>
+<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-19"><a href="#cb12-19" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb12-20"><a href="#cb12-20" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> random</span>
+<span id="cb12-21"><a href="#cb12-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-22"><a href="#cb12-22" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> optuna</span>
+<span id="cb12-23"><a href="#cb12-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-24"><a href="#cb12-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-25"><a href="#cb12-25" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective(trial):</span>
+<span id="cb12-26"><a href="#cb12-26" aria-hidden="true" tabindex="-1"></a>    x <span class="op">=</span> trial.suggest_float(<span class="st">"x"</span>, <span class="op">-</span><span class="fl">100.0</span>, <span class="fl">100.0</span>)</span>
+<span id="cb12-27"><a href="#cb12-27" aria-hidden="true" tabindex="-1"></a>    y <span class="op">=</span> trial.suggest_float(<span class="st">"y"</span>, <span class="op">-</span><span class="fl">100.0</span>, <span class="fl">100.0</span>)</span>
+<span id="cb12-28"><a href="#cb12-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-29"><a href="#cb12-29" aria-hidden="true" tabindex="-1"></a>    signal <span class="op">=</span> (x <span class="op">-</span> <span class="fl">3.0</span>) <span class="op">**</span> <span class="dv">2</span> <span class="op">+</span> (y <span class="op">+</span> <span class="fl">2.0</span>) <span class="op">**</span> <span class="dv">2</span></span>
+<span id="cb12-30"><a href="#cb12-30" aria-hidden="true" tabindex="-1"></a>    noise <span class="op">=</span> random.gauss(<span class="fl">0.0</span>, <span class="fl">1.0</span>)</span>
+<span id="cb12-31"><a href="#cb12-31" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> signal <span class="op">+</span> noise</span>
+<span id="cb12-32"><a href="#cb12-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-33"><a href="#cb12-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-34"><a href="#cb12-34" aria-hidden="true" tabindex="-1"></a>sampler <span class="op">=</span> optuna.samplers.TPESampler(seed<span class="op">=</span><span class="dv">42</span>)</span>
+<span id="cb12-35"><a href="#cb12-35" aria-hidden="true" tabindex="-1"></a>study <span class="op">=</span> optuna.create_study(direction<span class="op">=</span><span class="st">"minimize"</span>, sampler<span class="op">=</span>sampler)</span>
+<span id="cb12-36"><a href="#cb12-36" aria-hidden="true" tabindex="-1"></a>study.optimize(objective, n_trials<span class="op">=</span><span class="dv">120</span>)</span>
+<span id="cb12-37"><a href="#cb12-37" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-38"><a href="#cb12-38" aria-hidden="true" tabindex="-1"></a>best_so_far <span class="op">=</span> []</span>
+<span id="cb12-39"><a href="#cb12-39" aria-hidden="true" tabindex="-1"></a>incumbent <span class="op">=</span> <span class="bu">float</span>(<span class="st">"inf"</span>)</span>
+<span id="cb12-40"><a href="#cb12-40" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> trial <span class="kw">in</span> study.trials:</span>
+<span id="cb12-41"><a href="#cb12-41" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> trial.value <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb12-42"><a href="#cb12-42" aria-hidden="true" tabindex="-1"></a>        incumbent <span class="op">=</span> <span class="bu">min</span>(incumbent, trial.value)</span>
+<span id="cb12-43"><a href="#cb12-43" aria-hidden="true" tabindex="-1"></a>        best_so_far.append(<span class="bu">round</span>(incumbent, <span class="dv">3</span>))</span>
+<span id="cb12-44"><a href="#cb12-44" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-45"><a href="#cb12-45" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Best value:"</span>, <span class="bu">round</span>(study.best_value, <span class="dv">3</span>))</span>
+<span id="cb12-46"><a href="#cb12-46" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Best params:"</span>, study.best_params)</span>
+<span id="cb12-47"><a href="#cb12-47" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"First 10 incumbent values:"</span>, best_so_far[:<span class="dv">10</span>])</span>
+<span id="cb12-48"><a href="#cb12-48" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Last 10 incumbent values:"</span>, best_so_far[<span class="op">-</span><span class="dv">10</span>:])</span>
+<span id="cb12-49"><a href="#cb12-49" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb12-50"><a href="#cb12-50" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-51"><a href="#cb12-51" aria-hidden="true" tabindex="-1"></a>This example gives you something realistic to inspect: convergence under noise, a search space that is broader than needed, and two parameters that should both matter.</span>
+<span id="cb12-52"><a href="#cb12-52" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-53"><a href="#cb12-53" aria-hidden="true" tabindex="-1"></a><span class="fu">## Which Tools Does Optuna Provide?</span></span>
+<span id="cb12-54"><a href="#cb12-54" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-55"><a href="#cb12-55" aria-hidden="true" tabindex="-1"></a>Optuna exposes its plotting tools through <span class="in">`optuna.visualization`</span>, which generates interactive Plotly figures.</span>
+<span id="cb12-56"><a href="#cb12-56" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-57"><a href="#cb12-57" aria-hidden="true" tabindex="-1"></a><span class="in">``` python</span></span>
+<span id="cb12-58"><a href="#cb12-58" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> optuna.visualization <span class="im">as</span> vis</span>
+<span id="cb12-59"><a href="#cb12-59" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-60"><a href="#cb12-60" aria-hidden="true" tabindex="-1"></a>vis.plot_optimization_history(study)</span>
+<span id="cb12-61"><a href="#cb12-61" aria-hidden="true" tabindex="-1"></a>vis.plot_param_importances(study)</span>
+<span id="cb12-62"><a href="#cb12-62" aria-hidden="true" tabindex="-1"></a>vis.plot_slice(study)</span>
+<span id="cb12-63"><a href="#cb12-63" aria-hidden="true" tabindex="-1"></a>vis.plot_parallel_coordinate(study)</span>
+<span id="cb12-64"><a href="#cb12-64" aria-hidden="true" tabindex="-1"></a>vis.plot_contour(study)</span>
+<span id="cb12-65"><a href="#cb12-65" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb12-66"><a href="#cb12-66" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-67"><a href="#cb12-67" aria-hidden="true" tabindex="-1"></a>If Plotly is not already installed in your environment, add it explicitly:</span>
+<span id="cb12-68"><a href="#cb12-68" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-69"><a href="#cb12-69" aria-hidden="true" tabindex="-1"></a><span class="in">``` bash</span></span>
+<span id="cb12-70"><a href="#cb12-70" aria-hidden="true" tabindex="-1"></a><span class="ex">pip</span> install plotly</span>
+<span id="cb12-71"><a href="#cb12-71" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb12-72"><a href="#cb12-72" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-73"><a href="#cb12-73" aria-hidden="true" tabindex="-1"></a>For advanced studies, these plots are not presentation artifacts. They are debugging tools for your search strategy.</span>
+<span id="cb12-74"><a href="#cb12-74" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-75"><a href="#cb12-75" aria-hidden="true" tabindex="-1"></a><span class="fu">## How Should You Read Optimization History?</span></span>
+<span id="cb12-76"><a href="#cb12-76" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-77"><a href="#cb12-77" aria-hidden="true" tabindex="-1"></a>The optimization history plot shows objective value as a function of trial number.</span>
+<span id="cb12-78"><a href="#cb12-78" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-79"><a href="#cb12-79" aria-hidden="true" tabindex="-1"></a><span class="in">``` python</span></span>
+<span id="cb12-80"><a href="#cb12-80" aria-hidden="true" tabindex="-1"></a>optuna.visualization.plot_optimization_history(study)</span>
+<span id="cb12-81"><a href="#cb12-81" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb12-82"><a href="#cb12-82" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-83"><a href="#cb12-83" aria-hidden="true" tabindex="-1"></a>Two different curves matter conceptually:</span>
+<span id="cb12-84"><a href="#cb12-84" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-85"><a href="#cb12-85" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>Trial values: the raw objective values observed at each evaluation.</span>
+<span id="cb12-86"><a href="#cb12-86" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>Best-so-far values: the incumbent trajectory, which shows whether the optimizer is still making meaningful progress.</span>
+<span id="cb12-87"><a href="#cb12-87" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-90"><a href="#cb12-90" aria-hidden="true" tabindex="-1"></a><span class="in">```{mermaid}</span></span>
+<span id="cb12-91"><a href="#cb12-91" aria-hidden="true" tabindex="-1"></a>flowchart LR</span>
+<span id="cb12-92"><a href="#cb12-92" aria-hidden="true" tabindex="-1"></a>    A[Run <span class="fu">study</span>] --&gt; B[Plot optimization history]</span>
+<span id="cb12-93"><a href="#cb12-93" aria-hidden="true" tabindex="-1"></a>    B --&gt; C{Improvement still happening?}</span>
+<span id="cb12-94"><a href="#cb12-94" aria-hidden="true" tabindex="-1"></a>    C --&gt;|Yes| D[Keep budget <span class="ot">or</span> refine sampler]</span>
+<span id="cb12-95"><a href="#cb12-95" aria-hidden="true" tabindex="-1"></a>    C --&gt;|No| E[Inspect space <span class="ot">and</span> <span class="kw">diagnostics</span>]</span>
+<span id="cb12-96"><a href="#cb12-96" aria-hidden="true" tabindex="-1"></a>    E --&gt; F[Reduce range <span class="ot">or</span> redesign parameters]</span>
+<span id="cb12-97"><a href="#cb12-97" aria-hidden="true" tabindex="-1"></a>    D --&gt; G[Continue optimization]</span>
+<span id="cb12-98"><a href="#cb12-98" aria-hidden="true" tabindex="-1"></a>    F --&gt; G</span>
+<span id="cb12-99"><a href="#cb12-99" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb12-100"><a href="#cb12-100" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-101"><a href="#cb12-101" aria-hidden="true" tabindex="-1"></a>Typical interpretations:</span>
+<span id="cb12-102"><a href="#cb12-102" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-103"><a href="#cb12-103" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>Healthy convergence: the best-so-far curve keeps improving, even if raw trial values remain noisy.</span>
+<span id="cb12-104"><a href="#cb12-104" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>Stagnation: many trials pass without a better incumbent, suggesting a poor search space, insufficient exploration, or an almost-exhausted budget.</span>
+<span id="cb12-105"><a href="#cb12-105" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>High noise: raw values swing widely, but the incumbent barely changes, indicating evaluation instability or stochastic objectives.</span>
+<span id="cb12-106"><a href="#cb12-106" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-107"><a href="#cb12-107" aria-hidden="true" tabindex="-1"></a>Convergence plots are especially useful when read alongside <span class="co">[</span><span class="ot">Pruning</span><span class="co">](08-pruning.qmd)</span>, because apparent stagnation may mean the search space is bad, not merely that pruning is aggressive.</span>
+<span id="cb12-108"><a href="#cb12-108" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-109"><a href="#cb12-109" aria-hidden="true" tabindex="-1"></a><span class="fu">## What Does Parameter Importance Actually Mean?</span></span>
+<span id="cb12-110"><a href="#cb12-110" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-111"><a href="#cb12-111" aria-hidden="true" tabindex="-1"></a>Parameter importance estimates how much each parameter contributes to variation in the objective.</span>
+<span id="cb12-112"><a href="#cb12-112" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-113"><a href="#cb12-113" aria-hidden="true" tabindex="-1"></a><span class="in">``` python</span></span>
+<span id="cb12-114"><a href="#cb12-114" aria-hidden="true" tabindex="-1"></a>optuna.visualization.plot_param_importances(study)</span>
+<span id="cb12-115"><a href="#cb12-115" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb12-116"><a href="#cb12-116" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-117"><a href="#cb12-117" aria-hidden="true" tabindex="-1"></a>Optuna commonly uses fANOVA-style reasoning. At a high level, if total objective variation is $\mathrm{Var}(f(x))$, the importance of parameter $x_i$ is approximated by the fraction of variance explained by changes in that parameter:</span>
+<span id="cb12-118"><a href="#cb12-118" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-119"><a href="#cb12-119" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb12-120"><a href="#cb12-120" aria-hidden="true" tabindex="-1"></a>\mathrm{Importance}(x_i) = \frac{\mathrm{Var}_{x_i}\left(\mathbb{E}<span class="co">[</span><span class="ot">f(x) \mid x_i</span><span class="co">]</span>\right)}{\mathrm{Var}(f(x))}</span>
+<span id="cb12-121"><a href="#cb12-121" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb12-122"><a href="#cb12-122" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-123"><a href="#cb12-123" aria-hidden="true" tabindex="-1"></a>Interpretation is practical rather than philosophical:</span>
+<span id="cb12-124"><a href="#cb12-124" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-125"><a href="#cb12-125" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>High importance suggests the parameter meaningfully changes outcomes in the explored region.</span>
+<span id="cb12-126"><a href="#cb12-126" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>Low importance suggests the parameter is either genuinely weak or not yet explored in the right regime.</span>
+<span id="cb12-127"><a href="#cb12-127" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-128"><a href="#cb12-128" aria-hidden="true" tabindex="-1"></a>This distinction matters. Low importance does not automatically mean the parameter is useless. It may only mean that the current search space or trial budget has not revealed its effect yet.</span>
+<span id="cb12-129"><a href="#cb12-129" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-130"><a href="#cb12-130" aria-hidden="true" tabindex="-1"></a><span class="fu">## How Do Slice Plots Expose Useful Structure?</span></span>
+<span id="cb12-131"><a href="#cb12-131" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-132"><a href="#cb12-132" aria-hidden="true" tabindex="-1"></a>Slice plots visualize one parameter against the objective.</span>
+<span id="cb12-133"><a href="#cb12-133" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-134"><a href="#cb12-134" aria-hidden="true" tabindex="-1"></a><span class="in">``` python</span></span>
+<span id="cb12-135"><a href="#cb12-135" aria-hidden="true" tabindex="-1"></a>optuna.visualization.plot_slice(study)</span>
+<span id="cb12-136"><a href="#cb12-136" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb12-137"><a href="#cb12-137" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-138"><a href="#cb12-138" aria-hidden="true" tabindex="-1"></a>Use them to answer questions such as:</span>
+<span id="cb12-139"><a href="#cb12-139" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-140"><a href="#cb12-140" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>Is there a narrow region where the objective improves sharply?</span>
+<span id="cb12-141"><a href="#cb12-141" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>Is the relationship monotonic, U-shaped, or mostly flat?</span>
+<span id="cb12-142"><a href="#cb12-142" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>Are strong results concentrated near one boundary of the search range?</span>
+<span id="cb12-143"><a href="#cb12-143" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-144"><a href="#cb12-144" aria-hidden="true" tabindex="-1"></a>This is one of the quickest ways to catch poorly designed spaces from <span class="co">[</span><span class="ot">Designing Search Spaces</span><span class="co">](06-designing-search-spaces.qmd)</span>. If all strong trials cluster near one edge, your range is probably too wide or mis-scaled.</span>
+<span id="cb12-145"><a href="#cb12-145" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-146"><a href="#cb12-146" aria-hidden="true" tabindex="-1"></a><span class="fu">## When Do Parallel Coordinates Help More Than Slices?</span></span>
+<span id="cb12-147"><a href="#cb12-147" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-148"><a href="#cb12-148" aria-hidden="true" tabindex="-1"></a>Slice plots show one parameter at a time. Parallel coordinate plots help when performance depends on combinations of parameters.</span>
+<span id="cb12-149"><a href="#cb12-149" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-150"><a href="#cb12-150" aria-hidden="true" tabindex="-1"></a><span class="in">``` python</span></span>
+<span id="cb12-151"><a href="#cb12-151" aria-hidden="true" tabindex="-1"></a>optuna.visualization.plot_parallel_coordinate(study)</span>
+<span id="cb12-152"><a href="#cb12-152" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb12-153"><a href="#cb12-153" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-154"><a href="#cb12-154" aria-hidden="true" tabindex="-1"></a>Each line represents a single trial crossing multiple parameter axes and the objective value. This is useful for discovering patterns such as:</span>
+<span id="cb12-155"><a href="#cb12-155" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-156"><a href="#cb12-156" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>strong trials combining high learning rates with low regularization</span>
+<span id="cb12-157"><a href="#cb12-157" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>a parameter becoming useful only when another parameter is within a narrow interval</span>
+<span id="cb12-158"><a href="#cb12-158" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>certain regions consistently producing weak results regardless of other choices</span>
+<span id="cb12-159"><a href="#cb12-159" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-160"><a href="#cb12-160" aria-hidden="true" tabindex="-1"></a>For advanced practitioners, this is the bridge between raw visualization and search-space redesign: you use the observed structure to introduce conditional or hierarchical spaces rather than continuing with a flat parameter definition.</span>
+<span id="cb12-161"><a href="#cb12-161" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-162"><a href="#cb12-162" aria-hidden="true" tabindex="-1"></a><span class="fu">## What Do Contour Plots Add?</span></span>
+<span id="cb12-163"><a href="#cb12-163" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-164"><a href="#cb12-164" aria-hidden="true" tabindex="-1"></a>Contour plots focus on pairwise interactions between parameters.</span>
+<span id="cb12-165"><a href="#cb12-165" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-166"><a href="#cb12-166" aria-hidden="true" tabindex="-1"></a><span class="in">``` python</span></span>
+<span id="cb12-167"><a href="#cb12-167" aria-hidden="true" tabindex="-1"></a>optuna.visualization.plot_contour(study)</span>
+<span id="cb12-168"><a href="#cb12-168" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb12-169"><a href="#cb12-169" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-170"><a href="#cb12-170" aria-hidden="true" tabindex="-1"></a>They are especially informative when good performance is not attached to one parameter alone, but to a combination. A contour plot can reveal a valley, ridge, or island of strong performance that slice plots would hide.</span>
+<span id="cb12-171"><a href="#cb12-171" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-172"><a href="#cb12-172" aria-hidden="true" tabindex="-1"></a>Common diagnostic outcomes:</span>
+<span id="cb12-173"><a href="#cb12-173" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-174"><a href="#cb12-174" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>one parameter matters only when another is small</span>
+<span id="cb12-175"><a href="#cb12-175" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>two parameters compensate for one another</span>
+<span id="cb12-176"><a href="#cb12-176" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>a supposedly important parameter is important only because it interacts with another one</span>
+<span id="cb12-177"><a href="#cb12-177" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-178"><a href="#cb12-178" aria-hidden="true" tabindex="-1"></a>That is often the point where a search problem stops being “pick the right values” and becomes “represent the structure correctly.”</span>
+<span id="cb12-179"><a href="#cb12-179" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-180"><a href="#cb12-180" aria-hidden="true" tabindex="-1"></a><span class="fu">## How Do Visuals Reveal a Bad Search Space?</span></span>
+<span id="cb12-181"><a href="#cb12-181" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-182"><a href="#cb12-182" aria-hidden="true" tabindex="-1"></a>Most failed studies are not failures of the sampler alone. They are failures of problem formulation.</span>
+<span id="cb12-183"><a href="#cb12-183" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-184"><a href="#cb12-184" aria-hidden="true" tabindex="-1"></a>Typical warning signs include:</span>
+<span id="cb12-185"><a href="#cb12-185" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-186"><a href="#cb12-186" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Symptom <span class="pp">|</span> Likely issue <span class="pp">|</span> Typical fix <span class="pp">|</span></span>
+<span id="cb12-187"><a href="#cb12-187" aria-hidden="true" tabindex="-1"></a><span class="pp">|------------------------|------------------------|------------------------|</span></span>
+<span id="cb12-188"><a href="#cb12-188" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Best trials sit on parameter boundaries <span class="pp">|</span> Range too wide or too narrow <span class="pp">|</span> Re-center or rescale the space <span class="pp">|</span></span>
+<span id="cb12-189"><a href="#cb12-189" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Slice plots are flat <span class="pp">|</span> Parameter is weak or irrelevant <span class="pp">|</span> Remove it or reduce its emphasis <span class="pp">|</span></span>
+<span id="cb12-190"><a href="#cb12-190" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Good trials cluster logarithmically <span class="pp">|</span> Linear scale is inappropriate <span class="pp">|</span> Use log sampling <span class="pp">|</span></span>
+<span id="cb12-191"><a href="#cb12-191" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Convergence stalls early <span class="pp">|</span> Space is too broad or too noisy <span class="pp">|</span> Narrow the space or stabilize the objective <span class="pp">|</span></span>
+<span id="cb12-192"><a href="#cb12-192" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-193"><a href="#cb12-193" aria-hidden="true" tabindex="-1"></a>This is why visualization is not an afterthought. It is how you decide whether the next 200 trials will be useful or wasteful.</span>
+<span id="cb12-194"><a href="#cb12-194" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-195"><a href="#cb12-195" aria-hidden="true" tabindex="-1"></a><span class="fu">## How Do You Diagnose Parameter Interactions?</span></span>
+<span id="cb12-196"><a href="#cb12-196" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-197"><a href="#cb12-197" aria-hidden="true" tabindex="-1"></a>Interactions occur when the effect of one parameter depends on the value of another.</span>
+<span id="cb12-198"><a href="#cb12-198" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-199"><a href="#cb12-199" aria-hidden="true" tabindex="-1"></a>For example, a high learning rate may work only with a large batch size, while the same learning rate fails at smaller batches. If you ignore that interaction, you may incorrectly conclude that the learning rate itself is unstable.</span>
+<span id="cb12-200"><a href="#cb12-200" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-201"><a href="#cb12-201" aria-hidden="true" tabindex="-1"></a>The best tools for this are:</span>
+<span id="cb12-202"><a href="#cb12-202" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-203"><a href="#cb12-203" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>contour plots for pairwise structure</span>
+<span id="cb12-204"><a href="#cb12-204" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>parallel coordinate plots for higher-dimensional patterns</span>
+<span id="cb12-205"><a href="#cb12-205" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>parameter importance plots to see whether interaction-heavy parameters are globally influential</span>
+<span id="cb12-206"><a href="#cb12-206" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-207"><a href="#cb12-207" aria-hidden="true" tabindex="-1"></a>These signals often justify a redesign into conditional search spaces or alternative samplers, which connects directly back to <span class="co">[</span><span class="ot">Advanced Optimization Techniques</span><span class="co">](09-advanced-optimization-techniques.qmd)</span> and <span class="co">[</span><span class="ot">Samplers</span><span class="co">](07-samplers.qmd)</span>.</span>
+<span id="cb12-208"><a href="#cb12-208" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-209"><a href="#cb12-209" aria-hidden="true" tabindex="-1"></a><span class="fu">## When Is the Dashboard Worth Using?</span></span>
+<span id="cb12-210"><a href="#cb12-210" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-211"><a href="#cb12-211" aria-hidden="true" tabindex="-1"></a>Static analysis is useful, but long-running or collaborative studies benefit from a live interface.</span>
+<span id="cb12-212"><a href="#cb12-212" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-213"><a href="#cb12-213" aria-hidden="true" tabindex="-1"></a><span class="in">``` bash</span></span>
+<span id="cb12-214"><a href="#cb12-214" aria-hidden="true" tabindex="-1"></a><span class="ex">optuna-dashboard</span> sqlite:///example.db</span>
+<span id="cb12-215"><a href="#cb12-215" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb12-216"><a href="#cb12-216" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-217"><a href="#cb12-217" aria-hidden="true" tabindex="-1"></a>The dashboard is especially useful when you want:</span>
+<span id="cb12-218"><a href="#cb12-218" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-219"><a href="#cb12-219" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>live trial monitoring</span>
+<span id="cb12-220"><a href="#cb12-220" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>filtering and comparing subsets of runs</span>
+<span id="cb12-221"><a href="#cb12-221" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>interactive Pareto-front inspection for multi-objective studies</span>
+<span id="cb12-222"><a href="#cb12-222" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>lightweight review of a shared experiment store</span>
+<span id="cb12-223"><a href="#cb12-223" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-224"><a href="#cb12-224" aria-hidden="true" tabindex="-1"></a>If you are moving from one-off studies to an experiment workflow, the dashboard is often the fastest route to operational visibility.</span>
+<span id="cb12-225"><a href="#cb12-225" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-226"><a href="#cb12-226" aria-hidden="true" tabindex="-1"></a>::: callout-warning</span>
+<span id="cb12-227"><a href="#cb12-227" aria-hidden="true" tabindex="-1"></a><span class="fu">## Common Mistake</span></span>
+<span id="cb12-228"><a href="#cb12-228" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-229"><a href="#cb12-229" aria-hidden="true" tabindex="-1"></a>Do not interpret diagnostic plots as ground truth when you have too few trials or a highly noisy objective. A parameter-importance ranking built from weak coverage can look precise while still being misleading.</span>
+<span id="cb12-230"><a href="#cb12-230" aria-hidden="true" tabindex="-1"></a>:::</span>
+<span id="cb12-231"><a href="#cb12-231" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-232"><a href="#cb12-232" aria-hidden="true" tabindex="-1"></a><span class="fu">## Practical Exercise: Diagnose a Weak Study and Repair It</span></span>
+<span id="cb12-233"><a href="#cb12-233" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-234"><a href="#cb12-234" aria-hidden="true" tabindex="-1"></a>Use the study from the opening example as your baseline. Then generate the core diagnostics.</span>
+<span id="cb12-235"><a href="#cb12-235" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-236"><a href="#cb12-236" aria-hidden="true" tabindex="-1"></a><span class="in">``` python</span></span>
+<span id="cb12-237"><a href="#cb12-237" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> optuna.visualization <span class="im">as</span> vis</span>
+<span id="cb12-238"><a href="#cb12-238" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-239"><a href="#cb12-239" aria-hidden="true" tabindex="-1"></a>vis.plot_optimization_history(study)</span>
+<span id="cb12-240"><a href="#cb12-240" aria-hidden="true" tabindex="-1"></a>vis.plot_param_importances(study)</span>
+<span id="cb12-241"><a href="#cb12-241" aria-hidden="true" tabindex="-1"></a>vis.plot_slice(study)</span>
+<span id="cb12-242"><a href="#cb12-242" aria-hidden="true" tabindex="-1"></a>vis.plot_parallel_coordinate(study)</span>
+<span id="cb12-243"><a href="#cb12-243" aria-hidden="true" tabindex="-1"></a>vis.plot_contour(study)</span>
+<span id="cb12-244"><a href="#cb12-244" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb12-245"><a href="#cb12-245" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-246"><a href="#cb12-246" aria-hidden="true" tabindex="-1"></a>Work through the exercise in four passes:</span>
+<span id="cb12-247"><a href="#cb12-247" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-248"><a href="#cb12-248" aria-hidden="true" tabindex="-1"></a><span class="ss">1.  </span>Inspect the optimization history and decide whether the study is still improving or mostly plateaued.</span>
+<span id="cb12-249"><a href="#cb12-249" aria-hidden="true" tabindex="-1"></a><span class="ss">2.  </span>Use slice and importance plots to determine whether both <span class="in">`x`</span> and <span class="in">`y`</span> deserve the current range of <span class="in">`[-100, 100]`</span>.</span>
+<span id="cb12-250"><a href="#cb12-250" aria-hidden="true" tabindex="-1"></a><span class="ss">3.  </span>Redefine the objective with a narrower range such as <span class="in">`[-10, 10]`</span> and rerun the study with the same trial budget.</span>
+<span id="cb12-251"><a href="#cb12-251" aria-hidden="true" tabindex="-1"></a><span class="ss">4.  </span>Compare the two studies and explain whether the redesign improved convergence, interpretability, or both.</span>
+<span id="cb12-252"><a href="#cb12-252" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-253"><a href="#cb12-253" aria-hidden="true" tabindex="-1"></a>Questions to answer after the run:</span>
+<span id="cb12-254"><a href="#cb12-254" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-255"><a href="#cb12-255" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>Did the incumbent improve earlier after narrowing the range?</span>
+<span id="cb12-256"><a href="#cb12-256" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>Did parameter importance become easier to interpret?</span>
+<span id="cb12-257"><a href="#cb12-257" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>Did the plots suggest a log scale, a narrower linear scale, or a conditional redesign?</span>
+<span id="cb12-258"><a href="#cb12-258" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>If the objective remained noisy, would you spend more trials or reduce evaluation noise first?</span>
+<span id="cb12-259"><a href="#cb12-259" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-260"><a href="#cb12-260" aria-hidden="true" tabindex="-1"></a><span class="fu">## Recap</span></span>
+<span id="cb12-261"><a href="#cb12-261" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-262"><a href="#cb12-262" aria-hidden="true" tabindex="-1"></a>Diagnostics turn Optuna from a trial generator into an optimization workflow you can reason about.</span>
+<span id="cb12-263"><a href="#cb12-263" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-264"><a href="#cb12-264" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>Optimization history tells you whether progress is real, stalled, or hidden by noise.</span>
+<span id="cb12-265"><a href="#cb12-265" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>Parameter-importance analysis helps prioritize which parameters deserve budget and attention.</span>
+<span id="cb12-266"><a href="#cb12-266" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>Slice, contour, and parallel coordinate plots reveal boundaries, scaling mistakes, and interactions.</span>
+<span id="cb12-267"><a href="#cb12-267" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>The dashboard is useful once studies become large, persistent, or collaborative.</span>
+<span id="cb12-268"><a href="#cb12-268" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-269"><a href="#cb12-269" aria-hidden="true" tabindex="-1"></a><span class="fu">## Decision Guide</span></span>
+<span id="cb12-270"><a href="#cb12-270" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-271"><a href="#cb12-271" aria-hidden="true" tabindex="-1"></a>Use diagnostic tools as a redesign loop, not just as a report at the end.</span>
+<span id="cb12-272"><a href="#cb12-272" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-273"><a href="#cb12-273" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>Start with optimization history when you want to know whether the budget is still producing value.</span>
+<span id="cb12-274"><a href="#cb12-274" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>Use slice plots when you suspect a parameter range or scale is poorly chosen.</span>
+<span id="cb12-275"><a href="#cb12-275" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>Use contour and parallel coordinate plots when performance depends on interactions.</span>
+<span id="cb12-276"><a href="#cb12-276" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>Use parameter importance to simplify the space, but only after checking that the study has enough coverage.</span>
+<span id="cb12-277"><a href="#cb12-277" aria-hidden="true" tabindex="-1"></a><span class="ss">-   </span>Use the dashboard when repeated or long-running studies need live visibility.</span>
+<span id="cb12-278"><a href="#cb12-278" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-279"><a href="#cb12-279" aria-hidden="true" tabindex="-1"></a>The next chapter extends this diagnostic mindset into infrastructure. In <span class="co">[</span><span class="ot">Distributed and Scalable Optimization</span><span class="co">](11-distributed-scalable-optimization.qmd)</span>, we will look at storage backends, parallel execution, and the operational concerns that appear once optimization leaves the single-process notebook setting.</span>
+</code><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></pre></div>
+</div></div></div></div></div>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

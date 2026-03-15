@@ -6,7 +6,7 @@ jupyter: optuna-book
 book:
   title: "Optimization with Optuna: A Practical and Theoretical Guide to Modern Black-Box Optimization"
   subtitle: "Advanced Mini-Course"
-  author: "Miguel Angel"
+  author: "Miguel Conde"
   date: "3/14/2026" 
   chapters:
     - index.qmd

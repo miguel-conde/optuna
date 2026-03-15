@@ -1,0 +1,1835 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.7.31">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>4&nbsp; Optuna Architecture – Optimization with Optuna: A Practical and Theoretical Guide to Modern Black-Box Optimization</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<link href="../modules/05-basic-optuna-usage.html" rel="next">
+<link href="../modules/03-tpe-algorithm.html" rel="prev">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-e1a5c8363afafaef2c763b6775fbf3ca.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-84201f73209b7bbc7d36810704c07685.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script src="../site_libs/quarto-diagram/mermaid.min.js"></script>
+<script src="../site_libs/quarto-diagram/mermaid-init.js"></script>
+<link href="../site_libs/quarto-diagram/mermaid.css" rel="stylesheet">
+
+
+</head>
+
+<body class="nav-sidebar floating quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../modules/01-foundations-modern-optimization.html">Part I: Foundations</a></li><li class="breadcrumb-item"><a href="../modules/04-optuna-architecture.html"><span class="chapter-number">4</span>&nbsp; <span class="chapter-title">Optuna Architecture</span></a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="../">Optimization with Optuna: A Practical and Theoretical Guide to Modern Black-Box Optimization</a> 
+    </div>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Preface</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../intro.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Introduction</span></a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
+ <span class="menu-text">Part I: Foundations</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/01-foundations-modern-optimization.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">1</span>&nbsp; <span class="chapter-title">Foundations of Modern Optimization</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/02-bayesian-optimization-fundamentals.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">2</span>&nbsp; <span class="chapter-title">Bayesian Optimization Fundamentals</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/03-tpe-algorithm.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">3</span>&nbsp; <span class="chapter-title">The TPE Algorithm</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/04-optuna-architecture.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text"><span class="chapter-number">4</span>&nbsp; <span class="chapter-title">Optuna Architecture</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true">
+ <span class="menu-text">Part II: Core Usage</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/05-basic-optuna-usage.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">5</span>&nbsp; <span class="chapter-title">Basic Optuna Usage</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/06-designing-search-spaces.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">Designing Search Spaces</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/07-samplers.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">7</span>&nbsp; <span class="chapter-title">Samplers</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/08-pruning.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">8</span>&nbsp; <span class="chapter-title">Pruning</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true">
+ <span class="menu-text">Part III: Advanced Techniques</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/09-advanced-optimization-techniques.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">9</span>&nbsp; <span class="chapter-title">Advanced Optimization Techniques</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/10-visualization-diagnostics.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">10</span>&nbsp; <span class="chapter-title">Visualization and Diagnostics</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/11-distributed-scalable-optimization.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">11</span>&nbsp; <span class="chapter-title">Distributed and Scalable Optimization</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true">
+ <span class="menu-text">Part IV: Applications</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-4" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/12-optuna-machine-learning.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">12</span>&nbsp; <span class="chapter-title">Optuna for Machine Learning</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/13-optuna-general-optimization.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">13</span>&nbsp; <span class="chapter-title">Optuna for General Optimization</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/14-production-workflows.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">14</span>&nbsp; <span class="chapter-title">Production Workflows</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../modules/15-final-project.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">15</span>&nbsp; <span class="chapter-title">Final Project</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../summary.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Summary</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../references.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">References</span></a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true">
+ <span class="menu-text">Appendices</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-5" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../appendices/01-optuna-expert-cheat-sheet.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">A</span>&nbsp; <span class="chapter-title">Optuna Expert Cheat Sheet</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul>
+  <li><a href="#why-this-matters" id="toc-why-this-matters" class="nav-link active" data-scroll-target="#why-this-matters"><span class="header-section-number">4.1</span> Why This Matters</a></li>
+  <li><a href="#a-fast-first-win" id="toc-a-fast-first-win" class="nav-link" data-scroll-target="#a-fast-first-win"><span class="header-section-number">4.2</span> A Fast First Win</a></li>
+  <li><a href="#architecture-at-a-glance" id="toc-architecture-at-a-glance" class="nav-link" data-scroll-target="#architecture-at-a-glance"><span class="header-section-number">4.3</span> Architecture at a Glance</a></li>
+  <li><a href="#the-study-object" id="toc-the-study-object" class="nav-link" data-scroll-target="#the-study-object"><span class="header-section-number">4.4</span> The Study Object</a></li>
+  <li><a href="#the-trial-object" id="toc-the-trial-object" class="nav-link" data-scroll-target="#the-trial-object"><span class="header-section-number">4.5</span> The Trial Object</a>
+  <ul class="collapse">
+  <li><a href="#trial-lifecycle" id="toc-trial-lifecycle" class="nav-link" data-scroll-target="#trial-lifecycle"><span class="header-section-number">4.5.1</span> Trial lifecycle</a></li>
+  </ul></li>
+  <li><a href="#the-objective-function" id="toc-the-objective-function" class="nav-link" data-scroll-target="#the-objective-function"><span class="header-section-number">4.6</span> The Objective Function</a></li>
+  <li><a href="#the-search-space-and-define-by-run" id="toc-the-search-space-and-define-by-run" class="nav-link" data-scroll-target="#the-search-space-and-define-by-run"><span class="header-section-number">4.7</span> The Search Space and Define-by-Run</a></li>
+  <li><a href="#samplers" id="toc-samplers" class="nav-link" data-scroll-target="#samplers"><span class="header-section-number">4.8</span> Samplers</a></li>
+  <li><a href="#pruners" id="toc-pruners" class="nav-link" data-scroll-target="#pruners"><span class="header-section-number">4.9</span> Pruners</a></li>
+  <li><a href="#storage-backends" id="toc-storage-backends" class="nav-link" data-scroll-target="#storage-backends"><span class="header-section-number">4.10</span> Storage Backends</a>
+  <ul class="collapse">
+  <li><a href="#in-memory-storage" id="toc-in-memory-storage" class="nav-link" data-scroll-target="#in-memory-storage"><span class="header-section-number">4.10.1</span> In-memory storage</a></li>
+  <li><a href="#sqlite-storage" id="toc-sqlite-storage" class="nav-link" data-scroll-target="#sqlite-storage"><span class="header-section-number">4.10.2</span> SQLite storage</a></li>
+  <li><a href="#server-databases" id="toc-server-databases" class="nav-link" data-scroll-target="#server-databases"><span class="header-section-number">4.10.3</span> Server databases</a></li>
+  </ul></li>
+  <li><a href="#the-internal-optimization-loop" id="toc-the-internal-optimization-loop" class="nav-link" data-scroll-target="#the-internal-optimization-loop"><span class="header-section-number">4.11</span> The Internal Optimization Loop</a></li>
+  <li><a href="#a-minimal-end-to-end-example" id="toc-a-minimal-end-to-end-example" class="nav-link" data-scroll-target="#a-minimal-end-to-end-example"><span class="header-section-number">4.12</span> A Minimal End-to-End Example</a></li>
+  <li><a href="#practical-exercise-inspect-trial-objects" id="toc-practical-exercise-inspect-trial-objects" class="nav-link" data-scroll-target="#practical-exercise-inspect-trial-objects"><span class="header-section-number">4.13</span> Practical Exercise: Inspect Trial Objects</a></li>
+  <li><a href="#recap" id="toc-recap" class="nav-link" data-scroll-target="#recap"><span class="header-section-number">4.14</span> Recap</a></li>
+  <li><a href="#decision-guide" id="toc-decision-guide" class="nav-link" data-scroll-target="#decision-guide"><span class="header-section-number">4.15</span> Decision Guide</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../modules/01-foundations-modern-optimization.html">Part I: Foundations</a></li><li class="breadcrumb-item"><a href="../modules/04-optuna-architecture.html"><span class="chapter-number">4</span>&nbsp; <span class="chapter-title">Optuna Architecture</span></a></li></ol></nav>
+<div class="quarto-title">
+<div class="quarto-title-block"><div><h1 class="title"><span class="chapter-number">4</span>&nbsp; <span class="chapter-title">Optuna Architecture</span></h1><button type="button" class="btn code-tools-button" id="quarto-code-tools-source"><i class="bi"></i> Code</button></div></div>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>This chapter explains how Optuna is structured internally and how its main components cooperate during optimization. Once you understand the architecture, the library becomes easier to reason about: a study manages trials, a sampler proposes parameters, a pruner decides whether a trial should continue, and storage records the whole process.</p>
+<p>By the end of the chapter, you should be able to describe the role of the study, trial, objective function, search space, sampler, pruner, and storage backend, and explain how they interact inside Optuna’s optimization loop.</p>
+<p>This chapter assumes you already understand the optimization ideas behind <a href="../modules/03-tpe-algorithm.html">The TPE Algorithm</a>. Here the focus shifts from theory to the actual objects Optuna exposes.</p>
+<section id="why-this-matters" class="level2" data-number="4.1">
+<h2 data-number="4.1" class="anchored" data-anchor-id="why-this-matters"><span class="header-section-number">4.1</span> Why This Matters</h2>
+<p>Many Optuna users start by copying a short example and calling <code>study.optimize(...)</code>. That is enough to get results, but not enough to debug failures, interpret trial states, reason about pruning, or choose the right storage backend once experiments become more serious.</p>
+<p>Understanding the architecture matters because Optuna is not just a function minimizer. It is a coordination layer for optimization logic, experiment state, and execution flow.</p>
+</section>
+<section id="a-fast-first-win" class="level2" data-number="4.2">
+<h2 data-number="4.2" class="anchored" data-anchor-id="a-fast-first-win"><span class="header-section-number">4.2</span> A Fast First Win</h2>
+<p>The quickest way to see the architecture is to run a tiny study and inspect the central objects it produces.</p>
+<div id="ccadc7d7" class="cell" data-execution_count="1">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> optuna</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective(trial):</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    x <span class="op">=</span> trial.suggest_float(<span class="st">"x"</span>, <span class="op">-</span><span class="dv">10</span>, <span class="dv">10</span>)</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (x <span class="op">-</span> <span class="dv">2</span>) <span class="op">**</span> <span class="dv">2</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>study <span class="op">=</span> optuna.create_study(direction<span class="op">=</span><span class="st">"minimize"</span>)</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>study.optimize(objective, n_trials<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Best params:"</span>, study.best_params)</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Best value:"</span>, <span class="bu">round</span>(study.best_value, <span class="dv">4</span>))</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Number of trials:"</span>, <span class="bu">len</span>(study.trials))</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"First trial state:"</span>, study.trials[<span class="dv">0</span>].state)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<div class="ansi-escaped-output">
+<pre><span class="ansi-green-fg">[I 2026-03-15 07:55:35,536]</span> A new study created in memory with name: no-name-8d78a360-a82d-436b-a678-10143c67e315
+
+<span class="ansi-green-fg">[I 2026-03-15 07:55:35,540]</span> Trial 0 finished with value: 105.50518410129273 and parameters: {'x': -8.271571647089491}. Best is trial 0 with value: 105.50518410129273.
+
+<span class="ansi-green-fg">[I 2026-03-15 07:55:35,541]</span> Trial 1 finished with value: 12.76751835870536 and parameters: {'x': -1.5731664331101847}. Best is trial 1 with value: 12.76751835870536.
+
+<span class="ansi-green-fg">[I 2026-03-15 07:55:35,543]</span> Trial 2 finished with value: 48.306843388239976 and parameters: {'x': -4.950312466949955}. Best is trial 1 with value: 12.76751835870536.
+
+<span class="ansi-green-fg">[I 2026-03-15 07:55:35,546]</span> Trial 3 finished with value: 3.3741845056310393 and parameters: {'x': 0.16310465577620903}. Best is trial 3 with value: 3.3741845056310393.
+
+<span class="ansi-green-fg">[I 2026-03-15 07:55:35,548]</span> Trial 4 finished with value: 21.720995813588125 and parameters: {'x': 6.660578913996428}. Best is trial 3 with value: 3.3741845056310393.
+
+<span class="ansi-green-fg">[I 2026-03-15 07:55:35,552]</span> Trial 5 finished with value: 19.525575544169524 and parameters: {'x': 6.4187753443878}. Best is trial 3 with value: 3.3741845056310393.
+
+<span class="ansi-green-fg">[I 2026-03-15 07:55:35,554]</span> Trial 6 finished with value: 48.208417672261156 and parameters: {'x': 8.943228188116905}. Best is trial 3 with value: 3.3741845056310393.
+
+<span class="ansi-green-fg">[I 2026-03-15 07:55:35,556]</span> Trial 7 finished with value: 62.18057449817327 and parameters: {'x': 9.885466029232088}. Best is trial 3 with value: 3.3741845056310393.
+</pre>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Best params: {'x': 0.16310465577620903}
+Best value: 3.3742
+Number of trials: 8
+First trial state: TrialState.COMPLETE</code></pre>
+</div>
+</div>
+<p>This small example already exercises the core architecture:</p>
+<ul>
+<li>A <code>Study</code> manages the experiment.</li>
+<li>Each <code>Trial</code> evaluates one parameter configuration.</li>
+<li>The objective function defines the problem.</li>
+<li>The sampler proposes candidate parameter values.</li>
+<li>Results are stored and exposed through the study object.</li>
+</ul>
+</section>
+<section id="architecture-at-a-glance" class="level2" data-number="4.3">
+<h2 data-number="4.3" class="anchored" data-anchor-id="architecture-at-a-glance"><span class="header-section-number">4.3</span> Architecture at a Glance</h2>
+<p>An Optuna optimization run consists of several interacting components:</p>
+<pre class="text"><code>Study
+ ├── Trials
+ │     ├── Parameters
+ │     ├── Objective value
+ │     └── Intermediate results
+ │
+ ├── Sampler
+ ├── Pruner
+ └── Storage</code></pre>
+<p>The <code>Study</code> is the central coordination object. Most of Optuna’s public API is organized around it.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">flowchart LR
+    A[Study] --&gt; B[Sampler proposes parameters]
+    B --&gt; C[Trial object created]
+    C --&gt; D[Objective function runs]
+    D --&gt; E[Intermediate values reported]
+    E --&gt; F[Pruner may stop trial]
+    F --&gt; G[Result stored]
+    G --&gt; A
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</section>
+<section id="the-study-object" class="level2" data-number="4.4">
+<h2 data-number="4.4" class="anchored" data-anchor-id="the-study-object"><span class="header-section-number">4.4</span> The Study Object</h2>
+<p>A <code>Study</code> represents one complete optimization experiment.</p>
+<p>It manages:</p>
+<ul>
+<li>All trials in the experiment.</li>
+<li>The sampler.</li>
+<li>The pruner.</li>
+<li>The storage backend.</li>
+<li>The optimization direction.</li>
+</ul>
+<p>Creating a study is usually the first Optuna step:</p>
+<div id="4dae8a85" class="cell" data-execution_count="2">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> optuna</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>study <span class="op">=</span> optuna.create_study(direction<span class="op">=</span><span class="st">"minimize"</span>)</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="bu">type</span>(study).<span class="va">__name__</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<div class="ansi-escaped-output">
+<pre><span class="ansi-green-fg">[I 2026-03-15 07:55:35,586]</span> A new study created in memory with name: no-name-93058f07-f49d-41bc-8650-8a351a8ce226
+</pre>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Study</code></pre>
+</div>
+</div>
+<p>You can think of the study as the experiment manager. It schedules trials, collects results, tracks the best outcome, and exposes the overall state of the optimization.</p>
+<p>Important study operations include:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>study.optimize(objective, n_trials<span class="op">=</span><span class="dv">100</span>)</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>study.best_params</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>study.best_value</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>study.best_trial</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>study.trials</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="the-trial-object" class="level2" data-number="4.5">
+<h2 data-number="4.5" class="anchored" data-anchor-id="the-trial-object"><span class="header-section-number">4.5</span> The Trial Object</h2>
+<p>A <code>Trial</code> represents one evaluation of the objective function.</p>
+<p>Each trial stores:</p>
+<ul>
+<li>Parameter values.</li>
+<li>The final objective value.</li>
+<li>Intermediate values reported during training or iteration.</li>
+<li>Metadata such as state and timestamps.</li>
+</ul>
+<p>Conceptually, the flow looks like this:</p>
+<pre class="text"><code>Trial 1 -&gt; parameters -&gt; objective -&gt; result
+Trial 2 -&gt; parameters -&gt; objective -&gt; result
+Trial 3 -&gt; parameters -&gt; objective -&gt; result</code></pre>
+<p>Trials are created and managed by the study, but the objective function interacts with them directly.</p>
+<section id="trial-lifecycle" class="level3" data-number="4.5.1">
+<h3 data-number="4.5.1" class="anchored" data-anchor-id="trial-lifecycle"><span class="header-section-number">4.5.1</span> Trial lifecycle</h3>
+<pre class="text"><code>CREATED
+  ↓
+RUNNING
+  ↓
+COMPLETE / PRUNED / FAILED</code></pre>
+<p>Common states include:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>State</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>COMPLETE</code></td>
+<td>Trial finished successfully</td>
+</tr>
+<tr class="even">
+<td><code>PRUNED</code></td>
+<td>Trial was stopped early</td>
+</tr>
+<tr class="odd">
+<td><code>FAILED</code></td>
+<td>Trial ended with an error</td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="the-objective-function" class="level2" data-number="4.6">
+<h2 data-number="4.6" class="anchored" data-anchor-id="the-objective-function"><span class="header-section-number">4.6</span> The Objective Function</h2>
+<p>The objective function defines the optimization problem. It receives a <code>Trial</code> object and returns the scalar value to minimize or maximize.</p>
+<div id="d9c45bfb" class="cell" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective(trial):</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>    x <span class="op">=</span> trial.suggest_float(<span class="st">"x"</span>, <span class="op">-</span><span class="dv">10</span>, <span class="dv">10</span>)</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (x <span class="op">-</span> <span class="dv">2</span>) <span class="op">**</span> <span class="dv">2</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Inside the objective function, you usually do three things:</p>
+<ol type="1">
+<li>Define parameters through <code>trial.suggest_*</code> methods.</li>
+<li>Evaluate the model, simulation, or function.</li>
+<li>Return the result.</li>
+</ol>
+<p>That returned result becomes the stored trial value.</p>
+</section>
+<section id="the-search-space-and-define-by-run" class="level2" data-number="4.7">
+<h2 data-number="4.7" class="anchored" data-anchor-id="the-search-space-and-define-by-run"><span class="header-section-number">4.7</span> The Search Space and Define-by-Run</h2>
+<p>The search space is the set of parameters Optuna is allowed to explore.</p>
+<p>Optuna uses a define-by-run API, which means the search space is created dynamically during execution rather than declared in a separate static schema.</p>
+<p>For example:</p>
+<div id="4aee0bcd" class="cell" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective(trial):</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>    x <span class="op">=</span> trial.suggest_float(<span class="st">"x"</span>, <span class="op">-</span><span class="dv">5</span>, <span class="dv">5</span>)</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>    depth <span class="op">=</span> trial.suggest_int(<span class="st">"depth"</span>, <span class="dv">3</span>, <span class="dv">10</span>)</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>    optimizer <span class="op">=</span> trial.suggest_categorical(<span class="st">"optimizer"</span>, [<span class="st">"adam"</span>, <span class="st">"sgd"</span>])</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>    lr <span class="op">=</span> trial.suggest_float(<span class="st">"lr"</span>, <span class="fl">1e-5</span>, <span class="fl">1e-1</span>, log<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> x<span class="op">**</span><span class="dv">2</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>This approach is powerful because it supports dynamic and conditional spaces naturally.</p>
+<div id="9c75a2c0" class="cell" data-execution_count="5">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective(trial):</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>    model <span class="op">=</span> trial.suggest_categorical(<span class="st">"model"</span>, [<span class="st">"svm"</span>, <span class="st">"rf"</span>])</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> model <span class="op">==</span> <span class="st">"rf"</span>:</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>        depth <span class="op">=</span> trial.suggest_int(<span class="st">"depth"</span>, <span class="dv">3</span>, <span class="dv">10</span>)</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="fl">0.0</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>That is exactly the kind of tree-structured space where TPE is especially useful, which is why this chapter connects directly back to <a href="../modules/03-tpe-algorithm.html">The TPE Algorithm</a>.</p>
+</section>
+<section id="samplers" class="level2" data-number="4.8">
+<h2 data-number="4.8" class="anchored" data-anchor-id="samplers"><span class="header-section-number">4.8</span> Samplers</h2>
+<p>The sampler decides how Optuna chooses new parameter values.</p>
+<p>In other words, the sampler implements the optimization strategy.</p>
+<p>Examples include:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Sampler</th>
+<th>Method</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>TPESampler</code></td>
+<td>Bayesian-style density estimation</td>
+</tr>
+<tr class="even">
+<td><code>RandomSampler</code></td>
+<td>Random search</td>
+</tr>
+<tr class="odd">
+<td><code>CmaEsSampler</code></td>
+<td>Evolutionary strategy</td>
+</tr>
+<tr class="even">
+<td><code>GridSampler</code></td>
+<td>Exhaustive grid search</td>
+</tr>
+</tbody>
+</table>
+<p>You can pass a sampler explicitly when creating a study:</p>
+<div id="81fe5bce" class="cell" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>study <span class="op">=</span> optuna.create_study(</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>    direction<span class="op">=</span><span class="st">"minimize"</span>,</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>    sampler<span class="op">=</span>optuna.samplers.TPESampler(),</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="bu">type</span>(study.sampler).<span class="va">__name__</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<div class="ansi-escaped-output">
+<pre><span class="ansi-green-fg">[I 2026-03-15 07:55:35,687]</span> A new study created in memory with name: no-name-eba11095-4da0-4cf0-a2d6-f34c31bd2a66
+</pre>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>TPESampler</code></pre>
+</div>
+</div>
+<p>If you do not specify one, Optuna uses TPE by default for many standard single-objective optimization tasks.</p>
+</section>
+<section id="pruners" class="level2" data-number="4.9">
+<h2 data-number="4.9" class="anchored" data-anchor-id="pruners"><span class="header-section-number">4.9</span> Pruners</h2>
+<p>Pruners implement early stopping. They decide whether a trial is unlikely to become competitive and should be terminated before finishing.</p>
+<p>This is especially useful when objective evaluations are expensive and produce intermediate progress signals, such as training loss by epoch.</p>
+<p>Typical use cases include:</p>
+<ul>
+<li>Deep learning training.</li>
+<li>Boosting methods.</li>
+<li>Iterative simulations.</li>
+</ul>
+<p>Here is the basic pattern:</p>
+<div id="3f5f7708" class="cell" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective(trial):</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>    x <span class="op">=</span> trial.suggest_float(<span class="st">"x"</span>, <span class="op">-</span><span class="dv">5</span>, <span class="dv">5</span>)</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> step <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">5</span>):</span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>        value <span class="op">=</span> (x <span class="op">-</span> <span class="dv">2</span>) <span class="op">**</span> <span class="dv">2</span> <span class="op">+</span> <span class="dv">1</span> <span class="op">/</span> (step <span class="op">+</span> <span class="dv">1</span>)</span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>        trial.report(value, step)</span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> trial.should_prune():</span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>            <span class="cf">raise</span> optuna.TrialPruned()</span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> value</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Popular pruners include:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Pruner</th>
+<th>Strategy</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>MedianPruner</code></td>
+<td>Stops trials worse than the historical median</td>
+</tr>
+<tr class="even">
+<td><code>SuccessiveHalvingPruner</code></td>
+<td>Resource-based elimination</td>
+</tr>
+<tr class="odd">
+<td><code>HyperbandPruner</code></td>
+<td>Multi-bracket early stopping</td>
+</tr>
+</tbody>
+</table>
+<p>We will study pruning in depth later, but architecturally the main point is simple: the pruner depends on intermediate reports from the trial.</p>
+</section>
+<section id="storage-backends" class="level2" data-number="4.10">
+<h2 data-number="4.10" class="anchored" data-anchor-id="storage-backends"><span class="header-section-number">4.10</span> Storage Backends</h2>
+<p>Optuna supports both in-memory and persistent storage.</p>
+<p>Storage matters because it enables:</p>
+<ul>
+<li>Experiment tracking.</li>
+<li>Fault tolerance.</li>
+<li>Parallel or distributed optimization.</li>
+</ul>
+<section id="in-memory-storage" class="level3" data-number="4.10.1">
+<h3 data-number="4.10.1" class="anchored" data-anchor-id="in-memory-storage"><span class="header-section-number">4.10.1</span> In-memory storage</h3>
+<div id="b1653e8d" class="cell" data-execution_count="8">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>study <span class="op">=</span> optuna.create_study(direction<span class="op">=</span><span class="st">"minimize"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<div class="ansi-escaped-output">
+<pre><span class="ansi-green-fg">[I 2026-03-15 07:55:35,743]</span> A new study created in memory with name: no-name-6cd1deee-feba-48d9-8b8e-7c6c1509a8e4
+</pre>
+</div>
+</div>
+</div>
+<p>This is convenient for quick experiments, but the results disappear when the process ends.</p>
+</section>
+<section id="sqlite-storage" class="level3" data-number="4.10.2">
+<h3 data-number="4.10.2" class="anchored" data-anchor-id="sqlite-storage"><span class="header-section-number">4.10.2</span> SQLite storage</h3>
+<div class="sourceCode" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>study <span class="op">=</span> optuna.create_study(</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>    direction<span class="op">=</span><span class="st">"minimize"</span>,</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>    storage<span class="op">=</span><span class="st">"sqlite:///example.db"</span>,</span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>This persists the study in a local database file.</p>
+</section>
+<section id="server-databases" class="level3" data-number="4.10.3">
+<h3 data-number="4.10.3" class="anchored" data-anchor-id="server-databases"><span class="header-section-number">4.10.3</span> Server databases</h3>
+<p>For larger or distributed workloads, Optuna can use databases such as PostgreSQL or MySQL.</p>
+<div class="sourceCode" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>storage <span class="op">=</span> <span class="st">"postgresql://user:pass@host/db"</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>This allows multiple worker processes or machines to coordinate through shared study storage.</p>
+</section>
+</section>
+<section id="the-internal-optimization-loop" class="level2" data-number="4.11">
+<h2 data-number="4.11" class="anchored" data-anchor-id="the-internal-optimization-loop"><span class="header-section-number">4.11</span> The Internal Optimization Loop</h2>
+<p>At a high level, Optuna repeatedly runs a loop like this:</p>
+<pre class="text"><code>while trials_remaining:
+    sampler -&gt; propose parameters
+    trial -&gt; run objective
+    record result
+    pruner -&gt; check early stopping
+    update sampler</code></pre>
+<p>A more detailed view is:</p>
+<pre class="text"><code>Study starts
+   ↓
+Sampler suggests parameters
+   ↓
+Trial object created
+   ↓
+Objective function executed
+   ↓
+Intermediate results reported
+   ↓
+Pruner may stop trial
+   ↓
+Result stored
+   ↓
+Sampler updates model</code></pre>
+<p>This repeats until a stopping condition is reached, such as a target number of trials, a timeout, or an external stop.</p>
+<div class="callout callout-style-simple callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Common Mistake
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Do not think of the sampler, trial, and study as separate convenience features. They are parts of one coordinated system. Confusion usually appears when users try to reason about trial behavior without understanding which decisions belong to the study, which belong to the sampler, and which must happen inside the objective function.</p>
+</div>
+</div>
+</section>
+<section id="a-minimal-end-to-end-example" class="level2" data-number="4.12">
+<h2 data-number="4.12" class="anchored" data-anchor-id="a-minimal-end-to-end-example"><span class="header-section-number">4.12</span> A Minimal End-to-End Example</h2>
+<p>The following example exercises the whole architecture in a compact form:</p>
+<div id="9cb41cb7" class="cell" data-execution_count="9">
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> optuna</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective(trial):</span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>    x <span class="op">=</span> trial.suggest_float(<span class="st">"x"</span>, <span class="op">-</span><span class="dv">5</span>, <span class="dv">5</span>)</span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (x <span class="op">-</span> <span class="dv">2</span>) <span class="op">**</span> <span class="dv">2</span></span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a>study <span class="op">=</span> optuna.create_study(direction<span class="op">=</span><span class="st">"minimize"</span>)</span>
+<span id="cb20-10"><a href="#cb20-10" aria-hidden="true" tabindex="-1"></a>study.optimize(objective, n_trials<span class="op">=</span><span class="dv">20</span>)</span>
+<span id="cb20-11"><a href="#cb20-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-12"><a href="#cb20-12" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Best params:"</span>, study.best_params)</span>
+<span id="cb20-13"><a href="#cb20-13" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Best value:"</span>, <span class="bu">round</span>(study.best_value, <span class="dv">4</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<div class="ansi-escaped-output">
+<pre><span class="ansi-green-fg">[I 2026-03-15 07:55:35,771]</span> A new study created in memory with name: no-name-f158dc82-1b9e-4dcb-8eee-d4e35377d357
+
+<span class="ansi-green-fg">[I 2026-03-15 07:55:35,775]</span> Trial 0 finished with value: 25.010938575207422 and parameters: {'x': -3.0010937378944846}. Best is trial 0 with value: 25.010938575207422.
+
+<span class="ansi-green-fg">[I 2026-03-15 07:55:35,778]</span> Trial 1 finished with value: 6.373603397173531 and parameters: {'x': -0.5245996508701198}. Best is trial 1 with value: 6.373603397173531.
+
+<span class="ansi-green-fg">[I 2026-03-15 07:55:35,781]</span> Trial 2 finished with value: 3.421491502579817 and parameters: {'x': 3.8497274130476136}. Best is trial 2 with value: 3.421491502579817.
+
+<span class="ansi-green-fg">[I 2026-03-15 07:55:35,784]</span> Trial 3 finished with value: 27.001395038909294 and parameters: {'x': -3.19628665865436}. Best is trial 2 with value: 3.421491502579817.
+
+<span class="ansi-green-fg">[I 2026-03-15 07:55:35,787]</span> Trial 4 finished with value: 2.831706610920472 and parameters: {'x': 0.3172324548766481}. Best is trial 4 with value: 2.831706610920472.
+
+<span class="ansi-green-fg">[I 2026-03-15 07:55:35,789]</span> Trial 5 finished with value: 1.9651309619124393 and parameters: {'x': 3.401831288676508}. Best is trial 5 with value: 1.9651309619124393.
+
+<span class="ansi-green-fg">[I 2026-03-15 07:55:35,791]</span> Trial 6 finished with value: 5.597487107262885 and parameters: {'x': 4.365900908166461}. Best is trial 5 with value: 1.9651309619124393.
+
+<span class="ansi-green-fg">[I 2026-03-15 07:55:35,793]</span> Trial 7 finished with value: 7.495674783376098 and parameters: {'x': 4.737823000739109}. Best is trial 5 with value: 1.9651309619124393.
+
+<span class="ansi-green-fg">[I 2026-03-15 07:55:35,795]</span> Trial 8 finished with value: 0.724158827944623 and parameters: {'x': 1.1490247783016105}. Best is trial 8 with value: 0.724158827944623.
+
+<span class="ansi-green-fg">[I 2026-03-15 07:55:35,798]</span> Trial 9 finished with value: 3.879890456533642 and parameters: {'x': 3.969743754028336}. Best is trial 8 with value: 0.724158827944623.
+
+<span class="ansi-green-fg">[I 2026-03-15 07:55:35,805]</span> Trial 10 finished with value: 1.1082241772174513 and parameters: {'x': 0.9472777302548163}. Best is trial 8 with value: 0.724158827944623.
+
+<span class="ansi-green-fg">[I 2026-03-15 07:55:35,811]</span> Trial 11 finished with value: 0.8156245249502515 and parameters: {'x': 1.0968806695955116}. Best is trial 8 with value: 0.724158827944623.
+
+<span class="ansi-green-fg">[I 2026-03-15 07:55:35,816]</span> Trial 12 finished with value: 0.07748998356009856 and parameters: {'x': 1.7216297724969523}. Best is trial 12 with value: 0.07748998356009856.
+
+<span class="ansi-green-fg">[I 2026-03-15 07:55:35,821]</span> Trial 13 finished with value: 0.08609910977888655 and parameters: {'x': 2.293426498085784}. Best is trial 12 with value: 0.07748998356009856.
+
+<span class="ansi-green-fg">[I 2026-03-15 07:55:35,828]</span> Trial 14 finished with value: 0.1811964002957959 and parameters: {'x': 2.4256717048334266}. Best is trial 12 with value: 0.07748998356009856.
+
+<span class="ansi-green-fg">[I 2026-03-15 07:55:35,836]</span> Trial 15 finished with value: 10.357178833461568 and parameters: {'x': -1.2182571111490716}. Best is trial 12 with value: 0.07748998356009856.
+
+<span class="ansi-green-fg">[I 2026-03-15 07:55:35,841]</span> Trial 16 finished with value: 0.05724641159917123 and parameters: {'x': 2.239262223510464}. Best is trial 16 with value: 0.05724641159917123.
+
+<span class="ansi-green-fg">[I 2026-03-15 07:55:35,847]</span> Trial 17 finished with value: 14.420263181703552 and parameters: {'x': -1.7974021622292722}. Best is trial 16 with value: 0.05724641159917123.
+
+<span class="ansi-green-fg">[I 2026-03-15 07:55:35,852]</span> Trial 18 finished with value: 0.19395435710606462 and parameters: {'x': 2.4404024944366967}. Best is trial 16 with value: 0.05724641159917123.
+
+<span class="ansi-green-fg">[I 2026-03-15 07:55:35,856]</span> Trial 19 finished with value: 48.18574571479525 and parameters: {'x': -4.94159532923054}. Best is trial 16 with value: 0.05724641159917123.
+</pre>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Best params: {'x': 2.239262223510464}
+Best value: 0.0572</code></pre>
+</div>
+</div>
+<p>That code already includes the essential architecture: study creation, trial generation, search-space definition, sampler-driven suggestions, and result collection.</p>
+</section>
+<section id="practical-exercise-inspect-trial-objects" class="level2" data-number="4.13">
+<h2 data-number="4.13" class="anchored" data-anchor-id="practical-exercise-inspect-trial-objects"><span class="header-section-number">4.13</span> Practical Exercise: Inspect Trial Objects</h2>
+<p>After running a small study, inspect the recorded trial objects:</p>
+<div id="cb7ad484" class="cell" data-execution_count="10">
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> trial <span class="kw">in</span> study.trials[:<span class="dv">3</span>]:</span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"Trial:"</span>, trial.number)</span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"Params:"</span>, trial.params)</span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"Value:"</span>, trial.value)</span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"State:"</span>, trial.state)</span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Trial: 0
+Params: {'x': -3.0010937378944846}
+Value: 25.010938575207422
+State: TrialState.COMPLETE
+
+Trial: 1
+Params: {'x': -0.5245996508701198}
+Value: 6.373603397173531
+State: TrialState.COMPLETE
+
+Trial: 2
+Params: {'x': 3.8497274130476136}
+Value: 3.421491502579817
+State: TrialState.COMPLETE
+</code></pre>
+</div>
+</div>
+<p>You can also inspect one specific trial in more detail:</p>
+<div class="sourceCode" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>trial <span class="op">=</span> study.trials[<span class="dv">0</span>]</span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>trial.params</span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>trial.value</span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>trial.distributions</span>
+<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a>trial.datetime_start</span>
+<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a>trial.datetime_complete</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>This information is useful for debugging studies, analyzing optimization behavior, and later building dashboards or experiment summaries.</p>
+</section>
+<section id="recap" class="level2" data-number="4.14">
+<h2 data-number="4.14" class="anchored" data-anchor-id="recap"><span class="header-section-number">4.14</span> Recap</h2>
+<p>Optuna’s architecture consists of a small number of key components with distinct responsibilities:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Component</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>Study</code></td>
+<td>Manages the optimization experiment</td>
+</tr>
+<tr class="even">
+<td><code>Trial</code></td>
+<td>Represents one evaluation of the objective</td>
+</tr>
+<tr class="odd">
+<td>Objective function</td>
+<td>Defines the optimization problem</td>
+</tr>
+<tr class="even">
+<td>Search space</td>
+<td>Defines the tunable parameters</td>
+</tr>
+<tr class="odd">
+<td><code>Sampler</code></td>
+<td>Proposes parameter values</td>
+</tr>
+<tr class="even">
+<td><code>Pruner</code></td>
+<td>Stops weak trials early</td>
+</tr>
+<tr class="odd">
+<td>Storage</td>
+<td>Persists experiment state</td>
+</tr>
+</tbody>
+</table>
+<p>The main architectural idea is not complexity, but coordination. Optuna works because these components form an iterative feedback loop between proposing parameters, running evaluations, deciding whether to stop early, and storing results.</p>
+</section>
+<section id="decision-guide" class="level2" data-number="4.15">
+<h2 data-number="4.15" class="anchored" data-anchor-id="decision-guide"><span class="header-section-number">4.15</span> Decision Guide</h2>
+<p>Use the following mental model:</p>
+<ul>
+<li>Reach for the <code>Study</code> when you want experiment-level control.</li>
+<li>Reach for the <code>Trial</code> when defining parameters or reporting intermediate progress.</li>
+<li>Reach for samplers when changing optimization strategy.</li>
+<li>Reach for pruners when trial evaluations are iterative and expensive.</li>
+<li>Reach for persistent storage when experiments need to survive process boundaries or run in parallel.</li>
+</ul>
+<p>Next, <a href="../modules/05-basic-optuna-usage.html">Basic Optuna Usage</a> turns this architecture into practical day-to-day Optuna workflows.</p>
+
+
+<!-- -->
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+        const codeEl = trigger.previousElementSibling.cloneNode(true);
+        for (const childEl of codeEl.children) {
+          if (isCodeAnnotation(childEl)) {
+            childEl.remove();
+          }
+        }
+        return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+    const viewSource = window.document.getElementById('quarto-view-source') ||
+                       window.document.getElementById('quarto-code-tools-source');
+    if (viewSource) {
+      const sourceUrl = viewSource.getAttribute("data-quarto-source-url");
+      viewSource.addEventListener("click", function(e) {
+        if (sourceUrl) {
+          // rstudio viewer pane
+          if (/\bcapabilities=\b/.test(window.location)) {
+            window.open(sourceUrl);
+          } else {
+            window.location.href = sourceUrl;
+          }
+        } else {
+          const modal = new bootstrap.Modal(document.getElementById('quarto-embedded-source-code-modal'));
+          modal.show();
+        }
+        return false;
+      });
+    }
+    function toggleCodeHandler(show) {
+      return function(e) {
+        const detailsSrc = window.document.querySelectorAll(".cell > details > .sourceCode");
+        for (let i=0; i<detailsSrc.length; i++) {
+          const details = detailsSrc[i].parentElement;
+          if (show) {
+            details.open = true;
+          } else {
+            details.removeAttribute("open");
+          }
+        }
+        const cellCodeDivs = window.document.querySelectorAll(".cell > .sourceCode");
+        const fromCls = show ? "hidden" : "unhidden";
+        const toCls = show ? "unhidden" : "hidden";
+        for (let i=0; i<cellCodeDivs.length; i++) {
+          const codeDiv = cellCodeDivs[i];
+          if (codeDiv.classList.contains(fromCls)) {
+            codeDiv.classList.remove(fromCls);
+            codeDiv.classList.add(toCls);
+          } 
+        }
+        return false;
+      }
+    }
+    const hideAllCode = window.document.getElementById("quarto-hide-all-code");
+    if (hideAllCode) {
+      hideAllCode.addEventListener("click", toggleCodeHandler(false));
+    }
+    const showAllCode = window.document.getElementById("quarto-show-all-code");
+    if (showAllCode) {
+      showAllCode.addEventListener("click", toggleCodeHandler(true));
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+<nav class="page-navigation">
+  <div class="nav-page nav-page-previous">
+      <a href="../modules/03-tpe-algorithm.html" class="pagination-link" aria-label="The TPE Algorithm">
+        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text"><span class="chapter-number">3</span>&nbsp; <span class="chapter-title">The TPE Algorithm</span></span>
+      </a>          
+  </div>
+  <div class="nav-page nav-page-next">
+      <a href="../modules/05-basic-optuna-usage.html" class="pagination-link" aria-label="Basic Optuna Usage">
+        <span class="nav-page-text"><span class="chapter-number">5</span>&nbsp; <span class="chapter-title">Basic Optuna Usage</span></span> <i class="bi bi-arrow-right-short"></i>
+      </a>
+  </div>
+</nav><div class="modal fade" id="quarto-embedded-source-code-modal" tabindex="-1" aria-labelledby="quarto-embedded-source-code-modal-label" aria-hidden="true"><div class="modal-dialog modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="quarto-embedded-source-code-modal-label">Source Code</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="">
+<div class="sourceCode" id="cb25" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a><span class="an">title:</span><span class="co"> "Optuna Architecture"</span></span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a>This chapter explains how Optuna is structured internally and how its main components cooperate during optimization. Once you understand the architecture, the library becomes easier to reason about: a study manages trials, a sampler proposes parameters, a pruner decides whether a trial should continue, and storage records the whole process.</span>
+<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a>By the end of the chapter, you should be able to describe the role of the study, trial, objective function, search space, sampler, pruner, and storage backend, and explain how they interact inside Optuna's optimization loop.</span>
+<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-9"><a href="#cb25-9" aria-hidden="true" tabindex="-1"></a>This chapter assumes you already understand the optimization ideas behind <span class="co">[</span><span class="ot">The TPE Algorithm</span><span class="co">](03-tpe-algorithm.qmd)</span>. Here the focus shifts from theory to the actual objects Optuna exposes.</span>
+<span id="cb25-10"><a href="#cb25-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-11"><a href="#cb25-11" aria-hidden="true" tabindex="-1"></a><span class="fu">## Why This Matters</span></span>
+<span id="cb25-12"><a href="#cb25-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-13"><a href="#cb25-13" aria-hidden="true" tabindex="-1"></a>Many Optuna users start by copying a short example and calling <span class="in">`study.optimize(...)`</span>. That is enough to get results, but not enough to debug failures, interpret trial states, reason about pruning, or choose the right storage backend once experiments become more serious.</span>
+<span id="cb25-14"><a href="#cb25-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-15"><a href="#cb25-15" aria-hidden="true" tabindex="-1"></a>Understanding the architecture matters because Optuna is not just a function minimizer. It is a coordination layer for optimization logic, experiment state, and execution flow.</span>
+<span id="cb25-16"><a href="#cb25-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-17"><a href="#cb25-17" aria-hidden="true" tabindex="-1"></a><span class="fu">## A Fast First Win</span></span>
+<span id="cb25-18"><a href="#cb25-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-19"><a href="#cb25-19" aria-hidden="true" tabindex="-1"></a>The quickest way to see the architecture is to run a tiny study and inspect the central objects it produces.</span>
+<span id="cb25-20"><a href="#cb25-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-23"><a href="#cb25-23" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb25-24"><a href="#cb25-24" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> optuna</span>
+<span id="cb25-25"><a href="#cb25-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-26"><a href="#cb25-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-27"><a href="#cb25-27" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective(trial):</span>
+<span id="cb25-28"><a href="#cb25-28" aria-hidden="true" tabindex="-1"></a>    x <span class="op">=</span> trial.suggest_float(<span class="st">"x"</span>, <span class="op">-</span><span class="dv">10</span>, <span class="dv">10</span>)</span>
+<span id="cb25-29"><a href="#cb25-29" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (x <span class="op">-</span> <span class="dv">2</span>) <span class="op">**</span> <span class="dv">2</span></span>
+<span id="cb25-30"><a href="#cb25-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-31"><a href="#cb25-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-32"><a href="#cb25-32" aria-hidden="true" tabindex="-1"></a>study <span class="op">=</span> optuna.create_study(direction<span class="op">=</span><span class="st">"minimize"</span>)</span>
+<span id="cb25-33"><a href="#cb25-33" aria-hidden="true" tabindex="-1"></a>study.optimize(objective, n_trials<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb25-34"><a href="#cb25-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-35"><a href="#cb25-35" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Best params:"</span>, study.best_params)</span>
+<span id="cb25-36"><a href="#cb25-36" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Best value:"</span>, <span class="bu">round</span>(study.best_value, <span class="dv">4</span>))</span>
+<span id="cb25-37"><a href="#cb25-37" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Number of trials:"</span>, <span class="bu">len</span>(study.trials))</span>
+<span id="cb25-38"><a href="#cb25-38" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"First trial state:"</span>, study.trials[<span class="dv">0</span>].state)</span>
+<span id="cb25-39"><a href="#cb25-39" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb25-40"><a href="#cb25-40" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-41"><a href="#cb25-41" aria-hidden="true" tabindex="-1"></a>This small example already exercises the core architecture:</span>
+<span id="cb25-42"><a href="#cb25-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-43"><a href="#cb25-43" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>A <span class="in">`Study`</span> manages the experiment.</span>
+<span id="cb25-44"><a href="#cb25-44" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Each <span class="in">`Trial`</span> evaluates one parameter configuration.</span>
+<span id="cb25-45"><a href="#cb25-45" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>The objective function defines the problem.</span>
+<span id="cb25-46"><a href="#cb25-46" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>The sampler proposes candidate parameter values.</span>
+<span id="cb25-47"><a href="#cb25-47" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Results are stored and exposed through the study object.</span>
+<span id="cb25-48"><a href="#cb25-48" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-49"><a href="#cb25-49" aria-hidden="true" tabindex="-1"></a><span class="fu">## Architecture at a Glance</span></span>
+<span id="cb25-50"><a href="#cb25-50" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-51"><a href="#cb25-51" aria-hidden="true" tabindex="-1"></a>An Optuna optimization run consists of several interacting components:</span>
+<span id="cb25-52"><a href="#cb25-52" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-53"><a href="#cb25-53" aria-hidden="true" tabindex="-1"></a><span class="in">```text</span></span>
+<span id="cb25-54"><a href="#cb25-54" aria-hidden="true" tabindex="-1"></a><span class="in">Study</span></span>
+<span id="cb25-55"><a href="#cb25-55" aria-hidden="true" tabindex="-1"></a><span class="in"> ├── Trials</span></span>
+<span id="cb25-56"><a href="#cb25-56" aria-hidden="true" tabindex="-1"></a><span class="in"> │     ├── Parameters</span></span>
+<span id="cb25-57"><a href="#cb25-57" aria-hidden="true" tabindex="-1"></a><span class="in"> │     ├── Objective value</span></span>
+<span id="cb25-58"><a href="#cb25-58" aria-hidden="true" tabindex="-1"></a><span class="in"> │     └── Intermediate results</span></span>
+<span id="cb25-59"><a href="#cb25-59" aria-hidden="true" tabindex="-1"></a><span class="in"> │</span></span>
+<span id="cb25-60"><a href="#cb25-60" aria-hidden="true" tabindex="-1"></a><span class="in"> ├── Sampler</span></span>
+<span id="cb25-61"><a href="#cb25-61" aria-hidden="true" tabindex="-1"></a><span class="in"> ├── Pruner</span></span>
+<span id="cb25-62"><a href="#cb25-62" aria-hidden="true" tabindex="-1"></a><span class="in"> └── Storage</span></span>
+<span id="cb25-63"><a href="#cb25-63" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb25-64"><a href="#cb25-64" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-65"><a href="#cb25-65" aria-hidden="true" tabindex="-1"></a>The <span class="in">`Study`</span> is the central coordination object. Most of Optuna's public API is organized around it.</span>
+<span id="cb25-66"><a href="#cb25-66" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-69"><a href="#cb25-69" aria-hidden="true" tabindex="-1"></a><span class="in">```{mermaid}</span></span>
+<span id="cb25-70"><a href="#cb25-70" aria-hidden="true" tabindex="-1"></a>flowchart LR</span>
+<span id="cb25-71"><a href="#cb25-71" aria-hidden="true" tabindex="-1"></a>    A[Study] --&gt; B[Sampler proposes parameters]</span>
+<span id="cb25-72"><a href="#cb25-72" aria-hidden="true" tabindex="-1"></a>    B --&gt; C[Trial object created]</span>
+<span id="cb25-73"><a href="#cb25-73" aria-hidden="true" tabindex="-1"></a>    C --&gt; D[Objective function runs]</span>
+<span id="cb25-74"><a href="#cb25-74" aria-hidden="true" tabindex="-1"></a>    D --&gt; E[Intermediate <span class="fu">values</span> reported]</span>
+<span id="cb25-75"><a href="#cb25-75" aria-hidden="true" tabindex="-1"></a>    E --&gt; F[Pruner may stop trial]</span>
+<span id="cb25-76"><a href="#cb25-76" aria-hidden="true" tabindex="-1"></a>    F --&gt; G[Result stored]</span>
+<span id="cb25-77"><a href="#cb25-77" aria-hidden="true" tabindex="-1"></a>    G --&gt; A</span>
+<span id="cb25-78"><a href="#cb25-78" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb25-79"><a href="#cb25-79" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-80"><a href="#cb25-80" aria-hidden="true" tabindex="-1"></a><span class="fu">## The Study Object</span></span>
+<span id="cb25-81"><a href="#cb25-81" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-82"><a href="#cb25-82" aria-hidden="true" tabindex="-1"></a>A <span class="in">`Study`</span> represents one complete optimization experiment.</span>
+<span id="cb25-83"><a href="#cb25-83" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-84"><a href="#cb25-84" aria-hidden="true" tabindex="-1"></a>It manages:</span>
+<span id="cb25-85"><a href="#cb25-85" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-86"><a href="#cb25-86" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>All trials in the experiment.</span>
+<span id="cb25-87"><a href="#cb25-87" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>The sampler.</span>
+<span id="cb25-88"><a href="#cb25-88" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>The pruner.</span>
+<span id="cb25-89"><a href="#cb25-89" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>The storage backend.</span>
+<span id="cb25-90"><a href="#cb25-90" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>The optimization direction.</span>
+<span id="cb25-91"><a href="#cb25-91" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-92"><a href="#cb25-92" aria-hidden="true" tabindex="-1"></a>Creating a study is usually the first Optuna step:</span>
+<span id="cb25-93"><a href="#cb25-93" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-96"><a href="#cb25-96" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb25-97"><a href="#cb25-97" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> optuna</span>
+<span id="cb25-98"><a href="#cb25-98" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-99"><a href="#cb25-99" aria-hidden="true" tabindex="-1"></a>study <span class="op">=</span> optuna.create_study(direction<span class="op">=</span><span class="st">"minimize"</span>)</span>
+<span id="cb25-100"><a href="#cb25-100" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="bu">type</span>(study).<span class="va">__name__</span>)</span>
+<span id="cb25-101"><a href="#cb25-101" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb25-102"><a href="#cb25-102" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-103"><a href="#cb25-103" aria-hidden="true" tabindex="-1"></a>You can think of the study as the experiment manager. It schedules trials, collects results, tracks the best outcome, and exposes the overall state of the optimization.</span>
+<span id="cb25-104"><a href="#cb25-104" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-105"><a href="#cb25-105" aria-hidden="true" tabindex="-1"></a>Important study operations include:</span>
+<span id="cb25-106"><a href="#cb25-106" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-107"><a href="#cb25-107" aria-hidden="true" tabindex="-1"></a><span class="in">```python</span></span>
+<span id="cb25-108"><a href="#cb25-108" aria-hidden="true" tabindex="-1"></a>study.optimize(objective, n_trials<span class="op">=</span><span class="dv">100</span>)</span>
+<span id="cb25-109"><a href="#cb25-109" aria-hidden="true" tabindex="-1"></a>study.best_params</span>
+<span id="cb25-110"><a href="#cb25-110" aria-hidden="true" tabindex="-1"></a>study.best_value</span>
+<span id="cb25-111"><a href="#cb25-111" aria-hidden="true" tabindex="-1"></a>study.best_trial</span>
+<span id="cb25-112"><a href="#cb25-112" aria-hidden="true" tabindex="-1"></a>study.trials</span>
+<span id="cb25-113"><a href="#cb25-113" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb25-114"><a href="#cb25-114" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-115"><a href="#cb25-115" aria-hidden="true" tabindex="-1"></a><span class="fu">## The Trial Object</span></span>
+<span id="cb25-116"><a href="#cb25-116" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-117"><a href="#cb25-117" aria-hidden="true" tabindex="-1"></a>A <span class="in">`Trial`</span> represents one evaluation of the objective function.</span>
+<span id="cb25-118"><a href="#cb25-118" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-119"><a href="#cb25-119" aria-hidden="true" tabindex="-1"></a>Each trial stores:</span>
+<span id="cb25-120"><a href="#cb25-120" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-121"><a href="#cb25-121" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Parameter values.</span>
+<span id="cb25-122"><a href="#cb25-122" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>The final objective value.</span>
+<span id="cb25-123"><a href="#cb25-123" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Intermediate values reported during training or iteration.</span>
+<span id="cb25-124"><a href="#cb25-124" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Metadata such as state and timestamps.</span>
+<span id="cb25-125"><a href="#cb25-125" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-126"><a href="#cb25-126" aria-hidden="true" tabindex="-1"></a>Conceptually, the flow looks like this:</span>
+<span id="cb25-127"><a href="#cb25-127" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-128"><a href="#cb25-128" aria-hidden="true" tabindex="-1"></a><span class="in">```text</span></span>
+<span id="cb25-129"><a href="#cb25-129" aria-hidden="true" tabindex="-1"></a><span class="in">Trial 1 -&gt; parameters -&gt; objective -&gt; result</span></span>
+<span id="cb25-130"><a href="#cb25-130" aria-hidden="true" tabindex="-1"></a><span class="in">Trial 2 -&gt; parameters -&gt; objective -&gt; result</span></span>
+<span id="cb25-131"><a href="#cb25-131" aria-hidden="true" tabindex="-1"></a><span class="in">Trial 3 -&gt; parameters -&gt; objective -&gt; result</span></span>
+<span id="cb25-132"><a href="#cb25-132" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb25-133"><a href="#cb25-133" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-134"><a href="#cb25-134" aria-hidden="true" tabindex="-1"></a>Trials are created and managed by the study, but the objective function interacts with them directly.</span>
+<span id="cb25-135"><a href="#cb25-135" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-136"><a href="#cb25-136" aria-hidden="true" tabindex="-1"></a><span class="fu">### Trial lifecycle</span></span>
+<span id="cb25-137"><a href="#cb25-137" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-138"><a href="#cb25-138" aria-hidden="true" tabindex="-1"></a><span class="in">```text</span></span>
+<span id="cb25-139"><a href="#cb25-139" aria-hidden="true" tabindex="-1"></a><span class="in">CREATED</span></span>
+<span id="cb25-140"><a href="#cb25-140" aria-hidden="true" tabindex="-1"></a><span class="in">  ↓</span></span>
+<span id="cb25-141"><a href="#cb25-141" aria-hidden="true" tabindex="-1"></a><span class="in">RUNNING</span></span>
+<span id="cb25-142"><a href="#cb25-142" aria-hidden="true" tabindex="-1"></a><span class="in">  ↓</span></span>
+<span id="cb25-143"><a href="#cb25-143" aria-hidden="true" tabindex="-1"></a><span class="in">COMPLETE / PRUNED / FAILED</span></span>
+<span id="cb25-144"><a href="#cb25-144" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb25-145"><a href="#cb25-145" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-146"><a href="#cb25-146" aria-hidden="true" tabindex="-1"></a>Common states include:</span>
+<span id="cb25-147"><a href="#cb25-147" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-148"><a href="#cb25-148" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> State <span class="pp">|</span> Meaning <span class="pp">|</span></span>
+<span id="cb25-149"><a href="#cb25-149" aria-hidden="true" tabindex="-1"></a><span class="pp">| ---</span> <span class="pp">| ---</span> <span class="pp">|</span></span>
+<span id="cb25-150"><a href="#cb25-150" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`COMPLETE`</span> <span class="pp">|</span> Trial finished successfully <span class="pp">|</span></span>
+<span id="cb25-151"><a href="#cb25-151" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`PRUNED`</span> <span class="pp">|</span> Trial was stopped early <span class="pp">|</span></span>
+<span id="cb25-152"><a href="#cb25-152" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`FAILED`</span> <span class="pp">|</span> Trial ended with an error <span class="pp">|</span></span>
+<span id="cb25-153"><a href="#cb25-153" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-154"><a href="#cb25-154" aria-hidden="true" tabindex="-1"></a><span class="fu">## The Objective Function</span></span>
+<span id="cb25-155"><a href="#cb25-155" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-156"><a href="#cb25-156" aria-hidden="true" tabindex="-1"></a>The objective function defines the optimization problem. It receives a <span class="in">`Trial`</span> object and returns the scalar value to minimize or maximize.</span>
+<span id="cb25-157"><a href="#cb25-157" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-160"><a href="#cb25-160" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb25-161"><a href="#cb25-161" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective(trial):</span>
+<span id="cb25-162"><a href="#cb25-162" aria-hidden="true" tabindex="-1"></a>    x <span class="op">=</span> trial.suggest_float(<span class="st">"x"</span>, <span class="op">-</span><span class="dv">10</span>, <span class="dv">10</span>)</span>
+<span id="cb25-163"><a href="#cb25-163" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (x <span class="op">-</span> <span class="dv">2</span>) <span class="op">**</span> <span class="dv">2</span></span>
+<span id="cb25-164"><a href="#cb25-164" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb25-165"><a href="#cb25-165" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-166"><a href="#cb25-166" aria-hidden="true" tabindex="-1"></a>Inside the objective function, you usually do three things:</span>
+<span id="cb25-167"><a href="#cb25-167" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-168"><a href="#cb25-168" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>Define parameters through <span class="in">`trial.suggest_*`</span> methods.</span>
+<span id="cb25-169"><a href="#cb25-169" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>Evaluate the model, simulation, or function.</span>
+<span id="cb25-170"><a href="#cb25-170" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>Return the result.</span>
+<span id="cb25-171"><a href="#cb25-171" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-172"><a href="#cb25-172" aria-hidden="true" tabindex="-1"></a>That returned result becomes the stored trial value.</span>
+<span id="cb25-173"><a href="#cb25-173" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-174"><a href="#cb25-174" aria-hidden="true" tabindex="-1"></a><span class="fu">## The Search Space and Define-by-Run</span></span>
+<span id="cb25-175"><a href="#cb25-175" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-176"><a href="#cb25-176" aria-hidden="true" tabindex="-1"></a>The search space is the set of parameters Optuna is allowed to explore.</span>
+<span id="cb25-177"><a href="#cb25-177" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-178"><a href="#cb25-178" aria-hidden="true" tabindex="-1"></a>Optuna uses a define-by-run API, which means the search space is created dynamically during execution rather than declared in a separate static schema.</span>
+<span id="cb25-179"><a href="#cb25-179" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-180"><a href="#cb25-180" aria-hidden="true" tabindex="-1"></a>For example:</span>
+<span id="cb25-181"><a href="#cb25-181" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-184"><a href="#cb25-184" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb25-185"><a href="#cb25-185" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective(trial):</span>
+<span id="cb25-186"><a href="#cb25-186" aria-hidden="true" tabindex="-1"></a>    x <span class="op">=</span> trial.suggest_float(<span class="st">"x"</span>, <span class="op">-</span><span class="dv">5</span>, <span class="dv">5</span>)</span>
+<span id="cb25-187"><a href="#cb25-187" aria-hidden="true" tabindex="-1"></a>    depth <span class="op">=</span> trial.suggest_int(<span class="st">"depth"</span>, <span class="dv">3</span>, <span class="dv">10</span>)</span>
+<span id="cb25-188"><a href="#cb25-188" aria-hidden="true" tabindex="-1"></a>    optimizer <span class="op">=</span> trial.suggest_categorical(<span class="st">"optimizer"</span>, [<span class="st">"adam"</span>, <span class="st">"sgd"</span>])</span>
+<span id="cb25-189"><a href="#cb25-189" aria-hidden="true" tabindex="-1"></a>    lr <span class="op">=</span> trial.suggest_float(<span class="st">"lr"</span>, <span class="fl">1e-5</span>, <span class="fl">1e-1</span>, log<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb25-190"><a href="#cb25-190" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> x<span class="op">**</span><span class="dv">2</span></span>
+<span id="cb25-191"><a href="#cb25-191" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb25-192"><a href="#cb25-192" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-193"><a href="#cb25-193" aria-hidden="true" tabindex="-1"></a>This approach is powerful because it supports dynamic and conditional spaces naturally.</span>
+<span id="cb25-194"><a href="#cb25-194" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-197"><a href="#cb25-197" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb25-198"><a href="#cb25-198" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective(trial):</span>
+<span id="cb25-199"><a href="#cb25-199" aria-hidden="true" tabindex="-1"></a>    model <span class="op">=</span> trial.suggest_categorical(<span class="st">"model"</span>, [<span class="st">"svm"</span>, <span class="st">"rf"</span>])</span>
+<span id="cb25-200"><a href="#cb25-200" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-201"><a href="#cb25-201" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> model <span class="op">==</span> <span class="st">"rf"</span>:</span>
+<span id="cb25-202"><a href="#cb25-202" aria-hidden="true" tabindex="-1"></a>        depth <span class="op">=</span> trial.suggest_int(<span class="st">"depth"</span>, <span class="dv">3</span>, <span class="dv">10</span>)</span>
+<span id="cb25-203"><a href="#cb25-203" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-204"><a href="#cb25-204" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="fl">0.0</span></span>
+<span id="cb25-205"><a href="#cb25-205" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb25-206"><a href="#cb25-206" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-207"><a href="#cb25-207" aria-hidden="true" tabindex="-1"></a>That is exactly the kind of tree-structured space where TPE is especially useful, which is why this chapter connects directly back to <span class="co">[</span><span class="ot">The TPE Algorithm</span><span class="co">](03-tpe-algorithm.qmd)</span>.</span>
+<span id="cb25-208"><a href="#cb25-208" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-209"><a href="#cb25-209" aria-hidden="true" tabindex="-1"></a><span class="fu">## Samplers</span></span>
+<span id="cb25-210"><a href="#cb25-210" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-211"><a href="#cb25-211" aria-hidden="true" tabindex="-1"></a>The sampler decides how Optuna chooses new parameter values.</span>
+<span id="cb25-212"><a href="#cb25-212" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-213"><a href="#cb25-213" aria-hidden="true" tabindex="-1"></a>In other words, the sampler implements the optimization strategy.</span>
+<span id="cb25-214"><a href="#cb25-214" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-215"><a href="#cb25-215" aria-hidden="true" tabindex="-1"></a>Examples include:</span>
+<span id="cb25-216"><a href="#cb25-216" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-217"><a href="#cb25-217" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Sampler <span class="pp">|</span> Method <span class="pp">|</span></span>
+<span id="cb25-218"><a href="#cb25-218" aria-hidden="true" tabindex="-1"></a><span class="pp">| ---</span> <span class="pp">| ---</span> <span class="pp">|</span></span>
+<span id="cb25-219"><a href="#cb25-219" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`TPESampler`</span> <span class="pp">|</span> Bayesian-style density estimation <span class="pp">|</span></span>
+<span id="cb25-220"><a href="#cb25-220" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`RandomSampler`</span> <span class="pp">|</span> Random search <span class="pp">|</span></span>
+<span id="cb25-221"><a href="#cb25-221" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`CmaEsSampler`</span> <span class="pp">|</span> Evolutionary strategy <span class="pp">|</span></span>
+<span id="cb25-222"><a href="#cb25-222" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`GridSampler`</span> <span class="pp">|</span> Exhaustive grid search <span class="pp">|</span></span>
+<span id="cb25-223"><a href="#cb25-223" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-224"><a href="#cb25-224" aria-hidden="true" tabindex="-1"></a>You can pass a sampler explicitly when creating a study:</span>
+<span id="cb25-225"><a href="#cb25-225" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-228"><a href="#cb25-228" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb25-229"><a href="#cb25-229" aria-hidden="true" tabindex="-1"></a>study <span class="op">=</span> optuna.create_study(</span>
+<span id="cb25-230"><a href="#cb25-230" aria-hidden="true" tabindex="-1"></a>    direction<span class="op">=</span><span class="st">"minimize"</span>,</span>
+<span id="cb25-231"><a href="#cb25-231" aria-hidden="true" tabindex="-1"></a>    sampler<span class="op">=</span>optuna.samplers.TPESampler(),</span>
+<span id="cb25-232"><a href="#cb25-232" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb25-233"><a href="#cb25-233" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-234"><a href="#cb25-234" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="bu">type</span>(study.sampler).<span class="va">__name__</span>)</span>
+<span id="cb25-235"><a href="#cb25-235" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb25-236"><a href="#cb25-236" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-237"><a href="#cb25-237" aria-hidden="true" tabindex="-1"></a>If you do not specify one, Optuna uses TPE by default for many standard single-objective optimization tasks.</span>
+<span id="cb25-238"><a href="#cb25-238" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-239"><a href="#cb25-239" aria-hidden="true" tabindex="-1"></a><span class="fu">## Pruners</span></span>
+<span id="cb25-240"><a href="#cb25-240" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-241"><a href="#cb25-241" aria-hidden="true" tabindex="-1"></a>Pruners implement early stopping. They decide whether a trial is unlikely to become competitive and should be terminated before finishing.</span>
+<span id="cb25-242"><a href="#cb25-242" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-243"><a href="#cb25-243" aria-hidden="true" tabindex="-1"></a>This is especially useful when objective evaluations are expensive and produce intermediate progress signals, such as training loss by epoch.</span>
+<span id="cb25-244"><a href="#cb25-244" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-245"><a href="#cb25-245" aria-hidden="true" tabindex="-1"></a>Typical use cases include:</span>
+<span id="cb25-246"><a href="#cb25-246" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-247"><a href="#cb25-247" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Deep learning training.</span>
+<span id="cb25-248"><a href="#cb25-248" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Boosting methods.</span>
+<span id="cb25-249"><a href="#cb25-249" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Iterative simulations.</span>
+<span id="cb25-250"><a href="#cb25-250" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-251"><a href="#cb25-251" aria-hidden="true" tabindex="-1"></a>Here is the basic pattern:</span>
+<span id="cb25-252"><a href="#cb25-252" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-255"><a href="#cb25-255" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb25-256"><a href="#cb25-256" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective(trial):</span>
+<span id="cb25-257"><a href="#cb25-257" aria-hidden="true" tabindex="-1"></a>    x <span class="op">=</span> trial.suggest_float(<span class="st">"x"</span>, <span class="op">-</span><span class="dv">5</span>, <span class="dv">5</span>)</span>
+<span id="cb25-258"><a href="#cb25-258" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-259"><a href="#cb25-259" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> step <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">5</span>):</span>
+<span id="cb25-260"><a href="#cb25-260" aria-hidden="true" tabindex="-1"></a>        value <span class="op">=</span> (x <span class="op">-</span> <span class="dv">2</span>) <span class="op">**</span> <span class="dv">2</span> <span class="op">+</span> <span class="dv">1</span> <span class="op">/</span> (step <span class="op">+</span> <span class="dv">1</span>)</span>
+<span id="cb25-261"><a href="#cb25-261" aria-hidden="true" tabindex="-1"></a>        trial.report(value, step)</span>
+<span id="cb25-262"><a href="#cb25-262" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-263"><a href="#cb25-263" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> trial.should_prune():</span>
+<span id="cb25-264"><a href="#cb25-264" aria-hidden="true" tabindex="-1"></a>            <span class="cf">raise</span> optuna.TrialPruned()</span>
+<span id="cb25-265"><a href="#cb25-265" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-266"><a href="#cb25-266" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> value</span>
+<span id="cb25-267"><a href="#cb25-267" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb25-268"><a href="#cb25-268" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-269"><a href="#cb25-269" aria-hidden="true" tabindex="-1"></a>Popular pruners include:</span>
+<span id="cb25-270"><a href="#cb25-270" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-271"><a href="#cb25-271" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Pruner <span class="pp">|</span> Strategy <span class="pp">|</span></span>
+<span id="cb25-272"><a href="#cb25-272" aria-hidden="true" tabindex="-1"></a><span class="pp">| ---</span> <span class="pp">| ---</span> <span class="pp">|</span></span>
+<span id="cb25-273"><a href="#cb25-273" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`MedianPruner`</span> <span class="pp">|</span> Stops trials worse than the historical median <span class="pp">|</span></span>
+<span id="cb25-274"><a href="#cb25-274" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`SuccessiveHalvingPruner`</span> <span class="pp">|</span> Resource-based elimination <span class="pp">|</span></span>
+<span id="cb25-275"><a href="#cb25-275" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`HyperbandPruner`</span> <span class="pp">|</span> Multi-bracket early stopping <span class="pp">|</span></span>
+<span id="cb25-276"><a href="#cb25-276" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-277"><a href="#cb25-277" aria-hidden="true" tabindex="-1"></a>We will study pruning in depth later, but architecturally the main point is simple: the pruner depends on intermediate reports from the trial.</span>
+<span id="cb25-278"><a href="#cb25-278" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-279"><a href="#cb25-279" aria-hidden="true" tabindex="-1"></a><span class="fu">## Storage Backends</span></span>
+<span id="cb25-280"><a href="#cb25-280" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-281"><a href="#cb25-281" aria-hidden="true" tabindex="-1"></a>Optuna supports both in-memory and persistent storage.</span>
+<span id="cb25-282"><a href="#cb25-282" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-283"><a href="#cb25-283" aria-hidden="true" tabindex="-1"></a>Storage matters because it enables:</span>
+<span id="cb25-284"><a href="#cb25-284" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-285"><a href="#cb25-285" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Experiment tracking.</span>
+<span id="cb25-286"><a href="#cb25-286" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Fault tolerance.</span>
+<span id="cb25-287"><a href="#cb25-287" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Parallel or distributed optimization.</span>
+<span id="cb25-288"><a href="#cb25-288" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-289"><a href="#cb25-289" aria-hidden="true" tabindex="-1"></a><span class="fu">### In-memory storage</span></span>
+<span id="cb25-290"><a href="#cb25-290" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-293"><a href="#cb25-293" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb25-294"><a href="#cb25-294" aria-hidden="true" tabindex="-1"></a>study <span class="op">=</span> optuna.create_study(direction<span class="op">=</span><span class="st">"minimize"</span>)</span>
+<span id="cb25-295"><a href="#cb25-295" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb25-296"><a href="#cb25-296" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-297"><a href="#cb25-297" aria-hidden="true" tabindex="-1"></a>This is convenient for quick experiments, but the results disappear when the process ends.</span>
+<span id="cb25-298"><a href="#cb25-298" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-299"><a href="#cb25-299" aria-hidden="true" tabindex="-1"></a><span class="fu">### SQLite storage</span></span>
+<span id="cb25-300"><a href="#cb25-300" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-301"><a href="#cb25-301" aria-hidden="true" tabindex="-1"></a><span class="in">```python</span></span>
+<span id="cb25-302"><a href="#cb25-302" aria-hidden="true" tabindex="-1"></a>study <span class="op">=</span> optuna.create_study(</span>
+<span id="cb25-303"><a href="#cb25-303" aria-hidden="true" tabindex="-1"></a>    direction<span class="op">=</span><span class="st">"minimize"</span>,</span>
+<span id="cb25-304"><a href="#cb25-304" aria-hidden="true" tabindex="-1"></a>    storage<span class="op">=</span><span class="st">"sqlite:///example.db"</span>,</span>
+<span id="cb25-305"><a href="#cb25-305" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb25-306"><a href="#cb25-306" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb25-307"><a href="#cb25-307" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-308"><a href="#cb25-308" aria-hidden="true" tabindex="-1"></a>This persists the study in a local database file.</span>
+<span id="cb25-309"><a href="#cb25-309" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-310"><a href="#cb25-310" aria-hidden="true" tabindex="-1"></a><span class="fu">### Server databases</span></span>
+<span id="cb25-311"><a href="#cb25-311" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-312"><a href="#cb25-312" aria-hidden="true" tabindex="-1"></a>For larger or distributed workloads, Optuna can use databases such as PostgreSQL or MySQL.</span>
+<span id="cb25-313"><a href="#cb25-313" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-314"><a href="#cb25-314" aria-hidden="true" tabindex="-1"></a><span class="in">```python</span></span>
+<span id="cb25-315"><a href="#cb25-315" aria-hidden="true" tabindex="-1"></a>storage <span class="op">=</span> <span class="st">"postgresql://user:pass@host/db"</span></span>
+<span id="cb25-316"><a href="#cb25-316" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb25-317"><a href="#cb25-317" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-318"><a href="#cb25-318" aria-hidden="true" tabindex="-1"></a>This allows multiple worker processes or machines to coordinate through shared study storage.</span>
+<span id="cb25-319"><a href="#cb25-319" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-320"><a href="#cb25-320" aria-hidden="true" tabindex="-1"></a><span class="fu">## The Internal Optimization Loop</span></span>
+<span id="cb25-321"><a href="#cb25-321" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-322"><a href="#cb25-322" aria-hidden="true" tabindex="-1"></a>At a high level, Optuna repeatedly runs a loop like this:</span>
+<span id="cb25-323"><a href="#cb25-323" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-324"><a href="#cb25-324" aria-hidden="true" tabindex="-1"></a><span class="in">```text</span></span>
+<span id="cb25-325"><a href="#cb25-325" aria-hidden="true" tabindex="-1"></a><span class="in">while trials_remaining:</span></span>
+<span id="cb25-326"><a href="#cb25-326" aria-hidden="true" tabindex="-1"></a><span class="in">    sampler -&gt; propose parameters</span></span>
+<span id="cb25-327"><a href="#cb25-327" aria-hidden="true" tabindex="-1"></a><span class="in">    trial -&gt; run objective</span></span>
+<span id="cb25-328"><a href="#cb25-328" aria-hidden="true" tabindex="-1"></a><span class="in">    record result</span></span>
+<span id="cb25-329"><a href="#cb25-329" aria-hidden="true" tabindex="-1"></a><span class="in">    pruner -&gt; check early stopping</span></span>
+<span id="cb25-330"><a href="#cb25-330" aria-hidden="true" tabindex="-1"></a><span class="in">    update sampler</span></span>
+<span id="cb25-331"><a href="#cb25-331" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb25-332"><a href="#cb25-332" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-333"><a href="#cb25-333" aria-hidden="true" tabindex="-1"></a>A more detailed view is:</span>
+<span id="cb25-334"><a href="#cb25-334" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-335"><a href="#cb25-335" aria-hidden="true" tabindex="-1"></a><span class="in">```text</span></span>
+<span id="cb25-336"><a href="#cb25-336" aria-hidden="true" tabindex="-1"></a><span class="in">Study starts</span></span>
+<span id="cb25-337"><a href="#cb25-337" aria-hidden="true" tabindex="-1"></a><span class="in">   ↓</span></span>
+<span id="cb25-338"><a href="#cb25-338" aria-hidden="true" tabindex="-1"></a><span class="in">Sampler suggests parameters</span></span>
+<span id="cb25-339"><a href="#cb25-339" aria-hidden="true" tabindex="-1"></a><span class="in">   ↓</span></span>
+<span id="cb25-340"><a href="#cb25-340" aria-hidden="true" tabindex="-1"></a><span class="in">Trial object created</span></span>
+<span id="cb25-341"><a href="#cb25-341" aria-hidden="true" tabindex="-1"></a><span class="in">   ↓</span></span>
+<span id="cb25-342"><a href="#cb25-342" aria-hidden="true" tabindex="-1"></a><span class="in">Objective function executed</span></span>
+<span id="cb25-343"><a href="#cb25-343" aria-hidden="true" tabindex="-1"></a><span class="in">   ↓</span></span>
+<span id="cb25-344"><a href="#cb25-344" aria-hidden="true" tabindex="-1"></a><span class="in">Intermediate results reported</span></span>
+<span id="cb25-345"><a href="#cb25-345" aria-hidden="true" tabindex="-1"></a><span class="in">   ↓</span></span>
+<span id="cb25-346"><a href="#cb25-346" aria-hidden="true" tabindex="-1"></a><span class="in">Pruner may stop trial</span></span>
+<span id="cb25-347"><a href="#cb25-347" aria-hidden="true" tabindex="-1"></a><span class="in">   ↓</span></span>
+<span id="cb25-348"><a href="#cb25-348" aria-hidden="true" tabindex="-1"></a><span class="in">Result stored</span></span>
+<span id="cb25-349"><a href="#cb25-349" aria-hidden="true" tabindex="-1"></a><span class="in">   ↓</span></span>
+<span id="cb25-350"><a href="#cb25-350" aria-hidden="true" tabindex="-1"></a><span class="in">Sampler updates model</span></span>
+<span id="cb25-351"><a href="#cb25-351" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb25-352"><a href="#cb25-352" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-353"><a href="#cb25-353" aria-hidden="true" tabindex="-1"></a>This repeats until a stopping condition is reached, such as a target number of trials, a timeout, or an external stop.</span>
+<span id="cb25-354"><a href="#cb25-354" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-355"><a href="#cb25-355" aria-hidden="true" tabindex="-1"></a>::: {.callout-warning}</span>
+<span id="cb25-356"><a href="#cb25-356" aria-hidden="true" tabindex="-1"></a><span class="fu">## Common Mistake</span></span>
+<span id="cb25-357"><a href="#cb25-357" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-358"><a href="#cb25-358" aria-hidden="true" tabindex="-1"></a>Do not think of the sampler, trial, and study as separate convenience features. They are parts of one coordinated system. Confusion usually appears when users try to reason about trial behavior without understanding which decisions belong to the study, which belong to the sampler, and which must happen inside the objective function.</span>
+<span id="cb25-359"><a href="#cb25-359" aria-hidden="true" tabindex="-1"></a>:::</span>
+<span id="cb25-360"><a href="#cb25-360" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-361"><a href="#cb25-361" aria-hidden="true" tabindex="-1"></a><span class="fu">## A Minimal End-to-End Example</span></span>
+<span id="cb25-362"><a href="#cb25-362" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-363"><a href="#cb25-363" aria-hidden="true" tabindex="-1"></a>The following example exercises the whole architecture in a compact form:</span>
+<span id="cb25-364"><a href="#cb25-364" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-367"><a href="#cb25-367" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb25-368"><a href="#cb25-368" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> optuna</span>
+<span id="cb25-369"><a href="#cb25-369" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-370"><a href="#cb25-370" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-371"><a href="#cb25-371" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective(trial):</span>
+<span id="cb25-372"><a href="#cb25-372" aria-hidden="true" tabindex="-1"></a>    x <span class="op">=</span> trial.suggest_float(<span class="st">"x"</span>, <span class="op">-</span><span class="dv">5</span>, <span class="dv">5</span>)</span>
+<span id="cb25-373"><a href="#cb25-373" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (x <span class="op">-</span> <span class="dv">2</span>) <span class="op">**</span> <span class="dv">2</span></span>
+<span id="cb25-374"><a href="#cb25-374" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-375"><a href="#cb25-375" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-376"><a href="#cb25-376" aria-hidden="true" tabindex="-1"></a>study <span class="op">=</span> optuna.create_study(direction<span class="op">=</span><span class="st">"minimize"</span>)</span>
+<span id="cb25-377"><a href="#cb25-377" aria-hidden="true" tabindex="-1"></a>study.optimize(objective, n_trials<span class="op">=</span><span class="dv">20</span>)</span>
+<span id="cb25-378"><a href="#cb25-378" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-379"><a href="#cb25-379" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Best params:"</span>, study.best_params)</span>
+<span id="cb25-380"><a href="#cb25-380" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Best value:"</span>, <span class="bu">round</span>(study.best_value, <span class="dv">4</span>))</span>
+<span id="cb25-381"><a href="#cb25-381" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb25-382"><a href="#cb25-382" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-383"><a href="#cb25-383" aria-hidden="true" tabindex="-1"></a>That code already includes the essential architecture: study creation, trial generation, search-space definition, sampler-driven suggestions, and result collection.</span>
+<span id="cb25-384"><a href="#cb25-384" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-385"><a href="#cb25-385" aria-hidden="true" tabindex="-1"></a><span class="fu">## Practical Exercise: Inspect Trial Objects</span></span>
+<span id="cb25-386"><a href="#cb25-386" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-387"><a href="#cb25-387" aria-hidden="true" tabindex="-1"></a>After running a small study, inspect the recorded trial objects:</span>
+<span id="cb25-388"><a href="#cb25-388" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-391"><a href="#cb25-391" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb25-392"><a href="#cb25-392" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> trial <span class="kw">in</span> study.trials[:<span class="dv">3</span>]:</span>
+<span id="cb25-393"><a href="#cb25-393" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"Trial:"</span>, trial.number)</span>
+<span id="cb25-394"><a href="#cb25-394" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"Params:"</span>, trial.params)</span>
+<span id="cb25-395"><a href="#cb25-395" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"Value:"</span>, trial.value)</span>
+<span id="cb25-396"><a href="#cb25-396" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"State:"</span>, trial.state)</span>
+<span id="cb25-397"><a href="#cb25-397" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>()</span>
+<span id="cb25-398"><a href="#cb25-398" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb25-399"><a href="#cb25-399" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-400"><a href="#cb25-400" aria-hidden="true" tabindex="-1"></a>You can also inspect one specific trial in more detail:</span>
+<span id="cb25-401"><a href="#cb25-401" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-402"><a href="#cb25-402" aria-hidden="true" tabindex="-1"></a><span class="in">```python</span></span>
+<span id="cb25-403"><a href="#cb25-403" aria-hidden="true" tabindex="-1"></a>trial <span class="op">=</span> study.trials[<span class="dv">0</span>]</span>
+<span id="cb25-404"><a href="#cb25-404" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-405"><a href="#cb25-405" aria-hidden="true" tabindex="-1"></a>trial.params</span>
+<span id="cb25-406"><a href="#cb25-406" aria-hidden="true" tabindex="-1"></a>trial.value</span>
+<span id="cb25-407"><a href="#cb25-407" aria-hidden="true" tabindex="-1"></a>trial.distributions</span>
+<span id="cb25-408"><a href="#cb25-408" aria-hidden="true" tabindex="-1"></a>trial.datetime_start</span>
+<span id="cb25-409"><a href="#cb25-409" aria-hidden="true" tabindex="-1"></a>trial.datetime_complete</span>
+<span id="cb25-410"><a href="#cb25-410" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb25-411"><a href="#cb25-411" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-412"><a href="#cb25-412" aria-hidden="true" tabindex="-1"></a>This information is useful for debugging studies, analyzing optimization behavior, and later building dashboards or experiment summaries.</span>
+<span id="cb25-413"><a href="#cb25-413" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-414"><a href="#cb25-414" aria-hidden="true" tabindex="-1"></a><span class="fu">## Recap</span></span>
+<span id="cb25-415"><a href="#cb25-415" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-416"><a href="#cb25-416" aria-hidden="true" tabindex="-1"></a>Optuna's architecture consists of a small number of key components with distinct responsibilities:</span>
+<span id="cb25-417"><a href="#cb25-417" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-418"><a href="#cb25-418" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Component <span class="pp">|</span> Role <span class="pp">|</span></span>
+<span id="cb25-419"><a href="#cb25-419" aria-hidden="true" tabindex="-1"></a><span class="pp">| ---</span> <span class="pp">| ---</span> <span class="pp">|</span></span>
+<span id="cb25-420"><a href="#cb25-420" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`Study`</span> <span class="pp">|</span> Manages the optimization experiment <span class="pp">|</span></span>
+<span id="cb25-421"><a href="#cb25-421" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`Trial`</span> <span class="pp">|</span> Represents one evaluation of the objective <span class="pp">|</span></span>
+<span id="cb25-422"><a href="#cb25-422" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Objective function <span class="pp">|</span> Defines the optimization problem <span class="pp">|</span></span>
+<span id="cb25-423"><a href="#cb25-423" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Search space <span class="pp">|</span> Defines the tunable parameters <span class="pp">|</span></span>
+<span id="cb25-424"><a href="#cb25-424" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`Sampler`</span> <span class="pp">|</span> Proposes parameter values <span class="pp">|</span></span>
+<span id="cb25-425"><a href="#cb25-425" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> <span class="in">`Pruner`</span> <span class="pp">|</span> Stops weak trials early <span class="pp">|</span></span>
+<span id="cb25-426"><a href="#cb25-426" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Storage <span class="pp">|</span> Persists experiment state <span class="pp">|</span></span>
+<span id="cb25-427"><a href="#cb25-427" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-428"><a href="#cb25-428" aria-hidden="true" tabindex="-1"></a>The main architectural idea is not complexity, but coordination. Optuna works because these components form an iterative feedback loop between proposing parameters, running evaluations, deciding whether to stop early, and storing results.</span>
+<span id="cb25-429"><a href="#cb25-429" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-430"><a href="#cb25-430" aria-hidden="true" tabindex="-1"></a><span class="fu">## Decision Guide</span></span>
+<span id="cb25-431"><a href="#cb25-431" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-432"><a href="#cb25-432" aria-hidden="true" tabindex="-1"></a>Use the following mental model:</span>
+<span id="cb25-433"><a href="#cb25-433" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-434"><a href="#cb25-434" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Reach for the <span class="in">`Study`</span> when you want experiment-level control.</span>
+<span id="cb25-435"><a href="#cb25-435" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Reach for the <span class="in">`Trial`</span> when defining parameters or reporting intermediate progress.</span>
+<span id="cb25-436"><a href="#cb25-436" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Reach for samplers when changing optimization strategy.</span>
+<span id="cb25-437"><a href="#cb25-437" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Reach for pruners when trial evaluations are iterative and expensive.</span>
+<span id="cb25-438"><a href="#cb25-438" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Reach for persistent storage when experiments need to survive process boundaries or run in parallel.</span>
+<span id="cb25-439"><a href="#cb25-439" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-440"><a href="#cb25-440" aria-hidden="true" tabindex="-1"></a>Next, <span class="co">[</span><span class="ot">Basic Optuna Usage</span><span class="co">](05-basic-optuna-usage.qmd)</span> turns this architecture into practical day-to-day Optuna workflows.</span>
+</code><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></pre></div>
+</div></div></div></div></div>
+</div> <!-- /content -->
+
+
+
+
+</body></html>
