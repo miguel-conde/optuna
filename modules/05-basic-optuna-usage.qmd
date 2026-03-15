@@ -1,3 +1,362 @@
 ---
 title: "Basic Optuna Usage"
 ---
+
+This chapter moves from theory and internal architecture to day-to-day Optuna usage. The goal is straightforward: create a study, define an objective function, declare parameters through the `trial.suggest_*` API, run optimization, and inspect the results.
+
+By the end of the chapter, you should be able to build and run a small Optuna study from scratch and understand how to retrieve the best trial, best parameters, and full trial history.
+
+This chapter assumes you already understand the high-level architecture from [Optuna Architecture](04-optuna-architecture.qmd).
+
+## Why This Matters
+
+Many optimization libraries look conceptually elegant but remain awkward in practice. Optuna's main strength is that its core workflow is compact and readable: you write a normal Python function, define parameters where they are used, and let the study coordinate the optimization loop.
+
+That makes it a strong practical tool for hyperparameter tuning, simulation calibration, and general black-box optimization.
+
+## A Fast First Win
+
+The quickest useful Optuna program fits on one screen. It creates a study, defines one parameter, runs several trials, and prints the best result.
+
+```{python}
+import optuna
+
+optuna.logging.set_verbosity(optuna.logging.WARNING)
+
+
+def objective(trial):
+	x = trial.suggest_float("x", -10, 10)
+	return (x - 2) ** 2
+
+
+study = optuna.create_study(direction="minimize")
+study.optimize(objective, n_trials=20)
+
+print("Best value:", round(study.best_value, 4))
+print("Best parameters:", study.best_params)
+```
+
+That is already a complete optimization workflow. Everything else in this chapter is a refinement of that pattern.
+
+## Installation and Setup
+
+Optuna is installed with `pip`:
+
+```bash
+pip install optuna
+```
+
+To verify the installation:
+
+```{python}
+import optuna
+print(optuna.__version__)
+```
+
+Optional packages become useful later:
+
+```bash
+pip install optuna-dashboard
+pip install plotly
+```
+
+Those packages support dashboards and visualization, but they are not required for the core optimization loop.
+
+## Creating a Study
+
+The `Study` object manages the whole optimization process.
+
+The most basic form is:
+
+```python
+import optuna
+
+study = optuna.create_study(direction="minimize")
+print(type(study).__name__)
+```
+
+The most important initial choice is the optimization direction.
+
+| Parameter | Meaning |
+| --- | --- |
+| `direction` | Either `"minimize"` or `"maximize"` |
+
+Examples:
+
+```python
+study = optuna.create_study(direction="minimize")
+study = optuna.create_study(direction="maximize")
+```
+
+Use minimization for losses or error metrics. Use maximization for accuracy, reward, or utility-type objectives.
+
+## Defining the Objective Function
+
+The objective function defines the problem to be optimized. It receives a `Trial` object and returns a numeric value.
+
+```python
+def objective(trial):
+	x = trial.suggest_float("x", -10, 10)
+	return (x - 2) ** 2
+```
+
+Inside the function, three things usually happen:
+
+1. Parameters are suggested.
+2. A model or mathematical function is evaluated.
+3. A scalar value is returned.
+
+Optuna then tries to minimize or maximize that returned value depending on the study configuration.
+
+## Running the Optimization
+
+Once the study and objective function exist, optimization starts with:
+
+```python
+study.optimize(objective, n_trials=100)
+```
+
+The key arguments are:
+
+| Parameter | Meaning |
+| --- | --- |
+| `objective` | The function to optimize |
+| `n_trials` | The number of objective evaluations |
+
+Each trial corresponds to one evaluation of the objective.
+
+```text
+Trial 1 -> parameters -> objective value
+Trial 2 -> parameters -> objective value
+Trial 3 -> parameters -> objective value
+...
+```
+
+As trials accumulate, the sampler updates its search strategy using past results.
+
+```{mermaid}
+flowchart LR
+	A[Create study] --> B[Define objective]
+	B --> C[Run study.optimize]
+	C --> D[Sampler suggests parameters]
+	D --> E[Objective returns value]
+	E --> F[Study records result]
+	F --> D
+```
+
+## The Parameter Suggestion API
+
+Optuna defines the search space through `trial.suggest_*` methods. This is the define-by-run paradigm: parameters are declared inside the objective exactly where they are needed.
+
+### `suggest_float`
+
+Use this for continuous parameters.
+
+```python
+x = trial.suggest_float("x", -10, 10)
+```
+
+This samples a floating-point value between the given bounds.
+
+### Log-scaled floats
+
+For parameters spanning several orders of magnitude, use logarithmic sampling.
+
+```python
+lr = trial.suggest_float("lr", 1e-5, 1e-1, log=True)
+```
+
+This is especially appropriate for quantities such as learning rates, regularization strengths, and tolerances.
+
+### `suggest_int`
+
+Use this for integer-valued parameters.
+
+```python
+depth = trial.suggest_int("depth", 2, 10)
+```
+
+Typical examples include tree depth, number of layers, and numbers of neighbors.
+
+### `suggest_categorical`
+
+Use this for discrete choices.
+
+```python
+optimizer = trial.suggest_categorical(
+	"optimizer",
+	["adam", "sgd", "rmsprop"],
+)
+```
+
+This is common for model families, optimizers, activations, and preprocessing variants.
+
+## A Study with Multiple Parameters
+
+The objective function can define several parameters at once.
+
+```python
+def objective(trial):
+	x = trial.suggest_float("x", -10, 10)
+	y = trial.suggest_float("y", -10, 10)
+	return (x - 2) ** 2 + (y + 3) ** 2
+```
+
+This turns the search into a two-dimensional optimization problem. In practical machine-learning use, the same pattern extends naturally to many more parameters.
+
+## Retrieving Optimization Results
+
+After optimization, the study stores everything needed to inspect the outcome.
+
+### Best value
+
+```python
+print(study.best_value)
+```
+
+This returns the best objective value found.
+
+### Best parameters
+
+```python
+print(study.best_params)
+```
+
+Example output might look like:
+
+```text
+{'x': 1.98, 'y': -2.97}
+```
+
+### Best trial
+
+```python
+best = study.best_trial
+
+print(best.params)
+print(best.value)
+```
+
+The best trial contains both the winning parameters and the associated metadata.
+
+## Inspecting All Trials
+
+The full trial history is available through `study.trials`.
+
+```python
+for trial in study.trials[:5]:
+	print(trial.number, round(trial.value, 4), trial.params)
+```
+
+This is useful for:
+
+- Debugging.
+- Visualizing search behavior.
+- Building experiment summaries.
+- Understanding whether the sampler is converging toward a promising region.
+
+## A Minimal End-to-End Example
+
+The following example puts the full basic workflow in one place:
+
+```{python}
+import optuna
+
+optuna.logging.set_verbosity(optuna.logging.WARNING)
+
+
+def objective(trial):
+	x = trial.suggest_float("x", -10, 10)
+	return (x - 2) ** 2
+
+
+study = optuna.create_study(direction="minimize")
+study.optimize(objective, n_trials=30)
+
+print("Best value:", round(study.best_value, 4))
+print("Best parameters:", study.best_params)
+```
+
+This is the smallest workflow that still feels like real Optuna usage.
+
+::: {.callout-warning}
+## Common Mistake
+
+Do not define parameters outside the objective function and then expect Optuna to optimize them. If a value does not come from `trial.suggest_*`, it is not part of the search space and the sampler cannot reason about it.
+:::
+
+## Practical Exercise: Optimize a Mathematical Function
+
+As a first real exercise, optimize the function
+
+$$
+f(x) = (x - 3)^2 + \sin(5x)
+$$
+
+using Optuna.
+
+```{python}
+import math
+import optuna
+
+optuna.logging.set_verbosity(optuna.logging.WARNING)
+
+
+def objective(trial):
+	x = trial.suggest_float("x", -5, 5)
+	return (x - 3) ** 2 + math.sin(5 * x)
+
+
+study = optuna.create_study(direction="minimize")
+study.optimize(objective, n_trials=100)
+
+print("Best x:", study.best_params)
+print("Best value:", round(study.best_value, 4))
+```
+
+What to observe:
+
+- Early trials explore broadly.
+- Later trials focus more often near strong regions.
+- The sampler adapts based on what previous trials discovered.
+
+Try extending the exercise in three ways:
+
+1. Increase the search space from `[-5, 5]` to `[-20, 20]` and compare the result.
+2. Replace the one-dimensional objective with a two-parameter function.
+3. Add an integer or categorical parameter to see how naturally Optuna handles mixed spaces.
+
+## Recap
+
+Basic Optuna usage follows a simple five-step pattern:
+
+1. Install Optuna.
+2. Create a study.
+3. Define the objective function.
+4. Use `trial.suggest_*` methods to declare parameters.
+5. Run optimization with `study.optimize(...)`.
+
+The most important beginner-facing APIs in this chapter are:
+
+| Function | Purpose |
+| --- | --- |
+| `suggest_float` | Continuous parameters |
+| `suggest_int` | Integer parameters |
+| `suggest_categorical` | Discrete choices |
+
+The most important result accessors are:
+
+- `study.best_value`
+- `study.best_params`
+- `study.best_trial`
+
+## Decision Guide
+
+Use the following rule of thumb:
+
+- Reach for a minimal study first when testing a new optimization idea.
+- Use `suggest_float`, `suggest_int`, and `suggest_categorical` to express the true structure of the search space.
+- Inspect `study.trials` whenever the optimizer behaves unexpectedly.
+- Keep the first objective function simple before scaling up to real pipelines.
+
+Next, [Designing Search Spaces](06-designing-search-spaces.qmd) focuses on the part of optimization that often matters most in practice: choosing parameter ranges and structures that the optimizer can search effectively.
