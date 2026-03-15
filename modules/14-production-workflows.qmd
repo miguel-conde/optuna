@@ -1,3 +1,319 @@
 ---
 title: "Production Workflows"
 ---
+
+This chapter is about making Optuna dependable outside the notebook. By the end, you should be able to design an optimization workflow that is reproducible, resumable, traceable, and operationally sane, with clear separation between experimentation, model selection, and final training.
+
+## Why This Matters
+
+An Optuna study that produces a good score once is not yet a production workflow. In real systems, you need to answer harder questions:
+
+- Can the study be resumed after interruption?
+- Can another engineer reproduce the result next week?
+- Do you know which data, code, and configuration produced the winning trial?
+- Can you distinguish the search phase from the final training phase?
+
+Production work starts when optimization becomes part of a system of record rather than a one-off experiment.
+
+## Fast First Win: Create a Persistent, Resumable Study
+
+The simplest production improvement is to move from an in-memory study to persistent storage.
+
+The example below creates a temporary SQLite-backed study, runs a first batch of trials, then reconnects to the same study name and continues the search. That is the minimum viable pattern for resumability.
+
+```{python}
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
+import optuna
+
+
+def objective(trial):
+	x = trial.suggest_float("x", -10.0, 10.0)
+	return (x - 2.0) ** 2
+
+
+with TemporaryDirectory() as tmpdir:
+	db_path = Path(tmpdir) / "study.db"
+	storage = f"sqlite:///{db_path}"
+
+	study = optuna.create_study(
+		study_name="production-demo",
+		storage=storage,
+		direction="minimize",
+		load_if_exists=True,
+		sampler=optuna.samplers.TPESampler(seed=42),
+	)
+	study.set_user_attr("dataset_version", "demo-v1")
+	study.optimize(objective, n_trials=10)
+
+	resumed = optuna.create_study(
+		study_name="production-demo",
+		storage=storage,
+		direction="minimize",
+		load_if_exists=True,
+	)
+	resumed.optimize(objective, n_trials=10)
+
+	print("Total trials after resume:", len(resumed.trials))
+	print("Best params:", resumed.best_params)
+	print("Recorded dataset version:", resumed.user_attrs["dataset_version"])
+```
+
+That single shift already gives you three production properties: persistence, resumability, and a place to attach metadata.
+
+## What Actually Changes in Production?
+
+The optimization algorithm may stay the same, but the surrounding expectations change.
+
+In exploratory mode, the question is often: “Can I find a promising configuration?”
+
+In production mode, the question becomes: “Can I trust, reproduce, inspect, and operationalize the result?”
+
+That means a production workflow needs more than `study.best_params`. It needs discipline around storage, logging, versioning, and handoff to downstream systems.
+
+## What Should You Persist?
+
+At a minimum, a production-ready study should preserve:
+
+- trial parameters
+- objective values and intermediate values when relevant
+- study-level metadata such as dataset version and code version
+- optimization direction and sampler configuration
+- enough information to reproduce the winning run
+
+Optuna gives you a convenient place to attach metadata via study and trial attributes.
+
+```python
+study.set_user_attr("dataset_version", "2026-03-15")
+study.set_user_attr("git_commit", "abc1234")
+trial.set_user_attr("feature_set", "baseline-v2")
+```
+
+The important rule is simple: if you would need the information later to interpret or reproduce the result, store it at optimization time rather than trying to reconstruct it afterwards.
+
+## Why Is Reproducibility More Than Just a Seed?
+
+Fixing the sampler seed matters, but it is only one piece of reproducibility.
+
+```python
+sampler = optuna.samplers.TPESampler(seed=42)
+```
+
+Reproducibility also depends on:
+
+- the dataset version
+- feature engineering code
+- model library versions
+- train/validation split logic
+- objective function definition
+- storage backend and study name
+
+In other words, a seed makes the search path more stable, but it does not make an uncontrolled system reproducible by itself.
+
+## How Do Persistent Studies Change the Workflow?
+
+Once a study is persistent, optimization no longer has to happen in one uninterrupted process.
+
+That gives you several practical benefits:
+
+- long searches can resume after interruption
+- multiple workers can collaborate on the same study
+- dashboards and monitoring tools can inspect live results
+- best parameters can be retrieved without rerunning the entire search
+
+This chapter builds directly on [Distributed and Scalable Optimization](11-distributed-scalable-optimization.qmd). The difference here is emphasis: storage is not only a scalability tool, but also the foundation of experiment governance.
+
+```{mermaid}
+flowchart LR
+	A[Versioned dataset and code] --> B[Create persistent study]
+	B --> C[Run optimization trials]
+	C --> D[Store params metrics metadata]
+	D --> E[Select best configuration]
+	E --> F[Train final model separately]
+	F --> G[Register artifact and deploy]
+```
+
+## How Should You Log Progress During Optimization?
+
+Production workflows benefit from explicit logging rather than relying on ad hoc prints.
+
+One lightweight pattern is to use callbacks.
+
+```python
+def log_callback(study, frozen_trial):
+	print(
+		f"trial={frozen_trial.number} "
+		f"value={frozen_trial.value:.5f} "
+		f"best={study.best_value:.5f}"
+	)
+
+
+study.optimize(objective, n_trials=50, callbacks=[log_callback])
+```
+
+Callbacks are useful when you want to:
+
+- emit metrics to logs or dashboards
+- checkpoint metadata after each trial
+- stop or alert under certain conditions
+- integrate with external experiment-tracking systems
+
+The specific logging backend can vary, but the principle is consistent: optimization should be observable while it is running, not only after it finishes.
+
+## Where Does Experiment Tracking Fit?
+
+Optuna stores optimization results, but broader experiment tracking may still belong to a dedicated system. In practical teams, you often combine Optuna with tools that record runs, datasets, artifacts, and deployed models.
+
+The division of labor is usually:
+
+- Optuna: search logic, trials, parameter history, best trial selection
+- experiment tracker: artifacts, run lineage, dashboards, deployment handoff
+
+That separation is useful because not every production concern should be forced into the study object itself.
+
+## Why Must Final Training Be Separate From Optimization?
+
+One of the most important production rules is to separate hyperparameter search from final model training.
+
+The model trained inside the optimization loop is usually not the one you should deploy. It was fit under the search protocol, often on subsets or folds used only for evaluation.
+
+The safer workflow is:
+
+```text
+run optimization
+   -> choose best configuration
+   -> retrain with the approved setup
+   -> validate final artifact
+   -> register and deploy
+```
+
+This protects you from accidentally shipping a model that was produced under evaluation-only conditions.
+
+## How Do You Integrate Optuna Into ML Pipelines?
+
+In production ML systems, Optuna usually occupies one stage inside a larger pipeline.
+
+Typical steps are:
+
+1. Materialize a versioned dataset.
+2. Build or retrieve the training pipeline definition.
+3. Launch an Optuna study with persistent storage.
+4. Select the best configuration under the chosen validation protocol.
+5. Retrain the final model separately.
+6. Store the artifact in a registry or deployment system.
+
+This mirrors the discipline introduced in [Optuna for Machine Learning](12-optuna-machine-learning.qmd), but adds the operational requirement that every stage should be traceable.
+
+## How Should You Monitor Resource Usage?
+
+Production studies compete for real compute budgets. That means CPU, GPU, memory, disk, and queue time become optimization constraints whether you model them explicitly or not.
+
+Practical safeguards include:
+
+- limiting the number of concurrent workers
+- recording trial duration
+- pruning obviously poor runs early
+- separating cheap proxy evaluations from expensive final evaluations
+- watching for memory or GPU exhaustion when frameworks spawn multiple workers
+
+Resource-awareness is especially important when the objective itself launches large training jobs or simulations.
+
+## What Does a Production Architecture Look Like?
+
+At a high level, a robust Optuna workflow often looks like this:
+
+```text
+versioned data
+   -> persistent Optuna study
+   -> distributed or local workers
+   -> experiment logs and metadata
+   -> best configuration selected
+   -> final training job
+   -> model registry or deployment target
+```
+
+The main architectural principle is separation of concerns:
+
+- storage coordinates and preserves the study
+- workers evaluate candidate configurations
+- logging and tracking provide observability
+- final training and deployment happen downstream of search
+
+That separation keeps optimization from becoming an opaque, unrepeatable script.
+
+## When Should You Use the Dashboard?
+
+Once a study is persistent, the dashboard becomes much more useful.
+
+```bash
+optuna-dashboard sqlite:///study.db
+```
+
+It helps with:
+
+- reviewing trial history
+- inspecting parameter distributions
+- monitoring convergence while the study is live
+- explaining to others why one configuration won
+
+This is especially helpful when optimization becomes collaborative rather than personal.
+
+::: callout-warning
+## Common Mistake
+
+Do not treat `study.best_params` as the end of the workflow. Without dataset lineage, seed control, persistent storage, and a separate final-training step, the "best" parameters may be difficult to reproduce and unsafe to operationalize.
+:::
+
+## Practical Exercise: Productionize a Small Study
+
+Take a simple Optuna objective and turn it into a minimally production-ready workflow.
+
+Use this starting point:
+
+```{python}
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
+import optuna
+
+
+def objective(trial):
+	x = trial.suggest_float("x", -10.0, 10.0)
+	return (x - 2.0) ** 2
+```
+
+Then work through the exercise in four passes:
+
+1. Run the study in memory and record the best parameters.
+2. Move it to persistent SQLite storage with `study_name` and `load_if_exists=True`.
+3. Add study-level metadata such as dataset version, git commit, or experiment tag.
+4. Write down the post-optimization handoff: how the best configuration would be retrained, validated, and persisted outside the search loop.
+
+Questions to answer after the run:
+
+- Which information would you lose if the study stayed in memory only?
+- Which metadata fields are necessary to make the result interpretable next month?
+- What should happen after selecting `study.best_params` before deployment is even considered?
+- Where would you place logging, dashboarding, or experiment tracking in your own stack?
+
+## Recap
+
+Production Optuna is mostly about workflow discipline rather than new optimization APIs.
+
+- Persistent storage turns studies into resumable records instead of disposable sessions.
+- Reproducibility requires seeds, metadata, versioned inputs, and explicit evaluation logic.
+- Optimization, final training, and deployment should be treated as separate stages.
+- Logging, dashboards, and external experiment tracking make the search process inspectable and auditable.
+
+## Decision Guide
+
+Treat operational clarity as part of optimization quality.
+
+- Use persistent storage as soon as a study matters beyond one session.
+- Record metadata at the moment of optimization rather than reconstructing it later.
+- Separate search-time evaluation from final model training and deployment.
+- Add callbacks, dashboards, or tracking hooks when the study needs observability.
+- Design the workflow so another engineer can resume, inspect, and trust it without reverse-engineering your notebook.
+
+The final chapter turns the book into practice. In [Final Project](15-final-project.qmd), we will assemble a complete optimization workflow that combines search-space design, sampler choice, evaluation discipline, and production-style reproducibility into one end-to-end exercise.
