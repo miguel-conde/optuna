@@ -1,3 +1,362 @@
 ---
 title: "Pruning"
 ---
+
+This chapter explains how Optuna avoids wasting computation on trials that are clearly underperforming. In many optimization problems, especially machine-learning workflows, each trial unfolds over a sequence of steps such as epochs, boosting rounds, or simulation iterations. Pruning allows Optuna to stop weak trials early and redirect resources to stronger candidates.
+
+By the end of the chapter, you should be able to explain how intermediate results are reported, how pruning decisions are made, and when to use median pruning, successive halving, Hyperband, and related strategies.
+
+This chapter builds directly on [Samplers](07-samplers.qmd). Samplers decide what to try next; pruners decide whether the current trial is still worth continuing.
+
+## Why This Matters
+
+Suppose two neural-network configurations are both scheduled to train for 100 epochs. One shows promising validation loss from the first few epochs. The other is clearly lagging. If you still force both to train to completion, most of your optimization budget gets spent confirming something you already suspected.
+
+Pruning matters because early stopping at the trial level is often the biggest practical speedup in hyperparameter optimization.
+
+## A Fast First Win
+
+The simplest pruning pattern is small enough to fit in one function: report an intermediate metric, ask the pruner whether the trial should continue, and stop early if not.
+
+```{python}
+import optuna
+import random
+
+optuna.logging.set_verbosity(optuna.logging.WARNING)
+
+
+def objective(trial):
+	lr = trial.suggest_float("lr", 1e-4, 1e-1, log=True)
+	loss = 1.2 + 0.2 * lr
+
+	for epoch in range(20):
+		loss *= random.uniform(0.82, 1.02)
+		trial.report(loss, epoch)
+
+		if trial.should_prune():
+			raise optuna.TrialPruned()
+
+	return loss
+
+
+study = optuna.create_study(
+	direction="minimize",
+	pruner=optuna.pruners.MedianPruner(),
+)
+study.optimize(objective, n_trials=30)
+
+completed = sum(t.state == optuna.trial.TrialState.COMPLETE for t in study.trials)
+pruned = sum(t.state == optuna.trial.TrialState.PRUNED for t in study.trials)
+
+print("Completed trials:", completed)
+print("Pruned trials:", pruned)
+```
+
+This captures the full pruning pattern used in real training loops. The only difference in larger systems is that the intermediate metric usually comes from a real model evaluation.
+
+## Why Pruning Helps
+
+Consider two training runs after only a few epochs:
+
+| Epoch | Trial A loss | Trial B loss |
+| --- | --- | --- |
+| 1 | 0.92 | 1.40 |
+| 2 | 0.91 | 1.35 |
+| 3 | 0.90 | 1.31 |
+
+Trial B is already much weaker. If both trials still train to epoch 100, the optimizer wastes time, compute, and often expensive accelerator resources.
+
+Pruning makes the optimization budget more selective:
+
+- Weak trials terminate early.
+- Promising trials receive more compute.
+- The study covers more configurations with the same budget.
+
+## Intermediate Results
+
+Pruning only works when the objective provides progress updates during execution. Optuna uses:
+
+```python
+trial.report(value, step)
+```
+
+where:
+
+- `value` is the current metric, such as validation loss or accuracy.
+- `step` is the iteration number, such as epoch or boosting round.
+
+Example:
+
+```python
+trial.report(validation_loss, epoch)
+```
+
+Without intermediate reports, the pruner has nothing to evaluate.
+
+## The Pruning Decision
+
+After reporting an intermediate value, the objective asks Optuna whether the trial should continue:
+
+```python
+trial.should_prune()
+```
+
+If the answer is yes, the standard Optuna pattern is:
+
+```python
+raise optuna.TrialPruned()
+```
+
+The full loop looks like this:
+
+```python
+for epoch in range(100):
+	loss = train_one_epoch()
+	trial.report(loss, epoch)
+
+	if trial.should_prune():
+		raise optuna.TrialPruned()
+```
+
+That exception is not an error condition in the usual sense. It is the normal control-flow signal for a trial that has been intentionally stopped.
+
+```{mermaid}
+flowchart LR
+    A[Training step] --> B[Compute intermediate metric]
+    B --> C["trial.report(value, step)"]
+    C --> D{"trial.should_prune()?"}
+    D -->|Yes| E[Raise TrialPruned]
+    D -->|No| F[Continue training]
+    F --> A
+```
+
+## Median Pruning
+
+`MedianPruner` is the simplest widely useful pruning strategy.
+
+It compares the current trial against the median performance of earlier completed trials at the same step. If the current trial is worse than that reference, it is pruned.
+
+Example at epoch 5:
+
+| Trial | Loss |
+| --- | --- |
+| 1 | 0.70 |
+| 2 | 0.65 |
+| 3 | 0.75 |
+
+The median is roughly:
+
+$$
+0.70
+$$
+
+If a new trial reports a loss like:
+
+$$
+0.90
+$$
+
+it is a natural candidate for pruning.
+
+Advantages of median pruning:
+
+- Simple.
+- Robust.
+- Often effective with little tuning.
+
+## Successive Halving
+
+Successive halving is a resource-allocation strategy rather than a purely statistical threshold rule.
+
+The idea is:
+
+1. Start many trials with small budgets.
+2. Evaluate them quickly.
+3. Keep only the best fraction.
+4. Allocate larger budgets to the survivors.
+
+Example schedule:
+
+| Stage | Trials | Epochs |
+| --- | --- | --- |
+| 1 | 100 | 5 |
+| 2 | 25 | 20 |
+| 3 | 6 | 100 |
+
+Most trials die early. Only promising trials receive full resources.
+
+## Hyperband
+
+Hyperband improves on successive halving by running multiple resource-allocation schedules with different trade-offs.
+
+Some brackets favor many short trials. Others favor fewer but longer trials. This makes Hyperband more robust when you do not know the right allocation schedule in advance.
+
+Conceptually:
+
+```text
+multiple successive-halving brackets
+each bracket explores a different resource schedule
+best trials survive longer
+```
+
+Hyperband is one of the most widely used pruning strategies because it balances aggressiveness and robustness across a broad range of workloads.
+
+## Asynchronous Pruning
+
+In distributed optimization, trials may run in parallel on different workers.
+
+If pruning required global synchronization, idle time would accumulate quickly. Optuna therefore supports asynchronous pruning behavior, where trials are judged independently as their intermediate results arrive.
+
+This helps with:
+
+- Better resource utilization.
+- Reduced waiting time.
+- More efficient parallel studies.
+
+## Pruners Available in Optuna
+
+Optuna includes several pruner classes.
+
+| Pruner | Strategy |
+| --- | --- |
+| `MedianPruner` | Median-based pruning |
+| `SuccessiveHalvingPruner` | Multi-stage elimination |
+| `HyperbandPruner` | Multiple halving schedules |
+| `ThresholdPruner` | Absolute thresholds |
+| `NopPruner` | Disables pruning |
+
+A basic setup looks like this:
+
+```python
+pruner = optuna.pruners.MedianPruner()
+
+study = optuna.create_study(
+	direction="minimize",
+	pruner=pruner,
+)
+```
+
+## Integration with Training Loops
+
+Pruning is especially valuable for iterative algorithms such as neural-network training, boosting, and simulation-based learning loops.
+
+The integration pattern is always the same:
+
+```python
+for epoch in range(50):
+	train(model)
+	val_loss = evaluate(model)
+
+	trial.report(val_loss, epoch)
+
+	if trial.should_prune():
+		raise optuna.TrialPruned()
+```
+
+Three lines matter architecturally:
+
+- `trial.report(...)` sends the progress signal.
+- `trial.should_prune()` asks for a pruning decision.
+- `TrialPruned` stops the current trial early.
+
+## Example: Deep-Learning-Style Pruning Loop
+
+Here is a simplified training-style objective with pruning:
+
+```python
+def objective(trial):
+	lr = trial.suggest_float("lr", 1e-5, 1e-2, log=True)
+
+	model = build_model()
+	optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+
+	for epoch in range(20):
+		train_epoch(model)
+		val_loss = validate(model)
+
+		trial.report(val_loss, epoch)
+
+		if trial.should_prune():
+			raise optuna.TrialPruned()
+
+	return val_loss
+```
+
+This is intentionally shown as an illustrative code fence rather than an executable cell. The important point is the structural integration, not the specific framework.
+
+## Practical Exercise: Simulate Pruning
+
+Use the following runnable example to see pruning behavior in a small study:
+
+```{python}
+import optuna
+import random
+
+optuna.logging.set_verbosity(optuna.logging.WARNING)
+
+
+def objective(trial):
+	lr = trial.suggest_float("lr", 1e-5, 1e-1, log=True)
+	loss = 1.0 + 0.05 * lr
+
+	for epoch in range(20):
+		loss *= random.uniform(0.8, 1.1)
+		trial.report(loss, epoch)
+
+		if trial.should_prune():
+			raise optuna.TrialPruned()
+
+	return loss
+
+
+study = optuna.create_study(
+	direction="minimize",
+	pruner=optuna.pruners.MedianPruner(),
+)
+study.optimize(objective, n_trials=50)
+
+completed = sum(t.state == optuna.trial.TrialState.COMPLETE for t in study.trials)
+pruned = sum(t.state == optuna.trial.TrialState.PRUNED for t in study.trials)
+
+print("Completed:", completed)
+print("Pruned:", pruned)
+```
+
+What to observe:
+
+- Many trials stop early.
+- Only a subset finishes.
+- The study spends more effort on promising regions.
+
+## Recap
+
+Pruning is one of Optuna's most important efficiency features. It reduces wasted computation by stopping weak trials before they consume their full budget.
+
+The key pieces are:
+
+| Function or class | Purpose |
+| --- | --- |
+| `trial.report()` | Send intermediate results |
+| `trial.should_prune()` | Ask whether to stop early |
+| `optuna.TrialPruned` | Terminate the trial cleanly |
+
+Common pruning strategies include:
+
+| Pruner | Best fit |
+| --- | --- |
+| Median | Simple and robust |
+| Successive Halving | Budget allocation |
+| Hyperband | Multi-schedule early stopping |
+
+Pruning is especially useful in deep learning, boosting, and any iterative workload where weak trials reveal themselves long before completion.
+
+## Decision Guide
+
+Use the following mental model:
+
+- Use a pruner whenever the objective produces meaningful intermediate metrics.
+- Start with `MedianPruner` for a simple default.
+- Consider successive halving or Hyperband when budget allocation is central to the problem.
+- Skip pruning when the objective only returns a final value and has no useful intermediate signal.
+
+Next, [Advanced Optimization Techniques](09-advanced-optimization-techniques.qmd) extends the framework to more complex workflows such as multi-objective search, constrained optimization, and custom optimization components.

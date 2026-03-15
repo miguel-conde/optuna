@@ -1,409 +1,310 @@
-# Module 7 — Samplers (Optimization Engines)
+# Module 8 — Pruning (Early Stopping)
 
-**Goal:** Understand the algorithms that actually **choose parameter values** during optimization.
+**Goal:** Learn how Optuna reduces wasted computation by **stopping unpromising trials early**.
 
-In Optuna, the **Sampler** is the component responsible for generating new candidate parameters for each trial.
+In many optimization tasks (especially ML), evaluating a configuration requires **iterative computation**:
+
+* neural network training
+* gradient boosting
+* simulation loops
+* reinforcement learning
+
+If a trial performs poorly early on, there is little reason to **continue training it fully**.
+
+Optuna solves this using **pruning**.
+
+---
+
+# 1. Why Pruning Matters
+
+Consider tuning a neural network:
+
+| Epoch | Validation Loss |
+| ----- | --------------- |
+| 1     | 0.92            |
+| 2     | 0.91            |
+| 3     | 0.90            |
+
+Another trial:
+
+| Epoch | Validation Loss |
+| ----- | --------------- |
+| 1     | 1.40            |
+| 2     | 1.35            |
+| 3     | 1.31            |
+
+The second configuration is clearly worse.
+
+Without pruning:
+
+* both models train **100 epochs**
+
+With pruning:
+
+* the bad trial is stopped early.
+
+This saves:
+
+* time
+* compute
+* GPU resources
+
+Pruning is often the **biggest speedup** in hyperparameter optimization.
+
+---
+
+# 2. Intermediate Results
+
+For pruning to work, the algorithm needs **progress updates** during training.
+
+Optuna uses:
+
+```python
+trial.report(value, step)
+```
+
+Where:
+
+* `value` → current metric (loss, accuracy, etc.)
+* `step` → iteration number
+
+Example:
+
+```python
+trial.report(validation_loss, epoch)
+```
+
+The pruner analyzes these intermediate results.
+
+---
+
+# 3. Pruning Decision
+
+After reporting a value, we ask Optuna:
+
+```python
+trial.should_prune()
+```
+
+If the trial is performing poorly:
+
+```python
+raise optuna.TrialPruned()
+```
+
+Example training loop:
+
+```python
+for epoch in range(100):
+
+    loss = train_one_epoch()
+
+    trial.report(loss, epoch)
+
+    if trial.should_prune():
+        raise optuna.TrialPruned()
+```
+
+This stops the trial immediately.
+
+---
+
+# 4. Median Pruning
+
+The **MedianPruner** is the simplest pruning strategy.
+
+Idea:
+
+Compare a trial's performance with the **median of previous trials**.
+
+If the trial performs worse than the median at the same step, prune it.
+
+Example:
+
+| Trial | Epoch 5 Loss |
+| ----- | ------------ |
+| 1     | 0.70         |
+| 2     | 0.65         |
+| 3     | 0.75         |
+
+Median:
+
+[
+0.70
+]
+
+If a new trial has:
+
+[
+loss = 0.90
+]
+
+It will likely be pruned.
+
+---
+
+## Advantages
+
+* simple
+* robust
+* effective for many tasks
+
+---
+
+# 5. Successive Halving
+
+Successive Halving is a **resource allocation algorithm**.
+
+Basic idea:
+
+1. Start many trials with small resources
+2. Evaluate performance
+3. Keep only the best fraction
+4. Allocate more resources to survivors
+
+Example:
+
+| Stage | Trials | Epochs |
+| ----- | ------ | ------ |
+| 1     | 100    | 5      |
+| 2     | 25     | 20     |
+| 3     | 6      | 100    |
+
+Most trials die early.
+
+Only promising ones receive **full training**.
+
+---
+
+# 6. Hyperband
+
+Hyperband improves successive halving by **running multiple halving schedules**.
+
+Different schedules explore different trade-offs:
+
+* many cheap trials
+* fewer but longer trials
+
+This makes Hyperband **more robust across problems**.
 
 Conceptually:
 
-```
-Sampler → proposes parameters
-Trial → evaluates objective
-Sampler → updates model
+```id="sazb98"
+multiple successive-halving brackets
+each bracket explores different resource allocations
+best trials survive longer
 ```
 
-Different samplers implement different **optimization strategies**.
+Hyperband is one of the **most widely used pruning strategies**.
 
 ---
 
-# 1. What a Sampler Does
+# 7. Asynchronous Pruning
 
-Each trial follows this process:
+In distributed optimization, trials run **in parallel**.
 
-```
-1 sampler proposes parameters
-2 objective function evaluates them
-3 result is stored
-4 sampler learns from results
-```
+Waiting for synchronization would waste time.
 
-Example interaction:
+Optuna supports **asynchronous pruning**.
 
-```
-Trial 1 → sampler proposes random parameters
-Trial 2 → sampler proposes new parameters
-Trial 10 → sampler focuses near good regions
-```
+Meaning:
 
-The sampler decides **how exploration and exploitation are balanced**.
+* each trial is evaluated independently
+* pruning decisions are made immediately
+
+Advantages:
+
+* better resource utilization
+* efficient parallel execution
 
 ---
 
-# 2. TPE Sampler (Default)
+# 8. Pruners in Optuna
 
-Optuna’s default optimizer is **TPE (Tree-structured Parzen Estimator)**.
+Optuna includes several pruners.
 
-It is a **Bayesian optimization method based on density estimation**.
+| Pruner                  | Strategy                   |
+| ----------------------- | -------------------------- |
+| MedianPruner            | median-based pruning       |
+| SuccessiveHalvingPruner | multi-stage elimination    |
+| HyperbandPruner         | multiple halving schedules |
+| ThresholdPruner         | absolute thresholds        |
+| NopPruner               | disables pruning           |
 
-Instead of modeling:
-
-[
-p(y|x)
-]
-
-TPE models:
-
-[
-p(x|y)
-]
-
-Key idea:
-
-```
-good trials → build density l(x)
-bad trials → build density g(x)
-maximize l(x)/g(x)
-```
-
----
-
-## Characteristics
-
-| Property            | Behavior              |
-| ------------------- | --------------------- |
-| Type                | Bayesian optimization |
-| Exploration         | adaptive              |
-| Scalability         | good                  |
-| Categorical support | excellent             |
-| High dimensionality | good                  |
-
----
-
-## When to Use TPE
-
-Use TPE for:
-
-* ML hyperparameter tuning
-* mixed parameter spaces
-* categorical parameters
-* conditional spaces
-
-Typical example:
-
-```
-model selection
-learning rate tuning
-architecture search
-```
-
-TPE is the **general-purpose optimizer** in Optuna.
-
----
-
-# 3. Random Sampler
-
-The **RandomSampler** performs pure random search.
-
-Parameters are sampled independently from the search space.
-
-Example:
+Example usage:
 
 ```python
-sampler = optuna.samplers.RandomSampler()
+pruner = optuna.pruners.MedianPruner()
 
 study = optuna.create_study(
-    sampler=sampler
+    direction="minimize",
+    pruner=pruner
 )
 ```
 
 ---
 
-## Characteristics
+# 9. Integration with Training Loops
 
-| Property     | Behavior      |
-| ------------ | ------------- |
-| Type         | random search |
-| Exploration  | maximum       |
-| Exploitation | none          |
-| Complexity   | minimal       |
+Pruning is particularly useful for **iterative algorithms**.
 
----
-
-## When to Use Random Sampling
-
-Useful for:
-
-* baseline comparisons
-* early exploration
-* debugging optimization pipelines
-* small parameter spaces
-
-Random search is surprisingly effective in **very high-dimensional spaces**.
-
-However, it does **not learn from previous trials**.
-
----
-
-# 4. CMA-ES Sampler
-
-CMA-ES stands for:
-
-**Covariance Matrix Adaptation Evolution Strategy**
-
-It is an **evolutionary optimization algorithm**.
-
-Instead of modeling densities, it maintains a **multivariate Gaussian distribution** over parameters.
-
-Parameters are updated based on:
-
-* mean vector
-* covariance matrix
-
-The covariance matrix learns **parameter correlations**.
-
----
-
-## CMA-ES Update Concept
-
-Each generation:
-
-```
-sample population
-evaluate objective
-select best individuals
-update distribution
-```
-
-This adapts the **shape of the search distribution**.
-
----
-
-## Characteristics
-
-| Property             | Behavior              |
-| -------------------- | --------------------- |
-| Type                 | evolutionary strategy |
-| Exploration          | adaptive              |
-| Handles correlations | very well             |
-| Continuous spaces    | excellent             |
-
----
-
-## When to Use CMA-ES
-
-CMA-ES works well for:
-
-* continuous parameters
-* medium-dimensional spaces
-* expensive objective functions
-* smooth landscapes
-
-Example:
-
-```
-physics simulation calibration
-numerical optimization
-continuous ML hyperparameters
-```
-
-Limitations:
-
-* does **not handle categorical variables well**
-* slower initialization phase
-
----
-
-# 5. Grid Sampler
-
-GridSampler performs **exhaustive search** over a predefined grid.
-
-Example:
+Example: neural network training.
 
 ```python
-search_space = {
-    "x": [-2, 0, 2],
-    "y": [-1, 1]
-}
+for epoch in range(50):
 
-sampler = optuna.samplers.GridSampler(search_space)
+    train(model)
+
+    val_loss = evaluate(model)
+
+    trial.report(val_loss, epoch)
+
+    if trial.should_prune():
+        raise optuna.TrialPruned()
 ```
 
-This evaluates **all combinations**.
+Important points:
+
+* `report()` sends intermediate metrics
+* `should_prune()` checks pruning condition
+* `TrialPruned` stops the trial
 
 ---
 
-## Characteristics
+# 10. Example — PyTorch Training with Pruning
 
-| Property    | Behavior          |
-| ----------- | ----------------- |
-| Type        | exhaustive search |
-| Exploration | deterministic     |
-| Learning    | none              |
-
----
-
-## When to Use Grid Sampling
-
-Useful when:
-
-* search space is very small
-* reproducibility is critical
-* benchmarking algorithms
-
-Grid search becomes impractical when the number of parameters increases.
-
----
-
-# 6. NSGA-II Sampler (Multi-objective Optimization)
-
-NSGA-II is used for **multi-objective optimization**.
-
-Instead of optimizing one objective:
-
-[
-f(x)
-]
-
-we optimize multiple:
-
-[
-f_1(x), f_2(x)
-]
-
-Example:
-
-* maximize accuracy
-* minimize model size
-
----
-
-## Pareto Optimality
-
-In multi-objective optimization we search for the **Pareto frontier**.
-
-A solution is Pareto optimal if:
-
-* no objective can improve
-* without worsening another
-
-Example:
-
-```
-Model A → high accuracy, large size
-Model B → lower accuracy, smaller size
-```
-
-Both may belong to the **Pareto frontier**.
-
----
-
-## Characteristics
-
-| Property    | Behavior                     |
-| ----------- | ---------------------------- |
-| Type        | evolutionary multi-objective |
-| Output      | Pareto set                   |
-| Exploration | population-based             |
-
----
-
-## Example
+Example structure:
 
 ```python
-study = optuna.create_study(
-    directions=["minimize","maximize"],
-    sampler=optuna.samplers.NSGAIISampler()
-)
+def objective(trial):
+
+    lr = trial.suggest_float("lr", 1e-5, 1e-2, log=True)
+
+    model = build_model()
+
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+
+    for epoch in range(20):
+
+        train_epoch(model)
+
+        val_loss = validate(model)
+
+        trial.report(val_loss, epoch)
+
+        if trial.should_prune():
+            raise optuna.TrialPruned()
+
+    return val_loss
 ```
 
-This allows optimization of multiple objectives simultaneously.
+This prevents wasting time on **bad hyperparameter configurations**.
 
 ---
 
-# 7. Exploration Behavior of Samplers
+# Practical Exercise — Pruning Deep Learning Training
 
-Different samplers explore the search space differently.
-
-| Sampler | Exploration Strategy           |
-| ------- | ------------------------------ |
-| Random  | uniform sampling               |
-| TPE     | probabilistic density modeling |
-| CMA-ES  | adaptive Gaussian search       |
-| Grid    | deterministic enumeration      |
-| NSGA-II | evolutionary population        |
-
-Exploration strategies influence:
-
-* convergence speed
-* robustness
-* sample efficiency
-
----
-
-# 8. Samplers in High-Dimensional Spaces
-
-High-dimensional optimization is difficult because:
-
-[
-Volume \propto k^d
-]
-
-As dimension increases:
-
-* search space explodes
-* exploration becomes harder
-
-Performance comparison:
-
-| Sampler | High-dim performance |
-| ------- | -------------------- |
-| Random  | moderate             |
-| TPE     | good                 |
-| CMA-ES  | moderate             |
-| Grid    | poor                 |
-
-TPE often performs best in:
-
-```
-20–100 parameters
-mixed parameter types
-```
-
-This explains why it is the **default sampler in Optuna**.
-
----
-
-# 9. Selecting the Right Sampler
-
-General guidelines:
-
-| Situation                     | Recommended Sampler |
-| ----------------------------- | ------------------- |
-| general hyperparameter tuning | TPE                 |
-| baseline comparison           | Random              |
-| continuous optimization       | CMA-ES              |
-| small search space            | Grid                |
-| multi-objective problems      | NSGA-II             |
-
-In practice:
-
-> **Start with TPE unless you have a strong reason not to.**
-
----
-
-# Practical Exercise — Comparing Samplers
-
-Let’s compare **Random Search vs TPE**.
-
-Objective function:
-
-[
-f(x) = (x-3)^2 + \sin(5x)
-]
-
----
-
-### Implementation
+Below is a simplified training loop with pruning.
 
 ```python
 import optuna
@@ -412,64 +313,68 @@ import numpy as np
 
 def objective(trial):
 
-    x = trial.suggest_float("x", -5, 5)
+    lr = trial.suggest_float("lr", 1e-5, 1e-1, log=True)
 
-    return (x - 3)**2 + np.sin(5*x)
+    loss = 1.0
+
+    for epoch in range(20):
+
+        loss *= np.random.uniform(0.8, 1.1)
+
+        trial.report(loss, epoch)
+
+        if trial.should_prune():
+            raise optuna.TrialPruned()
+
+    return loss
 
 
-# TPE sampler
-study_tpe = optuna.create_study(
-    sampler=optuna.samplers.TPESampler(),
-    direction="minimize"
+study = optuna.create_study(
+    direction="minimize",
+    pruner=optuna.pruners.MedianPruner()
 )
 
-study_tpe.optimize(objective, n_trials=100)
-
-
-# Random sampler
-study_random = optuna.create_study(
-    sampler=optuna.samplers.RandomSampler(),
-    direction="minimize"
-)
-
-study_random.optimize(objective, n_trials=100)
-
-
-print("TPE best:", study_tpe.best_value)
-print("Random best:", study_random.best_value)
+study.optimize(objective, n_trials=50)
 ```
 
----
+Observe:
 
-### What to Observe
+* many trials stop early
+* only promising trials finish
 
-Typically:
-
-* early trials behave similarly
-* TPE converges faster
-* random search continues exploring
-
-This illustrates **adaptive optimization**.
+This significantly **reduces computation time**.
 
 ---
 
 # Key Takeaways
 
-Samplers determine **how parameters are chosen**.
+Pruning is a key Optuna feature that:
 
-| Sampler | Best For                      |
-| ------- | ----------------------------- |
-| TPE     | general hyperparameter tuning |
-| Random  | baseline or exploration       |
-| CMA-ES  | continuous optimization       |
-| Grid    | small discrete spaces         |
-| NSGA-II | multi-objective optimization  |
+* stops bad trials early
+* reduces computation cost
+* accelerates optimization
 
-TPE is the default because it:
+Important components:
 
-* balances exploration/exploitation
-* scales well to high dimensions
-* handles categorical parameters
+| Function               | Purpose                   |
+| ---------------------- | ------------------------- |
+| `trial.report()`       | send intermediate results |
+| `trial.should_prune()` | check pruning condition   |
+| `TrialPruned`          | terminate trial           |
+
+Common pruning strategies:
+
+| Pruner             | Best Use               |
+| ------------------ | ---------------------- |
+| Median             | simple, robust         |
+| Successive Halving | resource allocation    |
+| Hyperband          | adaptive multi-bracket |
+
+Pruning is especially powerful in:
+
+* deep learning
+* boosting models
+* iterative simulations
 
 ---
 
@@ -477,24 +382,20 @@ TPE is the default because it:
 
 Next we move to:
 
-# Module 8 — Pruning (Early Stopping)
+# Module 9 — Advanced Optimization Techniques
 
-One of Optuna’s most powerful features.
+Topics include:
 
-We will learn:
+* dynamic parameter spaces
+* multi-objective optimization
+* Pareto front analysis
+* constrained optimization
+* custom samplers and pruners
 
-* how to stop bad trials early
-* how pruning saves huge amounts of compute
-* pruning algorithms:
-
-  * Median pruning
-  * Successive Halving
-  * Hyperband
-
-This is **critical when optimizing expensive models like deep learning**.
+These techniques allow Optuna to handle **complex real-world optimization problems**.
 
 ---
 
-Before continuing, quick check:
+Before continuing, a quick question:
 
-Would you like me to also include a **real-world benchmark showing TPE vs Random vs CMA-ES convergence behavior** in the next module?
+Would you like the next module to also include a **visual explanation of Pareto fronts for multi-objective optimization**?
