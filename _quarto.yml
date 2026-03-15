@@ -8,6 +8,10 @@ book:
   subtitle: "Advanced Mini-Course"
   author: "Miguel Conde"
   date: "3/14/2026" 
+  site-url: "https://miguel-conde.github.io/optuna/"
+  repo-url: "https://github.com/miguel-conde/optuna"
+  repo-branch: main
+  repo-actions: [source, issue]
   chapters:
     - index.qmd
     - intro.qmd
