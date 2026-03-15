@@ -1,3 +1,319 @@
 ---
 title: "Distributed and Scalable Optimization"
 ---
+
+This chapter explains how to scale Optuna beyond the single-process workflow used in earlier modules. By the end, you should be able to choose between local parallelism and shared-storage distributed execution, understand the operational role of storage backends, and recognize the failure modes that appear once many workers collaborate on the same study.
+
+## Why This Matters
+
+Many real optimization problems are limited less by the quality of the sampler than by the cost of objective evaluation. If a single trial takes minutes or hours, sequential optimization quickly becomes the real bottleneck.
+
+Scaling Optuna is therefore not an infrastructure afterthought. It is part of the optimization design itself. The storage backend, worker model, and failure handling strategy determine whether a large study is reproducible, efficient, and resumable.
+
+## Fast First Win: Local Parallel Optimization
+
+The simplest form of scaling is to run several trials concurrently on one machine.
+
+```{python}
+import math
+import time
+
+import optuna
+
+
+def objective(trial):
+	x = trial.suggest_float("x", -10.0, 10.0)
+	time.sleep(0.02)
+	return (x - 2.0) ** 2 + math.sin(5.0 * x)
+
+
+study = optuna.create_study(direction="minimize")
+study.optimize(objective, n_trials=40, n_jobs=4)
+
+print("Best value:", round(study.best_value, 4))
+print("Best params:", study.best_params)
+print("Completed trials:", len(study.trials))
+```
+
+This does not make the optimization distributed, but it does make the concurrency model visible. Multiple workers are evaluating different trials concurrently while the study coordinates results in one process.
+
+## What Does `n_jobs` Actually Buy You?
+
+For many users, `n_jobs` is the first scaling lever:
+
+```python
+study.optimize(objective, n_trials=100, n_jobs=4)
+```
+
+Conceptually, the scheduler is simple:
+
+```text
+Trial 1 -> worker slot 1
+Trial 2 -> worker slot 2
+Trial 3 -> worker slot 3
+Trial 4 -> worker slot 4
+```
+
+This is attractive because it requires no extra infrastructure, but it has limits.
+
+- It is easiest when all workers live on one machine.
+- It does not solve cross-machine coordination.
+- CPU-bound Python workloads may not scale the same way as I/O-bound or external-process workloads.
+
+So `n_jobs` is the right place to start, but not the right answer for every large experiment.
+
+## When Do You Need Shared Storage?
+
+Once multiple processes or machines need to collaborate on the same study, Optuna needs persistent shared state. That state lives in the storage backend.
+
+At that point, each worker follows the same loop:
+
+1. Ask storage for the next trial.
+2. Evaluate the objective.
+3. Write the result back.
+4. Request another trial.
+
+```{mermaid}
+flowchart LR
+	A[Shared study storage] --> B[Worker requests trial]
+	B --> C[Sampler proposes parameters]
+	C --> D[Worker evaluates objective]
+	D --> E[Result stored]
+	E --> F[Next worker request]
+	F --> A
+```
+
+The critical design shift is that storage is no longer just for persistence. It becomes the coordination mechanism for the whole experiment.
+
+## Which Storage Backend Should You Use?
+
+Optuna can work with several relational databases, but they are not interchangeable in practice.
+
+| Backend | Best fit | Main limitation |
+|---|---|---|
+| In-memory | quick local experiments | no persistence, no cross-process coordination |
+| SQLite | small local shared studies | limited concurrency under heavier parallel load |
+| PostgreSQL | serious distributed experiments | requires external service management |
+| MySQL | distributed environments with existing MySQL ops | operational tuning still matters |
+
+### In-Memory Storage
+
+```{python}
+study = optuna.create_study(direction="minimize")
+```
+
+This is ideal for exploratory work, but once the process exits, the study is gone.
+
+### SQLite Storage
+
+```python
+study = optuna.create_study(
+	direction="minimize",
+	study_name="demo",
+	storage="sqlite:///example.db",
+	load_if_exists=True,
+)
+```
+
+SQLite is a useful stepping stone for local experiments and demonstrations. It is not the backend you should automatically choose for many concurrent workers across serious production workloads.
+
+### PostgreSQL or MySQL
+
+```python
+study = optuna.create_study(
+	direction="minimize",
+	study_name="experiment",
+	storage="postgresql://user:pass@host/db",
+	load_if_exists=True,
+)
+```
+
+For real distributed optimization, PostgreSQL is often the safest default because it handles concurrency, transactions, and failure recovery more robustly than SQLite.
+
+## How Does Distributed Execution Work?
+
+Distributed Optuna usually follows a producer-consumer pattern, but the important detail is that workers are asynchronous.
+
+They do not advance in lockstep. Fast workers complete more trials. Slow workers may still be evaluating while others have already requested new configurations.
+
+That means the system can keep hardware busy even when objective runtimes vary widely.
+
+```text
+Create study
+   -> worker requests trial
+   -> sampler proposes parameters
+   -> worker evaluates objective
+   -> result written to storage
+   -> next available worker requests another trial
+```
+
+Asynchronous behavior is usually an advantage, because synchronization barriers would waste compute. But it also means your study history reflects real system timing, not a clean round-based schedule.
+
+## What Happens When Workers Fail?
+
+Distributed experiments are only useful if they survive crashes, interruptions, and restarts.
+
+If a worker dies mid-trial, Optuna does not lose the whole study. Completed trials remain in storage, and other workers can continue. This is the operational reason storage matters so much.
+
+Typical failure scenarios include:
+
+- a worker process crashes
+- a machine is preempted
+- a container restarts
+- a cluster job times out
+
+With persistent storage, the study can be resumed instead of recomputed from scratch.
+
+This is especially important in long-running workloads where trial budgets are expensive and experiments span multiple sessions.
+
+## How Should You Think About Scalability?
+
+There are different scaling regimes, and they imply different engineering choices.
+
+| Scale | Typical budget | Natural strategy |
+|---|---:|---|
+| Small | 50-200 trials | single process or `n_jobs` |
+| Medium | hundreds to low thousands | multiple local or remote workers with persistent storage |
+| Large | 10,000+ trials | cluster execution with robust shared database and monitoring |
+
+The question is not simply "how many workers can I launch?" The real question is whether the objective function, storage backend, and monitoring stack can support that many workers without creating coordination or observability problems.
+
+## What Does a Multi-Worker Setup Look Like?
+
+At the code level, all workers typically run the same script and point to the same study.
+
+### Step 1: Create or Load the Study
+
+```python
+import optuna
+
+
+study = optuna.create_study(
+	study_name="distributed-demo",
+	storage="sqlite:///example.db",
+	load_if_exists=True,
+	direction="minimize",
+)
+```
+
+### Step 2: Define the Worker Objective
+
+```python
+def objective(trial):
+	x = trial.suggest_float("x", -10.0, 10.0)
+	return (x - 2.0) ** 2
+```
+
+### Step 3: Run the Worker
+
+```python
+study.optimize(objective, n_trials=100)
+```
+
+Launch the same worker script multiple times:
+
+```text
+python worker.py
+python worker.py
+python worker.py
+```
+
+All workers collaborate through the same storage backend. That is the core distributed pattern.
+
+## How Do You Monitor a Large Study?
+
+Once experiments become large, you need visibility while the optimization is still running.
+
+Programmatic monitoring is the minimum level:
+
+```python
+print("Best value:", study.best_value)
+print("Completed trials:", len(study.trials))
+```
+
+For interactive monitoring, the dashboard is more useful:
+
+```bash
+optuna-dashboard sqlite:///example.db
+```
+
+This is especially helpful when you want to inspect trial progress, compare parameter regions, or review multi-objective frontiers without writing custom reporting code.
+
+## How Does Optuna Fit Into Larger Distributed Systems?
+
+Optuna is often not the orchestrator itself. Instead, it is the optimization layer inside a broader execution environment.
+
+Common combinations include:
+
+| System | Typical role |
+|---|---|
+| Ray | distributed ML workloads and task execution |
+| Dask | parallel Python workflows |
+| Kubernetes | container orchestration for scalable workers |
+| SLURM | batch scheduling on HPC clusters |
+
+The pattern is usually the same:
+
+- the external platform launches workers
+- Optuna storage coordinates the study
+- workers report results back into the shared study state
+
+That separation of concerns is useful. Optuna handles optimization logic, while the surrounding platform handles resource scheduling.
+
+::: callout-warning
+## Common Mistake
+
+Do not assume SQLite is a production-grade answer for every distributed setup just because it works for a small demo. Once concurrency, fault tolerance, and worker count increase, backend limitations become part of the optimization bottleneck.
+:::
+
+## Practical Exercise: Turn a Local Study Into a Shared Study
+
+Start from a simple single-process optimization script and upgrade it into a shared-storage workflow.
+
+Use this objective:
+
+```{python}
+import math
+
+import optuna
+
+
+def objective(trial):
+	x = trial.suggest_float("x", -10.0, 10.0)
+	return (x - 2.0) ** 2 + math.sin(5.0 * x)
+```
+
+Then work through the exercise in four passes:
+
+1. Run the study in a single process and record the best value after 50 trials.
+2. Run it again with `n_jobs=4` and compare wall-clock behavior.
+3. Move the study to shared SQLite storage using `load_if_exists=True` and launch the worker script from multiple terminals.
+4. Replace SQLite with PostgreSQL conceptually and list what operational risks improve when you move to a stronger backend.
+
+Questions to answer after the run:
+
+- Which part of the speedup came from concurrency and which part was still limited by the objective?
+- Did local parallelism solve the problem, or did you still need shared storage for resumability?
+- At what point would SQLite stop being a comfortable choice?
+- If your workers lived on Kubernetes, Ray, or SLURM, what would Optuna handle and what would the platform handle?
+
+## Recap
+
+Distributed Optuna is fundamentally about coordination, not just raw worker count.
+
+- `n_jobs` provides the simplest local concurrency.
+- Shared storage is required once multiple processes or machines collaborate on the same study.
+- SQLite is useful for small shared experiments, while PostgreSQL or MySQL are better suited to serious distributed workloads.
+- Persistent storage enables fault tolerance, resumability, and monitoring.
+
+## Decision Guide
+
+Choose the simplest scaling model that matches the workload.
+
+- Use a single process for cheap exploratory studies.
+- Use `n_jobs` when one machine is enough and concurrency is the main need.
+- Use shared storage when workers must coordinate across processes or hosts.
+- Prefer PostgreSQL-class backends when the study is important enough that failures, locking, and concurrency behavior matter.
+- Use external platforms such as Ray, Dask, Kubernetes, or SLURM for resource orchestration, while letting Optuna remain the optimization layer.
+
+The next chapter moves from infrastructure back to applications. In [Optuna for Machine Learning](12-optuna-machine-learning.qmd), we will apply the ideas from this book to realistic model-selection and pipeline-tuning workflows.
