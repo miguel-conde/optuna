@@ -1,3 +1,306 @@
 ---
 title: "Advanced Optimization Techniques"
 ---
+
+This chapter shows how Optuna moves beyond single-objective hyperparameter tuning into richer optimization workflows. By the end, you should be able to model dynamic search spaces, reason about Pareto-optimal trade-offs, and decide when to use constrained optimization or custom optimization components.
+
+## Why This Matters
+
+In production systems, the best configuration is rarely the one with the highest validation score alone. You may need to balance accuracy against latency, memory footprint, energy usage, fairness constraints, or engineering limits imposed by deployment.
+
+That is where Optuna's more advanced features matter. They let you optimize over search spaces whose structure depends on runtime decisions, retain multiple equally valid trade-off solutions, and inject domain-specific search or pruning logic when the built-in algorithms are not enough.
+
+## Fast First Win: A Multi-Objective Study
+
+The quickest way to see the difference between ordinary and advanced optimization is to optimize two conflicting objectives at once.
+
+Here we minimize:
+
+$$
+f_1(x) = (x - 2)^2
+$$
+
+and
+
+$$
+f_2(x) = (x + 2)^2
+$$
+
+No single value of $x$ minimizes both objectives simultaneously, so the result is a Pareto set rather than a single best trial.
+
+```{python}
+import optuna
+
+
+def objective(trial):
+	x = trial.suggest_float("x", -5.0, 5.0)
+	f1 = (x - 2.0) ** 2
+	f2 = (x + 2.0) ** 2
+	return f1, f2
+
+
+study = optuna.create_study(
+	directions=["minimize", "minimize"],
+	sampler=optuna.samplers.NSGAIISampler(seed=42),
+)
+study.optimize(objective, n_trials=80)
+
+pareto_trials = sorted(study.best_trials, key=lambda trial: trial.params["x"])
+
+for trial in pareto_trials[:8]:
+	print(
+		f"x={trial.params['x']:.3f} | "
+		f"f1={trial.values[0]:.3f} | "
+		f"f2={trial.values[1]:.3f}"
+	)
+
+print(f"Pareto-optimal trials: {len(study.best_trials)}")
+```
+
+The important shift is conceptual: Optuna is no longer returning one optimum. It is returning a frontier of non-dominated solutions that reflect different engineering trade-offs.
+
+## When Does the Search Space Become Part of the Algorithm?
+
+Earlier chapters treated the search space as something you define once and then optimize over. In practice, many workflows are conditional.
+
+If a trial selects a linear model, you want regularization strength. If it selects a neural network, you want layers, hidden units, and dropout. The structure of the search space changes with the sampled path.
+
+This is where Optuna's define-by-run design becomes decisive. You can express branching logic directly in the objective function.
+
+```{python}
+def objective(trial):
+	model = trial.suggest_categorical("model", ["linear", "mlp"])
+
+	if model == "linear":
+		alpha = trial.suggest_float("alpha", 1e-4, 1.0, log=True)
+		return train_linear_model(alpha)
+
+	n_layers = trial.suggest_int("n_layers", 1, 3)
+	widths = []
+	for layer_index in range(n_layers):
+		widths.append(trial.suggest_int(f"units_{layer_index}", 32, 256))
+	dropout = trial.suggest_float("dropout", 0.0, 0.5)
+	return train_mlp(widths, dropout)
+```
+
+This is the natural continuation of the search-space design choices from [Designing Search Spaces](06-designing-search-spaces.qmd). The difference here is emphasis: the search space is not just descriptive; it becomes an adaptive program that encodes model families and structural decisions.
+
+## What Changes in Multi-Objective Optimization?
+
+In single-objective optimization, we solve:
+
+$$
+x^* = \arg\min_{x \in \mathcal{X}} f(x)
+$$
+
+In multi-objective optimization, the target becomes a vector:
+
+$$
+\mathbf{f}(x) = \left(f_1(x), f_2(x), \ldots, f_k(x)\right)
+$$
+
+There is usually no total ordering over all candidates, because improving one objective often worsens another. Instead, we use dominance.
+
+A candidate $x_a$ dominates $x_b$ if it is no worse on every objective and strictly better on at least one.
+
+The Pareto front is the set of non-dominated solutions. In Optuna, those solutions are exposed through `study.best_trials` for multi-objective studies.
+
+| Configuration | Accuracy | Latency | Dominated? |
+|---|---:|---:|---|
+| A | 0.95 | 45 ms | No |
+| B | 0.94 | 18 ms | No |
+| C | 0.92 | 16 ms | No |
+| D | 0.93 | 40 ms | Yes |
+
+Configuration D is dominated because another configuration can be both more accurate and faster.
+
+```{mermaid}
+flowchart LR
+	A[Sample candidate] --> B[Evaluate all objectives]
+	B --> C{Dominated by current frontier?}
+	C -->|Yes| D[Keep for history only]
+	C -->|No| E[Add to Pareto front]
+	E --> F[Remove newly dominated points]
+	D --> G[Update sampler state]
+	F --> G
+	G --> A
+```
+
+For advanced practitioners, this matters because model selection stops being a single scalar decision. The optimizer produces a set of candidates, and downstream decision-making becomes a policy question: which trade-off is operationally acceptable?
+
+## How Should You Read a Pareto Front?
+
+A Pareto front is useful only if you treat it as a decision surface rather than as a ranking.
+
+Three practical interpretations are common:
+
+- Knee-point selection: choose the point where small objective gains start costing a lot elsewhere.
+- Budget-based selection: choose the best solution under a latency, memory, or cost cap.
+- Portfolio selection: keep several frontier points for A/B tests or environment-specific deployment.
+
+That distinction matters because the optimizer cannot decide your business trade-off for you. It can only expose the feasible frontier cleanly.
+
+## How Do Constraints Enter the Search?
+
+Some requirements are not preferences but hard limits. You may need:
+
+- latency under 20 ms
+- model size under 200 MB
+- memory usage below device capacity
+- parameter combinations that satisfy physical or safety rules
+
+There are two broad strategies.
+
+### Penalty-Based Constraints
+
+The simplest approach is to encode constraint violations directly in the objective value.
+
+```{python}
+def objective(trial):
+	x = trial.suggest_float("x", -5.0, 5.0)
+	y = trial.suggest_float("y", -5.0, 5.0)
+
+	value = x**2 + y**2
+	violation = max(0.0, x + y - 2.0)
+
+	return value + 1000.0 * violation
+```
+
+This is easy to implement, but it mixes feasibility and quality into one scalar. A large penalty may make the landscape unstable, while a small penalty may let invalid solutions survive too long.
+
+### Constraint-Aware Multi-Objective Search
+
+For algorithms that support explicit constraints, it is cleaner to separate objective values from feasibility information.
+
+```{python}
+def objective(trial):
+	x = trial.suggest_float("x", -5.0, 5.0)
+	y = trial.suggest_float("y", -5.0, 5.0)
+	trial.set_user_attr("constraint", x + y - 2.0)
+	return x**2, y**2
+
+
+def constraints_func(frozen_trial):
+	return (frozen_trial.user_attrs["constraint"],)
+
+
+sampler = optuna.samplers.NSGAIISampler(constraints_func=constraints_func)
+```
+
+The rule is simple: negative or zero values indicate feasible solutions, while positive values indicate violations. This keeps the optimization objective readable and the constraint handling explicit.
+
+## When Should You Write a Custom Sampler?
+
+Most Optuna workloads should start with the built-in samplers from [Samplers](07-samplers.qmd). A custom sampler is justified only when you need search behavior that Optuna does not already implement.
+
+Typical reasons include:
+
+- integrating a research algorithm
+- reproducing a proprietary search strategy
+- injecting domain heuristics
+- combining Optuna with an external optimizer that proposes candidates
+
+At the API level, a custom sampler subclasses `BaseSampler` and decides how new parameter values are proposed.
+
+```python
+from optuna.samplers import BaseSampler
+
+
+class MySampler(BaseSampler):
+	def infer_relative_search_space(self, study, trial):
+		return {}
+
+	def sample_relative(self, study, trial, search_space):
+		return {}
+
+	def sample_independent(self, study, trial, param_name, param_distribution):
+		return param_distribution.to_external_repr(0.5)
+```
+
+In practice, writing a strong sampler is significantly harder than wiring up the class. You are taking responsibility for the exploration-exploitation policy, the statistical assumptions, and the failure modes that Optuna's built-in samplers already handle for you.
+
+## When Should You Write a Custom Pruner?
+
+The same caution applies to pruners. Optuna already ships with median pruning, successive halving, Hyperband, and related policies discussed in [Pruning](08-pruning.qmd). A custom pruner is worthwhile only when your stopping logic depends on domain knowledge unavailable to the built-in rules.
+
+Examples include:
+
+- simulation pipelines with custom convergence criteria
+- training systems with resource-aware stop rules
+- domain-specific safety checks that should terminate invalid trials early
+
+```python
+from optuna.pruners import BasePruner
+
+
+class ThresholdPruner(BasePruner):
+	def prune(self, study, trial):
+		if trial.last_step is None:
+			return False
+
+		latest_value = trial.intermediate_values[trial.last_step]
+		return latest_value > 0.5
+```
+
+The engineering question is not whether you can subclass `BasePruner`, but whether the custom rule produces better resource allocation than the standard pruners with less maintenance risk.
+
+::: callout-warning
+## Common Mistake
+
+Do not treat multi-objective optimization as if it should produce one universally best trial. If you immediately collapse several objectives into a single score without a clear reason, you throw away the main benefit of the Pareto formulation and hide the trade-offs you were supposed to inspect.
+:::
+
+## Practical Exercise: Constrained Multi-Objective Optimization with NSGA-II
+
+Extend the fast first win into a more realistic workflow.
+
+Build a study with two objectives and one explicit feasibility rule:
+
+$$
+g(x, y) = x + y - 1 \le 0
+$$
+
+Use NSGA-II to minimize:
+
+$$
+f_1(x, y) = (x - 1)^2 + y^2
+$$
+
+and
+
+$$
+f_2(x, y) = x^2 + (y - 1)^2
+$$
+
+Work through the exercise in four passes:
+
+1. Reproduce the study with `directions=["minimize", "minimize"]`.
+2. Attach the constraint value to each trial with `trial.set_user_attr(...)` and pass `constraints_func` into `NSGAIISampler`.
+3. Print the feasible Pareto-optimal trials and verify that infeasible points are filtered out of the frontier.
+4. Change the constraint to $x + y - 0.25 \le 0$ and compare how the frontier shrinks.
+
+Questions to answer after the run:
+
+- Which points survive after the feasible region tightens?
+- Does the new frontier move toward one axis or remain balanced?
+- If you were deploying under a strict latency or memory budget, which frontier point would you pick and why?
+
+## Recap
+
+This chapter introduced the Optuna features that matter once optimization becomes structurally complex.
+
+- Dynamic parameter spaces let the search space depend on earlier trial decisions.
+- Multi-objective studies return Pareto-optimal sets rather than one scalar optimum.
+- Constraint handling separates feasibility from pure objective quality.
+- Custom samplers and pruners are extension points, but they shift algorithmic responsibility onto you.
+
+## Decision Guide
+
+Use the simplest mechanism that matches the problem.
+
+- Use dynamic spaces when the model family or pipeline structure depends on trial choices.
+- Use multi-objective optimization when competing metrics should remain visible instead of being collapsed prematurely.
+- Use penalty methods for quick prototypes, but prefer explicit constraint handling when feasibility is a first-class concern.
+- Use custom samplers or pruners only when built-in Optuna components cannot express the domain logic you need.
+
+The next chapter turns these advanced runs into something inspectable. In [Optuna Visualization and Diagnostics](10-visualization-diagnostics.qmd), we will analyze optimization histories, parameter importance, and failure patterns so that search behavior becomes easier to interpret and improve.
